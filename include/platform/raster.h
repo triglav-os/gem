@@ -20,7 +20,8 @@ typedef enum gem_raster_format {
     GEM_RASTER_XRGB8888 = 1,
     GEM_RASTER_ARGB8888 = 2,
     GEM_RASTER_RGB565   = 3,
-    GEM_RASTER_INDEX8   = 4
+    GEM_RASTER_INDEX8   = 4,
+    GEM_RASTER_MONO1    = 5
 } gem_raster_format_t;
 
 typedef struct gem_raster_surface {
@@ -38,6 +39,12 @@ typedef struct gem_raster_surface {
  */
 int  gem_raster_init(uint16_t width, uint16_t height,
                      gem_raster_format_t format);
+
+/*
+ * Revalidates the framebuffer mapping after backend-side reconfiguration.
+ * Returns non-zero on success and zero on failure.
+ */
+int  gem_raster_resync(void);
 
 /*
  * Shuts down the raster backend and releases any owned surfaces.

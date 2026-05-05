@@ -13,8 +13,14 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <dirent.h>
+#include <limits.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <sys/statvfs.h>
 #include <sys/types.h>
 #include <time.h>
 #include <unistd.h>
@@ -133,4 +139,229 @@ int32_t gem_os_write(int fd, const void *buf, uint32_t size)
     }
 
     return (int32_t) rc;
+}
+
+int64_t gem_os_seek(int fd, int64_t offset, int whence)
+{
+    int seek_whence;
+    off_t rc;
+
+    switch (whence) {
+    case 0:
+        seek_whence = SEEK_SET;
+        break;
+    case 1:
+        seek_whence = SEEK_CUR;
+        break;
+    case 2:
+        seek_whence = SEEK_END;
+        break;
+    default:
+        errno = EINVAL;
+        return -1;
+    }
+
+    rc = lseek(fd, (off_t) offset, seek_whence);
+    if (rc < 0) {
+        return -1;
+    }
+    return (int64_t) rc;
+}
+
+int gem_os_getcwd(char *buf, size_t size)
+{
+    if (buf == NULL || size == 0u) {
+        errno = EINVAL;
+        return 0;
+    }
+    return (getcwd(buf, size) != NULL) ? 1 : 0;
+}
+
+int gem_os_chdir(const char *path)
+{
+    if (path == NULL) {
+        errno = EINVAL;
+        return 0;
+    }
+    return (chdir(path) == 0) ? 1 : 0;
+}
+
+int gem_os_mkdir(const char *path)
+{
+    if (path == NULL) {
+        errno = EINVAL;
+        return 0;
+    }
+    return (mkdir(path, 0755) == 0) ? 1 : 0;
+}
+
+int gem_os_rmdir(const char *path)
+{
+    if (path == NULL) {
+        errno = EINVAL;
+        return 0;
+    }
+    return (rmdir(path) == 0) ? 1 : 0;
+}
+
+int gem_os_unlink(const char *path)
+{
+    if (path == NULL) {
+        errno = EINVAL;
+        return 0;
+    }
+    return (unlink(path) == 0) ? 1 : 0;
+}
+
+int gem_os_rename(const char *old_path, const char *new_path)
+{
+    if (old_path == NULL || new_path == NULL) {
+        errno = EINVAL;
+        return 0;
+    }
+    return (rename(old_path, new_path) == 0) ? 1 : 0;
+}
+
+static int gem_os_fill_info_from_stat(const char *name,
+                                      const struct stat *st,
+                                      gem_os_file_info_t *info)
+{
+    if (st == NULL || info == NULL) {
+        errno = EINVAL;
+        return 0;
+    }
+
+    info->size_bytes = (uint64_t) st->st_size;
+    info->mtime_ms = (uint64_t) st->st_mtim.tv_sec * 1000u +
+        (uint64_t) st->st_mtim.tv_nsec / 1000000u;
+    info->is_directory = S_ISDIR(st->st_mode) ? 1 : 0;
+    info->is_hidden = (name != NULL && name[0] == '.') ? 1 : 0;
+    info->is_read_only = ((st->st_mode & S_IWUSR) == 0) ? 1 : 0;
+    return 1;
+}
+
+int gem_os_stat_path(const char *path, gem_os_file_info_t *info)
+{
+    struct stat st;
+
+    if (path == NULL || info == NULL) {
+        errno = EINVAL;
+        return 0;
+    }
+    if (stat(path, &st) != 0) {
+        return 0;
+    }
+    return gem_os_fill_info_from_stat(path, &st, info);
+}
+
+int gem_os_dir_open(const char *path, gem_os_dir_t *dir)
+{
+    DIR *handle;
+
+    if (path == NULL || dir == NULL) {
+        errno = EINVAL;
+        return 0;
+    }
+
+    handle = opendir(path);
+    if (handle == NULL) {
+        return 0;
+    }
+
+    dir->handle = handle;
+    strncpy(dir->path, path, sizeof(dir->path) - 1u);
+    dir->path[sizeof(dir->path) - 1u] = '\0';
+    return 1;
+}
+
+int gem_os_dir_read(gem_os_dir_t *dir, gem_os_dirent_t *entry)
+{
+    DIR *handle;
+    struct dirent *dent;
+
+    if (dir == NULL || entry == NULL || dir->handle == NULL) {
+        errno = EINVAL;
+        return 0;
+    }
+
+    handle = (DIR *) dir->handle;
+    for (;;) {
+        char full_path[PATH_MAX];
+        struct stat st;
+        int rc;
+
+        errno = 0;
+        dent = readdir(handle);
+        if (dent == NULL) {
+            return 0;
+        }
+
+        strncpy(entry->name, dent->d_name, sizeof(entry->name) - 1u);
+        entry->name[sizeof(entry->name) - 1u] = '\0';
+
+        rc = snprintf(full_path, sizeof(full_path), "%s/%s",
+            dir->path, dent->d_name);
+        if (rc < 0 || (size_t) rc >= sizeof(full_path)) {
+            continue;
+        }
+        if (stat(full_path, &st) != 0) {
+            continue;
+        }
+        if (gem_os_fill_info_from_stat(dent->d_name, &st, &entry->info) != 0) {
+            return 1;
+        }
+    }
+}
+
+void gem_os_dir_close(gem_os_dir_t *dir)
+{
+    if (dir == NULL || dir->handle == NULL) {
+        return;
+    }
+
+    (void) closedir((DIR *) dir->handle);
+    dir->handle = NULL;
+    dir->path[0] = '\0';
+}
+
+int gem_os_space(const char *path, uint64_t *total_bytes, uint64_t *avail_bytes)
+{
+    struct statvfs st;
+
+    if (path == NULL) {
+        errno = EINVAL;
+        return 0;
+    }
+    if (statvfs(path, &st) != 0) {
+        return 0;
+    }
+    if (total_bytes != NULL) {
+        *total_bytes = (uint64_t) st.f_blocks * (uint64_t) st.f_frsize;
+    }
+    if (avail_bytes != NULL) {
+        *avail_bytes = (uint64_t) st.f_bavail * (uint64_t) st.f_frsize;
+    }
+    return 1;
+}
+
+int gem_os_set_read_only(const char *path, int read_only)
+{
+    struct stat st;
+    mode_t mode;
+
+    if (path == NULL) {
+        errno = EINVAL;
+        return 0;
+    }
+    if (stat(path, &st) != 0) {
+        return 0;
+    }
+
+    mode = st.st_mode;
+    if (read_only != 0) {
+        mode &= (mode_t) ~(S_IWUSR | S_IWGRP | S_IWOTH);
+    } else {
+        mode |= S_IWUSR;
+    }
+    return (chmod(path, mode) == 0) ? 1 : 0;
 }

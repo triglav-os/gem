@@ -9,11 +9,13 @@
  */
 
 #include "platform/hid.h"
+#include "platform/raster.h"
 
 #include <arpa/inet.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <netinet/in.h>
+#include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -43,6 +45,22 @@ static int g_socket_fd = -1;
 static int16_t g_mouse_x;
 static int16_t g_mouse_y;
 static uint16_t g_button_flags;
+
+static const char *rasta_framebuffer_path(void)
+{
+    const char *value = getenv("GEM_RASTA_FRAMEBUFFER");
+
+    if (value != NULL && value[0] != '\0') {
+        return value;
+    }
+
+    value = getenv("RASTA_FRAMEBUFFER");
+    if (value != NULL && value[0] != '\0') {
+        return value;
+    }
+
+    return "/tmp/rasta.fb";
+}
 
 static const char *rasta_host(void)
 {
@@ -79,6 +97,65 @@ static uint16_t rasta_port(void)
     }
 
     return (uint16_t) port;
+}
+
+static uint16_t rasta_scale(void)
+{
+    const char *value = getenv("GEM_RASTA_SCALE");
+    char *end = NULL;
+    unsigned long scale;
+
+    if (value == NULL || value[0] == '\0') {
+        value = getenv("RASTA_SCALE");
+    }
+    if (value == NULL || value[0] == '\0') {
+        return 1u;
+    }
+
+    scale = strtoul(value, &end, 10);
+    if (end == value || *end != '\0' || scale == 0ul || scale > 65535ul) {
+        return 1u;
+    }
+
+    return (uint16_t) scale;
+}
+
+static const char *rasta_cursor_mode(void)
+{
+    const char *value = getenv("GEM_RASTA_CURSOR");
+
+    if (value == NULL || value[0] == '\0') {
+        value = getenv("RASTA_CURSOR");
+    }
+    if (value == NULL || value[0] == '\0') {
+        return "off";
+    }
+
+    if (strcmp(value, "on") == 0 || strcmp(value, "true") == 0 ||
+        strcmp(value, "1") == 0) {
+        return "on";
+    }
+
+    return "off";
+}
+
+static const char *rasta_inverse_mode(void)
+{
+    const char *value = getenv("GEM_RASTA_INVERSE");
+
+    if (value == NULL || value[0] == '\0') {
+        value = getenv("RASTA_INVERSE");
+    }
+    if (value == NULL || value[0] == '\0') {
+        return "on";
+    }
+
+    if (strcmp(value, "off") == 0 || strcmp(value, "false") == 0 ||
+        strcmp(value, "0") == 0) {
+        return "off";
+    }
+
+    return "on";
 }
 
 static int set_nonblocking(int fd)
@@ -122,6 +199,75 @@ static int receive_message(struct rasta_input_message *message)
     message->par1 = (int16_t) ntoh_i16(message->par1);
     message->par2 = (int16_t) ntoh_i16(message->par2);
     return 1;
+}
+
+/*
+ * Builds a subscriber datagram that asks rasta to reconfigure itself to
+ * match GEM's active raster geometry and framebuffer path.
+ */
+static char *build_subscription_payload(void)
+{
+    const gem_raster_surface_t *surface = gem_raster_surface();
+    const char *path = rasta_framebuffer_path();
+    uint16_t scale = rasta_scale();
+    const char *cursor_mode = rasta_cursor_mode();
+    const char *inverse_mode = rasta_inverse_mode();
+    const char *scan;
+    size_t escaped_length;
+    size_t total_length;
+    char *payload;
+    int prefix_length;
+    char *cursor;
+
+    if (surface == NULL || path == NULL) {
+        errno = EINVAL;
+        return NULL;
+    }
+
+    escaped_length = strlen(path);
+    for (scan = path; *scan != '\0'; ++scan) {
+        if (*scan == '"' || *scan == '\\') {
+            ++escaped_length;
+        }
+    }
+
+    prefix_length = snprintf(NULL, 0,
+        "--width %u --height %u --bpp 1 --scale %u --cursor %s --inverse %s "
+        "--framebuffer \"",
+        (unsigned) surface->width, (unsigned) surface->height,
+        (unsigned) scale, cursor_mode, inverse_mode);
+    if (prefix_length < 0) {
+        errno = EOVERFLOW;
+        return NULL;
+    }
+
+    total_length = (size_t) prefix_length + escaped_length + 2u;
+    payload = calloc(1u, total_length);
+    if (payload == NULL) {
+        return NULL;
+    }
+
+    prefix_length = snprintf(payload, total_length,
+        "--width %u --height %u --bpp 1 --scale %u --cursor %s --inverse %s "
+        "--framebuffer \"",
+        (unsigned) surface->width, (unsigned) surface->height,
+        (unsigned) scale, cursor_mode, inverse_mode);
+    if (prefix_length < 0 || (size_t) prefix_length >= total_length) {
+        free(payload);
+        errno = EOVERFLOW;
+        return NULL;
+    }
+
+    cursor = payload + (size_t) prefix_length;
+    while (*path != '\0') {
+        if (*path == '"' || *path == '\\') {
+            *cursor++ = '\\';
+        }
+        *cursor++ = *path++;
+    }
+    *cursor++ = '"';
+    *cursor = '\0';
+    return payload;
 }
 
 static void fill_mouse_move(gem_hid_event_t *evt,
@@ -219,6 +365,8 @@ int gem_hid_init(void)
     struct sockaddr_in addr;
     const char *host = rasta_host();
     uint16_t port = rasta_port();
+    char *subscription;
+    size_t subscription_length;
 
     g_socket_fd = socket(AF_INET, SOCK_DGRAM, 0);
     if (g_socket_fd < 0) {
@@ -241,12 +389,22 @@ int gem_hid_init(void)
         return 0;
     }
 
-    if (sendto(g_socket_fd, "subscribe", 9, 0,
-        (struct sockaddr *) &addr, sizeof(addr)) < 0) {
+    subscription = build_subscription_payload();
+    if (subscription == NULL) {
         close(g_socket_fd);
         g_socket_fd = -1;
         return 0;
     }
+
+    subscription_length = strlen(subscription);
+    if (sendto(g_socket_fd, subscription, subscription_length, 0,
+        (struct sockaddr *) &addr, sizeof(addr)) < 0) {
+        free(subscription);
+        close(g_socket_fd);
+        g_socket_fd = -1;
+        return 0;
+    }
+    free(subscription);
 
     g_mouse_x = 0;
     g_mouse_y = 0;

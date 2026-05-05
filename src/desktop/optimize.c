@@ -1,0 +1,432 @@
+/*
+ * Implements small utility helpers used across the imported desktop code,
+ * including memory and geometry support. The file collects routines the
+ * original shell shared broadly.
+ *
+ * MIT License (see: LICENSE)
+ * Copyright (C) 2026 tomaz stih
+ */
+
+#include <portab.h>
+#include <machine.h>
+#include <taddr.h>
+#include <obdefs.h>
+
+EXTERN BYTE	*scasb();
+EXTERN WORD min(WORD a, WORD b);
+EXTERN WORD max(WORD a, WORD b);
+EXTERN WORD strlen(BYTE *p1);
+EXTERN VOID gsx_ncode(WORD code, WORD n, WORD m);
+
+EXTERN UWORD	intin[];
+EXTERN UWORD	intout[];
+EXTERN UWORD	contrl[];
+
+WORD sound(WORD isfreq, WORD freq, WORD dura)
+{
+	WORD		cnt;
+
+	intin[0] = freq;
+	intin[1] = dura;
+	if (isfreq)
+	{
+						/* make a sound		*/
+	  contrl[5] = 61;
+	  cnt = 2;
+	}
+	else
+	{
+						/* get / set mute status*/
+	  contrl[5] = 62;
+	  cnt = 1;
+	}
+	gsx_ncode(5, 0, cnt);
+	return(intout[0]);
+}
+
+
+WORD bit_num(UWORD flag)
+{
+	WORD		i;
+	UWORD		test;
+
+	if ( !flag )
+	  return(-1);
+	for (i=0,test=1; !(flag & test); test <<= 1,i++);
+	return(i);
+}
+
+VOID rc_constrain(GRECT *pc, GRECT *pt)
+{
+	  if (pt->g_x < pc->g_x)
+	    pt->g_x = pc->g_x;
+	  if (pt->g_y < pc->g_y)
+	    pt->g_y = pc->g_y;
+	  if ((pt->g_x + pt->g_w) > (pc->g_x + pc->g_w))
+	    pt->g_x = (pc->g_x + pc->g_w) - pt->g_w;
+	  if ((pt->g_y + pt->g_h) > (pc->g_y + pc->g_h))
+	    pt->g_y = (pc->g_y + pc->g_h) - pt->g_h;
+}
+
+
+VOID rc_union(GRECT *p1, GRECT *p2)
+{
+	WORD		tx, ty, tw, th;
+
+	tw = max(p1->g_x + p1->g_w, p2->g_x + p2->g_w);
+	th = max(p1->g_y + p1->g_h, p2->g_y + p2->g_h);
+	tx = min(p1->g_x, p2->g_x);
+	ty = min(p1->g_y, p2->g_y);
+	p2->g_x = tx;
+	p2->g_y = ty;
+	p2->g_w = tw - tx;
+	p2->g_h = th - ty;
+}
+
+
+WORD rc_intersect(GRECT *p1, GRECT *p2)
+{
+	WORD		tx, ty, tw, th;
+
+	tw = min(p2->g_x + p2->g_w, p1->g_x + p1->g_w);
+	th = min(p2->g_y + p2->g_h, p1->g_y + p1->g_h);
+	tx = max(p2->g_x, p1->g_x);
+	ty = max(p2->g_y, p1->g_y);
+	p2->g_x = tx;
+	p2->g_y = ty;
+	p2->g_w = tw - tx;
+	p2->g_h = th - ty;
+	return( (tw > tx) && (th > ty) );
+}
+
+WORD mid(WORD lo, WORD val, WORD hi)
+{
+	if (val < lo)
+	  return(lo);
+	if (val > hi)
+	  return(hi);
+	return(val);
+}
+
+BYTE *strscn(BYTE *ps, BYTE *pd, BYTE stop)
+{
+	while ( (*ps) &&
+		(*ps != stop) )
+	  *pd++ = *ps++;
+	return(pd);
+}
+
+
+BYTE *strcat(BYTE *ps, BYTE *pd)
+{
+	while(*pd)
+	  pd++;
+	while( (*pd++ = *ps++) != 0 )
+	  ;
+	return(pd);
+}
+
+
+/*
+*	Strip out period and turn into raw data.
+*/
+VOID fmt_str(BYTE *instr, BYTE *outstr)
+{
+	WORD		count;
+	BYTE		*pstr;
+
+	pstr = instr;
+	while( (*pstr) && (*pstr != '.') )
+	  *outstr++ = *pstr++;
+	if (*pstr)
+	{
+	  count = 8 - (pstr - instr);
+	  while ( count-- )
+	    *outstr++ = ' ';
+	  pstr++;
+	  while (*pstr)
+	    *outstr++ = *pstr++;
+	}
+	*outstr = NULL;
+}
+
+
+/*
+*	Insert in period and make into true data.
+*/
+VOID unfmt_str(BYTE *instr, BYTE *outstr)
+{
+	BYTE		*pstr, temp;
+
+	pstr = instr;
+	while( (*pstr) && ((pstr - instr) < 8) )
+	{
+	  temp = *pstr++;
+	  if (temp != ' ')
+	    *outstr++ = temp;
+	}
+	if (*pstr)
+	{
+	  *outstr++ = '.';
+	  while (*pstr)
+	  {
+	    temp = *pstr++;
+	    if (temp != ' ')
+	      *outstr++ = temp;
+	  }
+	}
+	*outstr = NULL;
+}
+
+
+VOID fs_sset(LONG tree, WORD obj, LONG pstr, LONG *ptext, WORD *ptxtlen)
+{
+	LONG		spec;
+
+	*ptext = LLGET( spec = LLGET(OB_SPEC(obj)) );
+	WORD LSTCPY(LONG dst, LONG src);
+	*ptxtlen = LWGET( spec + 24 );
+}
+
+
+VOID inf_sset(LONG tree, WORD obj, BYTE *pstr)
+{
+	LONG		text;
+	WORD		txtlen;
+
+	fs_sset(tree, obj, ADDR(pstr), &text, &txtlen);
+}
+
+
+VOID fs_sget(LONG tree, WORD obj, LONG pstr)
+{
+	LONG		ptext;
+
+	ptext = LLGET( LLGET(OB_SPEC(obj)) );
+	WORD LSTCPY(LONG dst, LONG src);
+}
+
+
+VOID inf_sget(LONG tree, WORD obj, BYTE *pstr)
+{
+	fs_sget(tree, obj, ADDR(pstr));
+}
+
+
+VOID inf_fldset(LONG tree, WORD obj, UWORD testfld, UWORD testbit, UWORD truestate, UWORD falsestate)
+{
+	LWSET(OB_STATE(obj), (testfld & testbit) ? truestate : falsestate);
+}
+
+
+WORD inf_gindex(LONG tree, WORD baseobj, WORD numobj)
+{
+	WORD		retobj;
+
+	for (retobj=0; retobj < numobj; retobj++)
+	{
+	  if (LWGET(OB_STATE(baseobj+retobj)) & SELECTED)
+	    return(retobj);
+	}
+	return(-1);
+}
+
+
+/*
+*	Return 0 if cancel was selected, 1 if okay was selected, -1 if
+*	nothing was selected.
+*/
+
+WORD inf_what(LONG tree, WORD ok, WORD cncl)
+{
+	WORD		field;
+					/* dangerous assumption!	*/
+	field = inf_gindex(tree, ok, 2);
+
+	if (field != -1)
+	{
+	  LWSET(OB_STATE(ok + field), NORMAL);
+	  field = (field == 0);
+	}
+	return(field);
+}
+
+
+	VOID merge_str(pdst, ptmp, parms)
+	BYTE		*pdst;
+	BYTE		*ptmp;
+	UWORD		parms[];	
+{
+	WORD		num;
+	WORD		do_value;
+	BYTE		lholder[12];
+	BYTE		*pnum, *psrc;
+	LONG		lvalue, divten;
+	WORD		digit;
+
+	num = 0;
+	while(*ptmp)
+	{
+	  if (*ptmp != '%')
+	    *pdst++ = *ptmp++;
+	  else
+	  {
+	    ptmp++;
+	    do_value = FALSE;
+	    switch(*ptmp++)
+	    {
+	      case '%':
+		*pdst++ = '%';
+		break;
+	      case 'L':
+		lvalue = *((LONG *) &parms[num]);
+		num += 2;
+		do_value = TRUE;
+		break;
+	      case 'W':
+		lvalue = (LONG) parms[num];
+#if MC68K
+		num += 2;
+#endif
+#if I8086
+		num++;
+#endif	
+		do_value = TRUE;
+		break;
+	      case 'S':
+		psrc = (BYTE *) parms[num]; 
+#if MC68K
+		num += 2;
+#endif
+#if I8086
+		num++;
+#endif	
+		while(*psrc)
+		  *pdst++ = *psrc++;
+		break;
+	    }
+	    if (do_value)
+	    {
+	      pnum = &lholder[0];
+	      while(lvalue)
+	      {
+		divten = lvalue / 10;
+		digit = (WORD) (lvalue - (divten * 10));
+		*pnum++ = '0' + ((BYTE) digit);
+		lvalue = divten;
+	      }
+	      if ( pnum == ((BYTE *) &lholder[0]) )
+		*pdst++ = '0';
+	      else
+	      {
+		while(pnum != ((BYTE *) &lholder[0]) )
+		  *pdst++ = *--pnum;
+	      }
+	    }
+	  }
+	}
+	*pdst = NULL;
+}
+
+/*
+*	Routine to see if the test filename matches one of a set of 
+*	comma delimited wildcard strings.
+*		e.g.,	pwld = "*.COM,*.EXE,*.BAT"
+*		 	ptst = "myfile.bat"
+*/
+WORD wildcmp(BYTE *pwld, BYTE *ptst)
+{
+	BYTE		*pwild;
+	BYTE		*ptest;
+						/* skip over *.*, and	*/
+						/*   *.ext faster	*/
+	while(*pwld)
+	{
+	  ptest = ptst;
+	  pwild = pwld;
+						/* move on to next 	*/
+						/*   set of wildcards	*/
+	  pwld = scasb(pwld, ',');
+	  if (*pwld)
+	    pwld++;
+						/* start the checking	*/
+	  if (pwild[0] == '*')
+	  {
+	    if (pwild[2] == '*')
+	      return(TRUE);
+	    else
+	    {
+	      pwild = &pwild[2];
+	      ptest = scasb(ptest, '.');
+	      if (*ptest)
+	        ptest++;
+	    }
+	  }
+						/* finish off comparison*/
+	  while( (*ptest) && 
+	         (*pwild) &&
+		 (*pwild != ',') )
+	  {
+	    if (*pwild == '?')
+	    {
+	       pwild++;
+	       if (*ptest != '.')
+	         ptest++;
+	    }
+	    else
+	    {
+	      if (*pwild == '*')
+	      {
+	        if (*ptest != '.')
+		  ptest++;
+	        else		
+		  pwild++;
+	      }
+	      else
+	      {
+	        if (*ptest == *pwild)
+	        {
+	          pwild++;
+	          ptest++;
+	        }
+	        else
+	          break;
+	      }
+	    }
+	  }
+						/* eat up remaining 	*/
+						/*   wildcard chars	*/
+	  while( (*pwild == '*') ||
+	         (*pwild == '?') ||
+	         (*pwild == '.') )
+	    pwild++;
+						/* if any part of wild-	*/
+						/*   card or test is	*/
+						/*   left then no match	*/
+	  if ( ((*pwild == NULL) || (*pwild == ',')) && 
+	       (!*ptest) )
+	    return( TRUE );
+	}
+	return(FALSE);
+}
+
+
+
+/*
+*	Routine to insert a character in a string by
+*/
+VOID ins_char(REG BYTE *str, WORD pos, BYTE chr, REG WORD tot_len)
+{
+	REG WORD	ii, len;
+
+	len = strlen(str);
+
+	for (ii = len; ii > pos; ii--)
+	  str[ii] = str[ii-1];
+	str[ii] = chr;
+	if (len+1 < tot_len)
+	  str[len+1] = NULL;
+	else
+	  str[tot_len-1] = NULL;
+}
+

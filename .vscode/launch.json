@@ -1,0 +1,39 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug Desktop",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/bin/desktop",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [
+                {
+                    "name": "GEM_RASTA_FRAMEBUFFER",
+                    "value": "/tmp/rasta.fb"
+                },
+                {
+                    "name": "GEM_RASTA_HOST",
+                    "value": "127.0.0.1"
+                },
+                {
+                    "name": "GEM_RASTA_PORT",
+                    "value": "5000"
+                }
+            ],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "miDebuggerPath": "/usr/bin/gdb",
+            "preLaunchTask": "Build Desktop",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ]
+        }
+    ]
+}

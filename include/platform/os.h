@@ -17,6 +17,26 @@
 extern "C" {
 #endif
 
+#define GEM_OS_PATH_MAX 512
+
+typedef struct gem_os_file_info {
+    uint64_t size_bytes;
+    uint64_t mtime_ms;
+    int is_directory;
+    int is_hidden;
+    int is_read_only;
+} gem_os_file_info_t;
+
+typedef struct gem_os_dir {
+    void *handle;
+    char path[GEM_OS_PATH_MAX];
+} gem_os_dir_t;
+
+typedef struct gem_os_dirent {
+    char name[GEM_OS_PATH_MAX];
+    gem_os_file_info_t info;
+} gem_os_dirent_t;
+
 /*
  * Initializes operating system services required by the GEM runtime.
  * Returns non-zero on success and zero on failure.
@@ -79,6 +99,85 @@ int32_t  gem_os_read(int fd, void *buf, uint32_t size);
  * Returns the number of bytes written, or a negative value on failure.
  */
 int32_t  gem_os_write(int fd, const void *buf, uint32_t size);
+
+/*
+ * Seeks `fd` to `offset` according to `whence` and returns the resulting
+ * absolute byte position, or a negative value on failure.
+ * `whence` matches POSIX semantics: 0 = start, 1 = current, 2 = end.
+ */
+int64_t  gem_os_seek(int fd, int64_t offset, int whence);
+
+/*
+ * Returns the current working directory in `buf`.
+ * Returns non-zero on success and zero on failure.
+ */
+int      gem_os_getcwd(char *buf, size_t size);
+
+/*
+ * Changes the current working directory to `path`.
+ * Returns non-zero on success and zero on failure.
+ */
+int      gem_os_chdir(const char *path);
+
+/*
+ * Creates a directory at `path`.
+ * Returns non-zero on success and zero on failure.
+ */
+int      gem_os_mkdir(const char *path);
+
+/*
+ * Removes an empty directory at `path`.
+ * Returns non-zero on success and zero on failure.
+ */
+int      gem_os_rmdir(const char *path);
+
+/*
+ * Deletes the file at `path`.
+ * Returns non-zero on success and zero on failure.
+ */
+int      gem_os_unlink(const char *path);
+
+/*
+ * Renames `old_path` to `new_path`.
+ * Returns non-zero on success and zero on failure.
+ */
+int      gem_os_rename(const char *old_path, const char *new_path);
+
+/*
+ * Populates `info` with host metadata for `path`.
+ * Returns non-zero on success and zero on failure.
+ */
+int      gem_os_stat_path(const char *path, gem_os_file_info_t *info);
+
+/*
+ * Opens a directory stream rooted at `path`.
+ * Returns non-zero on success and zero on failure.
+ */
+int      gem_os_dir_open(const char *path, gem_os_dir_t *dir);
+
+/*
+ * Reads the next entry from `dir` into `entry`.
+ * Returns non-zero when an entry is produced, or zero on end/failure.
+ */
+int      gem_os_dir_read(gem_os_dir_t *dir, gem_os_dirent_t *entry);
+
+/*
+ * Closes a directory stream previously opened by `gem_os_dir_open()`.
+ */
+void     gem_os_dir_close(gem_os_dir_t *dir);
+
+/*
+ * Returns filesystem capacity and available free space for `path`.
+ * Returns non-zero on success and zero on failure.
+ */
+int      gem_os_space(const char *path, uint64_t *total_bytes,
+                      uint64_t *avail_bytes);
+
+/*
+ * Updates the read-only bit for `path`.
+ * Returns non-zero on success and zero on failure.
+ */
+int      gem_os_set_read_only(const char *path, int read_only);
 
 #ifdef __cplusplus
 }
