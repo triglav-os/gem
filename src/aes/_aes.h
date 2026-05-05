@@ -20,6 +20,7 @@ enum {
     AES_MAX_APPS = 16,
     AES_MAX_MESSAGES = 16,
     AES_MAX_WINDOWS = 16,
+    AES_MAX_MENU_SAVED_REGIONS = 2,
     AES_PATH_LEN = 260,
     AES_SHELL_BUF_LEN = 1024,
     AES_DECOR = 8,
@@ -69,6 +70,10 @@ typedef struct aes_state {
     WORD work_out[57];
     OBJECT *menu_tree;
     WORD menu_visible;
+    WORD menu_popup_root_direct;
+    WORD menu_saved_count;
+    GRECT menu_saved_rects[AES_MAX_MENU_SAVED_REGIONS];
+    uint8_t *menu_saved_pixels[AES_MAX_MENU_SAVED_REGIONS];
     char scrap_path[AES_PATH_LEN];
     char shell_cmd[AES_PATH_LEN];
     char shell_tail[AES_PATH_LEN];
@@ -159,7 +164,10 @@ void gem_builtin_rsrc_free(void);
 
 void _aes_trace(const char *fmt, ...);
 void _aes_store_mouse_state(const gem_hid_event_t *evt);
+void _aes_menu_prepare_tree(OBJECT *tree);
 void _aes_menu_hide_popups(OBJECT *tree);
+void _aes_menu_redraw_tree(OBJECT *tree);
+void _aes_menu_clear_saved_region(void);
 WORD _aes_menu_event(OBJECT *tree,
                      const gem_hid_event_t *first_evt,
                      WORD mepbuff[8]);
@@ -177,6 +185,8 @@ void _aes_draw_window_frame(const aes_window_t *window);
 void _aes_clear_window_frame(const aes_window_t *window);
 void _aes_redraw_open_windows(void);
 void _aes_redraw_window_change(const GRECT *before, const GRECT *after);
+void _aes_redraw_window_title_states(const aes_window_t *previous_top,
+                                     const aes_window_t *new_top);
 void _aes_raise_window(aes_window_t *window);
 WORD _aes_window_hit_part(const aes_window_t *window, WORD x, WORD y);
 void _aes_object_extent(OBJECT *tree, WORD object, WORD *x, WORD *y);

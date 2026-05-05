@@ -18,7 +18,7 @@
 
 enum {
     _vdi_handle_screen = 1,
-    _vdi_default_width = 1600,
+    _vdi_default_width = 992,
     _vdi_default_height = 1400
 };
 

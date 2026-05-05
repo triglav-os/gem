@@ -1,328 +1,263 @@
 /*
- * Brings up a minimal hosted GEM AES window and draws a few VDI text
- * lines into its work area. The sample is intended as the first AES
- * smoke test on Linux, with redraw handling and a simple ESC-or-close
- * event loop.
+ * Demonstrates two classic GEM windows with independent titles and VDI
+ * fonts so overlap, topping, and redraw behavior can be checked
+ * against Atari ST expectations.
  *
  * MIT License (see: LICENSE)
  * Copyright (C) 2026 tomaz stih
  */
 
-#include <gem/aes.h>
-#include <gem/os.h>
-#include <gem/vdi.h>
+#include <gem.h>
+#include <string.h>
 
-#include <stdio.h>
+WORD appl_id;
+VDI_HANDLE vdi_handle;
+WORD work_in[11] = {1,1,1,1,1,1,1,1,1,1,2};
+WORD work_out[57];
+WORD msg[8];
+WORD win1_handle;
+WORD win2_handle;
+GRECT full_rect;
+GRECT win1_normal;
+GRECT win2_normal;
 
-typedef struct demo20_window_state {
-    WORD handle;
-    WORD font_id;
-    GRECT normal_rect;
-    const BYTE *line1;
-    const BYTE *line2;
-    const BYTE *line3;
-} demo20_window_state_t;
+char *win1_title = "Hello GEM";
+char *win2_title = "Second Font Window";
 
-static void demo20_draw_window_content(const demo20_window_state_t *window,
-                                       const GRECT *dirty_rect,
-                                       WORD vdi_handle)
+char *win1_line1 = "Hello from GEM AES!";
+char *win1_line2 = "This is a basic AES window.";
+char *win1_line3 = "Close the window or press ESC to exit.";
+
+char *win2_line1 = "Small system font window";
+char *win2_line2 = "Overlap me to test redraw.";
+char *win2_line3 = "This one uses the second built-in VDI font.";
+
+WORD win1_font = 1;
+WORD win2_font = 2;
+
+void draw_window(WORD handle, WORD font_id,
+    char *line1, char *line2, char *line3, GRECT *clip);
+
+int main(void)
 {
-    GRECT work_rect;
-    GRECT clip_rect;
-    WORD text_attrib[6];
-    WORD clear_rect[4];
-    WORD clip[4];
-    WORD previous_font;
-
-    if (window == NULL) {
-        return;
+    appl_id = appl_init();
+    if (appl_id < 0) {
+        return -1;
     }
 
-    if (wind_get(window->handle, WF_CXYWH, &work_rect.g_x, &work_rect.g_y,
-        &work_rect.g_w, &work_rect.g_h) == 0) {
-        return;
+    vdi_handle = graf_handle();
+    v_opnvwk(work_in, &vdi_handle, work_out);
+
+    wind_get(0, WF_WORKXYWH, &full_rect.g_x, &full_rect.g_y,
+        &full_rect.g_w, &full_rect.g_h);
+
+    win1_handle = wind_create(NAME | CLOSER | FULLER | MOVER | SIZER,
+        full_rect.g_x, full_rect.g_y, full_rect.g_w, full_rect.g_h);
+    win2_handle = wind_create(NAME | CLOSER | FULLER | MOVER | SIZER,
+        full_rect.g_x, full_rect.g_y, full_rect.g_w, full_rect.g_h);
+
+    if (win1_handle < 0 || win2_handle < 0) {
+        if (win1_handle >= 0) {
+            wind_delete(win1_handle);
+        }
+        if (win2_handle >= 0) {
+            wind_delete(win2_handle);
+        }
+        v_clsvwk(vdi_handle);
+        appl_exit();
+        return -1;
     }
+
+    wind_set(win1_handle, WF_NAME, win1_title, 0, 0);
+    wind_set(win2_handle, WF_NAME, win2_title, 0, 0);
+
+    wind_open(win1_handle, full_rect.g_x + 60, full_rect.g_y + 60, 480, 240);
+    wind_open(win2_handle, full_rect.g_x + 220, full_rect.g_y + 150,
+        420, 210);
+
+    wind_get(win1_handle, WF_CURRXYWH, &win1_normal.g_x, &win1_normal.g_y,
+        &win1_normal.g_w, &win1_normal.g_h);
+    wind_get(win2_handle, WF_CURRXYWH, &win2_normal.g_x, &win2_normal.g_y,
+        &win2_normal.g_w, &win2_normal.g_h);
+
+    while (1) {
+        evnt_mesag(msg);
+
+        switch (msg[0]) {
+        case WM_REDRAW:
+        {
+            GRECT r;
+
+            r.g_x = msg[4];
+            r.g_y = msg[5];
+            r.g_w = msg[6];
+            r.g_h = msg[7];
+
+            if (msg[3] == win1_handle) {
+                draw_window(win1_handle, win1_font,
+                    win1_line1, win1_line2, win1_line3, &r);
+            } else if (msg[3] == win2_handle) {
+                draw_window(win2_handle, win2_font,
+                    win2_line1, win2_line2, win2_line3, &r);
+            }
+            break;
+        }
+
+        case WM_CLOSED:
+            if (msg[3] == win1_handle) {
+                wind_close(win1_handle);
+                wind_delete(win1_handle);
+                win1_handle = -1;
+            } else if (msg[3] == win2_handle) {
+                wind_close(win2_handle);
+                wind_delete(win2_handle);
+                win2_handle = -1;
+            }
+
+            if (win1_handle < 0 && win2_handle < 0) {
+                goto cleanup;
+            }
+            break;
+
+        case WM_MOVED:
+        case WM_SIZED:
+            wind_set(msg[3], WF_CURRXYWH, msg[4], msg[5], msg[6], msg[7]);
+            if (msg[3] == win1_handle) {
+                win1_normal.g_x = msg[4];
+                win1_normal.g_y = msg[5];
+                win1_normal.g_w = msg[6];
+                win1_normal.g_h = msg[7];
+            } else if (msg[3] == win2_handle) {
+                win2_normal.g_x = msg[4];
+                win2_normal.g_y = msg[5];
+                win2_normal.g_w = msg[6];
+                win2_normal.g_h = msg[7];
+            }
+            break;
+
+        case WM_TOPPED:
+            wind_set(msg[3], WF_TOP, 0, 0, 0, 0);
+            break;
+
+        case WM_FULLED:
+        {
+            GRECT current;
+            GRECT *normal;
+
+            if (msg[3] == win1_handle) {
+                normal = &win1_normal;
+            } else if (msg[3] == win2_handle) {
+                normal = &win2_normal;
+            } else {
+                break;
+            }
+
+            wind_get(msg[3], WF_CURRXYWH, &current.g_x, &current.g_y,
+                &current.g_w, &current.g_h);
+
+            if (current.g_x == full_rect.g_x && current.g_y == full_rect.g_y &&
+                current.g_w == full_rect.g_w && current.g_h == full_rect.g_h) {
+                wind_set(msg[3], WF_CURRXYWH, normal->g_x, normal->g_y,
+                    normal->g_w, normal->g_h);
+            } else {
+                *normal = current;
+                wind_set(msg[3], WF_CURRXYWH, full_rect.g_x, full_rect.g_y,
+                    full_rect.g_w, full_rect.g_h);
+            }
+            break;
+        }
+        }
+    }
+
+cleanup:
+    if (win1_handle >= 0) {
+        wind_close(win1_handle);
+        wind_delete(win1_handle);
+    }
+    if (win2_handle >= 0) {
+        wind_close(win2_handle);
+        wind_delete(win2_handle);
+    }
+
+    v_clsvwk(vdi_handle);
+    appl_exit();
+    return 0;
+}
+
+void draw_window(WORD handle, WORD font_id,
+    char *line1, char *line2, char *line3, GRECT *clip)
+{
+    GRECT work;
+    GRECT box;
+    WORD clip_xy[4];
+    WORD pxy[4];
+    WORD text_attr[6];
+    WORD old_font = 0;
 
     wind_update(BEG_UPDATE);
 
-    if (vqt_attributes(vdi_handle, text_attrib) != 0) {
-        previous_font = text_attrib[0];
-    } else {
-        previous_font = 0;
+    wind_get(handle, WF_WORKXYWH, &work.g_x, &work.g_y, &work.g_w, &work.g_h);
+    wind_get(handle, WF_FIRSTXYWH, &box.g_x, &box.g_y, &box.g_w, &box.g_h);
+
+    if (vqt_attributes(vdi_handle, text_attr) != 0) {
+        old_font = text_attr[0];
     }
 
-    wind_get(window->handle, WF_FIRSTXYWH, &clip_rect.g_x, &clip_rect.g_y,
-        &clip_rect.g_w, &clip_rect.g_h);
-    while (clip_rect.g_w > 0 && clip_rect.g_h > 0) {
-        WORD clip_right = (WORD) (clip_rect.g_x + clip_rect.g_w - 1);
-        WORD clip_bottom = (WORD) (clip_rect.g_y + clip_rect.g_h - 1);
-        WORD x0 = clip_rect.g_x;
-        WORD y0 = clip_rect.g_y;
-        WORD x1 = clip_right;
-        WORD y1 = clip_bottom;
+    while (box.g_w > 0 && box.g_h > 0) {
+        WORD x0 = box.g_x;
+        WORD y0 = box.g_y;
+        WORD x1 = (WORD) (box.g_x + box.g_w - 1);
+        WORD y1 = (WORD) (box.g_y + box.g_h - 1);
 
-        if (dirty_rect != NULL) {
-            WORD dirty_right = (WORD) (dirty_rect->g_x + dirty_rect->g_w - 1);
-            WORD dirty_bottom = (WORD) (dirty_rect->g_y + dirty_rect->g_h - 1);
+        if (clip != NULL) {
+            WORD cx1 = (WORD) (clip->g_x + clip->g_w - 1);
+            WORD cy1 = (WORD) (clip->g_y + clip->g_h - 1);
 
-            if (x0 < dirty_rect->g_x) {
-                x0 = dirty_rect->g_x;
+            if (x0 < clip->g_x) {
+                x0 = clip->g_x;
             }
-            if (y0 < dirty_rect->g_y) {
-                y0 = dirty_rect->g_y;
+            if (y0 < clip->g_y) {
+                y0 = clip->g_y;
             }
-            if (x1 > dirty_right) {
-                x1 = dirty_right;
+            if (x1 > cx1) {
+                x1 = cx1;
             }
-            if (y1 > dirty_bottom) {
-                y1 = dirty_bottom;
+            if (y1 > cy1) {
+                y1 = cy1;
             }
         }
 
         if (x0 <= x1 && y0 <= y1) {
-            clip[0] = x0;
-            clip[1] = y0;
-            clip[2] = x1;
-            clip[3] = y1;
-            vs_clip(vdi_handle, 1, clip);
-            vswr_mode(vdi_handle, MD_REPLACE);
-            vsf_color(vdi_handle, 1);
-            clear_rect[0] = x0;
-            clear_rect[1] = y0;
-            clear_rect[2] = x1;
-            clear_rect[3] = y1;
-            v_bar(vdi_handle, clear_rect);
-            vst_color(vdi_handle, 0);
-            (void) vst_alignment(vdi_handle, 0, 0);
-            (void) vst_font(vdi_handle, window->font_id);
+            clip_xy[0] = x0;
+            clip_xy[1] = y0;
+            clip_xy[2] = x1;
+            clip_xy[3] = y1;
+            vs_clip(vdi_handle, 1, clip_xy);
 
-            v_gtext(vdi_handle, (WORD) (work_rect.g_x + 24),
-                (WORD) (work_rect.g_y + 36),
-                window->line1);
-            v_gtext(vdi_handle, (WORD) (work_rect.g_x + 24),
-                (WORD) (work_rect.g_y + 60),
-                window->line2);
-            v_gtext(vdi_handle, (WORD) (work_rect.g_x + 24),
-                (WORD) (work_rect.g_y + 84),
-                window->line3);
+            pxy[0] = x0;
+            pxy[1] = y0;
+            pxy[2] = x1;
+            pxy[3] = y1;
+            vr_recfl(vdi_handle, pxy);
+
+            vst_font(vdi_handle, font_id);
+            v_gtext(vdi_handle, (WORD) (work.g_x + 24),
+                (WORD) (work.g_y + 36), (BYTE *) line1);
+            v_gtext(vdi_handle, (WORD) (work.g_x + 24),
+                (WORD) (work.g_y + 60), (BYTE *) line2);
+            v_gtext(vdi_handle, (WORD) (work.g_x + 24),
+                (WORD) (work.g_y + 84), (BYTE *) line3);
         }
 
-        wind_get(window->handle, WF_NEXTXYWH, &clip_rect.g_x, &clip_rect.g_y,
-            &clip_rect.g_w, &clip_rect.g_h);
+        wind_get(handle, WF_NEXTXYWH,
+            &box.g_x, &box.g_y, &box.g_w, &box.g_h);
     }
 
-    if (previous_font != 0) {
-        (void) vst_font(vdi_handle, previous_font);
+    if (old_font != 0) {
+        vst_font(vdi_handle, old_font);
     }
-    vs_clip(vdi_handle, 0, clip);
+
+    vs_clip(vdi_handle, 0, NULL);
     v_updwk(vdi_handle);
     wind_update(END_UPDATE);
-}
-
-static demo20_window_state_t *demo20_find_window(
-    demo20_window_state_t windows[2], WORD handle)
-{
-    if (windows[0].handle == handle) {
-        return &windows[0];
-    }
-    if (windows[1].handle == handle) {
-        return &windows[1];
-    }
-    return NULL;
-}
-
-int main(void)
-{
-    WORD appl_id;
-    WORD vdi_handle;
-    WORD work_in[11] = { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2 };
-    WORD work_out[57] = { 0 };
-    WORD char_w = 0;
-    WORD char_h = 0;
-    WORD box_w = 0;
-    WORD box_h = 0;
-    WORD msg[8] = { 0 };
-    WORD event_flags;
-    WORD mouse_x = 0;
-    WORD mouse_y = 0;
-    WORD mouse_buttons = 0;
-    WORD key_state = 0;
-    WORD key_code = 0;
-    WORD button_return = 0;
-    WORD open_windows = 0;
-    GRECT current_rect;
-    GRECT full_rect;
-    demo20_window_state_t windows[2] = {
-        { 0, 1, { 0, 0, 0, 0 },
-            (CONST BYTE *) "Hello from GEM AES!",
-            (CONST BYTE *) "This is a basic AES window on Linux.",
-            (CONST BYTE *) "Close the window or press ESC to exit." },
-        { 0, 2, { 0, 0, 0, 0 },
-            (CONST BYTE *) "Small system font window",
-            (CONST BYTE *) "Overlap me to test redraw and topping.",
-            (CONST BYTE *) "This one uses the second built-in VDI font." }
-    };
-    demo20_window_state_t *window;
-
-    if (!gem_os_init()) {
-        fprintf(stderr, "gem_os_init() failed\n");
-        return 1;
-    }
-
-    appl_id = appl_init();
-    if (appl_id < 0) {
-        gem_os_shutdown();
-        return 1;
-    }
-
-    vdi_handle = graf_handle(&char_w, &char_h, &box_w, &box_h);
-    if (vdi_handle == 0) {
-        appl_exit();
-        gem_os_shutdown();
-        return 1;
-    }
-
-    v_opnvwk(work_in, &vdi_handle, work_out);
-
-    windows[0].handle = wind_create(
-        (UWORD) (NAME | MOVER | CLOSER | FULLER | SIZER),
-        0, 0, (WORD) (work_out[0] + 1), (WORD) (work_out[1] + 1));
-    windows[1].handle = wind_create(
-        (UWORD) (NAME | MOVER | CLOSER | FULLER | SIZER),
-        0, 0, (WORD) (work_out[0] + 1), (WORD) (work_out[1] + 1));
-    if (windows[0].handle <= 0 || windows[1].handle <= 0) {
-        if (windows[0].handle > 0) {
-            (void) wind_delete(windows[0].handle);
-        }
-        if (windows[1].handle > 0) {
-            (void) wind_delete(windows[1].handle);
-        }
-        v_clsvwk(vdi_handle);
-        appl_exit();
-        gem_os_shutdown();
-        return 1;
-    }
-
-    (void) wind_set_str(windows[0].handle, WF_NAME, "Hello GEM on Linux");
-    (void) wind_set_str(windows[1].handle, WF_NAME, "Second Font Window");
-    (void) wind_open(windows[0].handle, 80, 80, 480, 240);
-    (void) wind_open(windows[1].handle, 220, 180, 420, 210);
-    (void) wind_get(windows[0].handle, WF_WXYWH, &windows[0].normal_rect.g_x,
-        &windows[0].normal_rect.g_y, &windows[0].normal_rect.g_w,
-        &windows[0].normal_rect.g_h);
-    (void) wind_get(windows[1].handle, WF_WXYWH, &windows[1].normal_rect.g_x,
-        &windows[1].normal_rect.g_y, &windows[1].normal_rect.g_w,
-        &windows[1].normal_rect.g_h);
-    full_rect.g_x = 0;
-    full_rect.g_y = 0;
-    full_rect.g_w = (WORD) (work_out[0] + 1);
-    full_rect.g_h = (WORD) (work_out[1] + 1);
-    (void) graf_mouse(M_ON, NULL);
-    demo20_draw_window_content(&windows[0], NULL, vdi_handle);
-    demo20_draw_window_content(&windows[1], NULL, vdi_handle);
-    open_windows = 2;
-
-    FOREVER {
-        event_flags = evnt_multi((UWORD) (MU_MESAG | MU_KEYBD),
-            0, 0, 0,
-            0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0,
-            msg,
-            0, 0,
-            &mouse_x, &mouse_y, &mouse_buttons, &key_state,
-            &key_code, &button_return);
-
-        if ((event_flags & MU_MESAG) != 0) {
-            window = demo20_find_window(windows, msg[3]);
-            if (window == NULL) {
-                if ((event_flags & MU_KEYBD) != 0 && key_code == 0x011b) {
-                    break;
-                }
-                continue;
-            }
-            if (msg[0] == WM_CLOSED) {
-                wind_update(BEG_UPDATE);
-                (void) wind_close(window->handle);
-                (void) wind_delete(window->handle);
-                window->handle = 0;
-                --open_windows;
-                wind_update(END_UPDATE);
-                if (open_windows <= 0) {
-                    break;
-                }
-            } else if (msg[0] == WM_REDRAW) {
-                GRECT redraw_rect;
-
-                redraw_rect.g_x = msg[4];
-                redraw_rect.g_y = msg[5];
-                redraw_rect.g_w = msg[6];
-                redraw_rect.g_h = msg[7];
-                demo20_draw_window_content(window, &redraw_rect, vdi_handle);
-            } else if (msg[0] == WM_MOVED) {
-                wind_update(BEG_UPDATE);
-                (void) wind_set(window->handle, WF_WXYWH, msg[4], msg[5], msg[6],
-                    msg[7]);
-                (void) wind_get(window->handle, WF_WXYWH, &current_rect.g_x,
-                    &current_rect.g_y, &current_rect.g_w, &current_rect.g_h);
-                if (current_rect.g_x != full_rect.g_x ||
-                    current_rect.g_y != full_rect.g_y ||
-                    current_rect.g_w != full_rect.g_w ||
-                    current_rect.g_h != full_rect.g_h) {
-                    window->normal_rect = current_rect;
-                }
-                wind_update(END_UPDATE);
-            } else if (msg[0] == WM_SIZED) {
-                wind_update(BEG_UPDATE);
-                (void) wind_set(window->handle, WF_WXYWH, msg[4], msg[5], msg[6],
-                    msg[7]);
-                (void) wind_get(window->handle, WF_WXYWH, &current_rect.g_x,
-                    &current_rect.g_y, &current_rect.g_w, &current_rect.g_h);
-                if (current_rect.g_x != full_rect.g_x ||
-                    current_rect.g_y != full_rect.g_y ||
-                    current_rect.g_w != full_rect.g_w ||
-                    current_rect.g_h != full_rect.g_h) {
-                    window->normal_rect = current_rect;
-                }
-                wind_update(END_UPDATE);
-            } else if (msg[0] == WM_TOPPED) {
-                wind_update(BEG_UPDATE);
-                (void) wind_set(window->handle, WF_TOP, 0, 0, 0, 0);
-                wind_update(END_UPDATE);
-            } else if (msg[0] == WM_FULLED) {
-                wind_update(BEG_UPDATE);
-                (void) wind_get(window->handle, WF_WXYWH, &current_rect.g_x,
-                    &current_rect.g_y, &current_rect.g_w, &current_rect.g_h);
-                if (current_rect.g_x == full_rect.g_x &&
-                    current_rect.g_y == full_rect.g_y &&
-                    current_rect.g_w == full_rect.g_w &&
-                    current_rect.g_h == full_rect.g_h) {
-                    (void) wind_set(window->handle, WF_WXYWH,
-                        window->normal_rect.g_x, window->normal_rect.g_y,
-                        window->normal_rect.g_w, window->normal_rect.g_h);
-                } else {
-                    window->normal_rect = current_rect;
-                    (void) wind_set(window->handle, WF_WXYWH, full_rect.g_x,
-                        full_rect.g_y, full_rect.g_w, full_rect.g_h);
-                }
-                wind_update(END_UPDATE);
-            }
-        }
-
-        if ((event_flags & MU_KEYBD) != 0 && key_code == 0x011b) {
-            break;
-        }
-    }
-
-    if (windows[0].handle > 0) {
-        (void) wind_close(windows[0].handle);
-        (void) wind_delete(windows[0].handle);
-    }
-    if (windows[1].handle > 0) {
-        (void) wind_close(windows[1].handle);
-        (void) wind_delete(windows[1].handle);
-    }
-    v_clsvwk(vdi_handle);
-    appl_exit();
-    gem_os_shutdown();
-    return 0;
 }

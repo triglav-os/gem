@@ -28,6 +28,7 @@ static void _aes_desktop_rect(GRECT *rect);
 static int _aes_window_is_top(const aes_window_t *window);
 static void _aes_queue_window_message(const aes_window_t *window,
     WORD message, WORD w4, WORD w5, WORD w6, WORD w7);
+static WORD _aes_dequeue_message(WORD msg[8]);
 static void _aes_draw_drag_outline(const GRECT *rect);
 static int _aes_rects_intersect_local(const GRECT *left, const GRECT *right);
 static int _aes_intersect_rects_local(const GRECT *left, const GRECT *right,
@@ -71,6 +72,25 @@ static int _aes_window_is_top(const aes_window_t *window)
     return window->z_order == top_z;
 }
 
+static aes_window_t *_aes_find_top_window(void)
+{
+    aes_window_t *best = NULL;
+    size_t i;
+
+    for (i = 0; i < AES_MAX_WINDOWS; ++i) {
+        aes_window_t *window = &_aes.windows[i];
+
+        if (window->used == 0 || window->open == 0) {
+            continue;
+        }
+        if (best == NULL || window->z_order > best->z_order) {
+            best = window;
+        }
+    }
+
+    return best;
+}
+
 static void _aes_queue_window_message(const aes_window_t *window,
     WORD message, WORD w4, WORD w5, WORD w6, WORD w7)
 {
@@ -89,6 +109,15 @@ static void _aes_queue_window_message(const aes_window_t *window,
     msg[6] = w6;
     msg[7] = w7;
     (void) appl_write(window->owner, 8, msg);
+}
+
+static WORD _aes_dequeue_message(WORD msg[8])
+{
+    if (msg == NULL) {
+        return 0;
+    }
+
+    return appl_read(_aes.current_app_id, 8, msg);
 }
 
 static void _aes_draw_drag_outline(const GRECT *rect)
@@ -310,7 +339,9 @@ static WORD _aes_track_window_interaction(const gem_hid_event_t *first_evt,
 
     raised = (_aes_window_is_top(window) == 0) ? 1 : 0;
     if (raised != 0) {
+        aes_window_t *previous_top = _aes_find_top_window();
         _aes_raise_window(window);
+        _aes_redraw_window_title_states(previous_top, window);
     }
 
     part = _aes_window_hit_part(window, (WORD) first_evt->x, (WORD) first_evt->y);
@@ -345,7 +376,7 @@ static WORD _aes_track_window_interaction(const gem_hid_event_t *first_evt,
                     (WORD) evt.y) == AES_WINDOW_PART_CLOSER) {
                     _aes_queue_window_message(window, WM_CLOSED, 0, 0, 0, 0);
                     if ((flags & MU_MESAG) != 0u && mepbuff != NULL &&
-                        evnt_mesag(mepbuff) != 0) {
+                        _aes_dequeue_message(mepbuff) != 0) {
                         return MU_MESAG;
                     }
                 }
@@ -357,7 +388,7 @@ static WORD _aes_track_window_interaction(const gem_hid_event_t *first_evt,
     if (part == AES_WINDOW_PART_FULLER) {
         _aes_queue_window_message(window, WM_FULLED, 0, 0, 0, 0);
         if ((flags & MU_MESAG) != 0u && mepbuff != NULL &&
-            evnt_mesag(mepbuff) != 0) {
+            _aes_dequeue_message(mepbuff) != 0) {
             return MU_MESAG;
         }
         return 0;
@@ -420,7 +451,7 @@ static WORD _aes_track_window_interaction(const gem_hid_event_t *first_evt,
                 _aes_queue_window_message(window, WM_MOVED, drag_rect.g_x,
                     drag_rect.g_y, drag_rect.g_w, drag_rect.g_h);
                 if ((flags & MU_MESAG) != 0u && mepbuff != NULL &&
-                    evnt_mesag(mepbuff) != 0) {
+                    _aes_dequeue_message(mepbuff) != 0) {
                     return MU_MESAG;
                 }
                 return 0;
@@ -484,7 +515,7 @@ static WORD _aes_track_window_interaction(const gem_hid_event_t *first_evt,
                 _aes_queue_window_message(window, WM_SIZED, drag_rect.g_x,
                     drag_rect.g_y, drag_rect.g_w, drag_rect.g_h);
                 if ((flags & MU_MESAG) != 0u && mepbuff != NULL &&
-                    evnt_mesag(mepbuff) != 0) {
+                    _aes_dequeue_message(mepbuff) != 0) {
                     return MU_MESAG;
                 }
                 return 0;
@@ -495,7 +526,7 @@ static WORD _aes_track_window_interaction(const gem_hid_event_t *first_evt,
     if (raised != 0) {
         _aes_queue_window_message(window, WM_TOPPED, 0, 0, 0, 0);
         if ((flags & MU_MESAG) != 0u && mepbuff != NULL &&
-            evnt_mesag(mepbuff) != 0) {
+            _aes_dequeue_message(mepbuff) != 0) {
             return MU_MESAG;
         }
     }
@@ -762,7 +793,32 @@ WORD evnt_mouse(WORD flags,
  */
 WORD evnt_mesag(WORD msg[8])
 {
-    return appl_read(_aes.current_app_id, 8, msg);
+    FOREVER {
+        gem_hid_event_t evt;
+
+        if (_aes_dequeue_message(msg) != 0) {
+            return 1;
+        }
+
+        if (gem_hid_poll(&evt) != 0) {
+            if (_aes.menu_visible != 0 && _aes.menu_tree != NULL &&
+                _aes_menu_event(_aes.menu_tree, &evt, msg) != 0) {
+                return 1;
+            }
+
+            if (_aes_track_window_interaction(&evt, MU_MESAG, msg,
+                NULL, NULL, NULL, NULL) == MU_MESAG) {
+                return 1;
+            }
+
+            if (evt.type == GEM_HID_MOUSE_MOVE ||
+                evt.type == GEM_HID_MOUSE_BUTTON) {
+                _aes_store_mouse_state(&evt);
+            }
+        }
+
+        gem_os_sleep_ms(1u);
+    }
 }
 
 /*
@@ -818,7 +874,7 @@ WORD evnt_multi(UWORD flags,
         WORD ks = 0;
 
         if ((flags & MU_MESAG) != 0u && mepbuff != NULL &&
-            evnt_mesag(mepbuff) != 0) {
+            _aes_dequeue_message(mepbuff) != 0) {
             return MU_MESAG;
         }
 
@@ -920,7 +976,11 @@ WORD menu_bar(OBJECT *tree, WORD show)
     _aes.menu_tree = tree;
     _aes.menu_visible = (show != 0) ? 1 : 0;
     if (show != 0 && tree != NULL) {
+        _aes_menu_prepare_tree(tree);
         _aes_menu_hide_popups(tree);
+        _aes_menu_redraw_tree(tree);
+    } else {
+        _aes_menu_clear_saved_region();
     }
     _aes_trace("menu_bar tree=%p show=%d", (void *) tree, show);
     return 1;
@@ -1691,10 +1751,14 @@ WORD wind_get(WORD handle, WORD field, WORD *w1, WORD *w2, WORD *w3, WORD *w4)
         rect_value.g_w = (WORD) (_aes.work_out[0] + 1);
         rect_value.g_h = (WORD) (_aes.work_out[1] + 1);
 
-        (void) graf_handle(NULL, NULL, NULL, &box_height);
-        menu_height = (box_height > 0) ? box_height : 16;
-        if (menu_height <= 0) {
-            menu_height = 16;
+        if (_aes.menu_visible != 0 && _aes.menu_tree != NULL) {
+            (void) graf_handle(NULL, NULL, NULL, &box_height);
+            menu_height = (box_height > 0) ? box_height : 16;
+            if (menu_height <= 0) {
+                menu_height = 16;
+            }
+        } else {
+            menu_height = 0;
         }
 
         rect_value.g_y = menu_height;
@@ -1808,9 +1872,13 @@ WORD wind_set(WORD handle, WORD field, WORD w1, WORD w2, WORD w3, WORD w4)
         return _aes_wind_set_text(handle, field,
             (const char *) (intptr_t) w1);
     case WF_TOP:
+    {
+        aes_window_t *previous_top = _aes_find_top_window();
         _aes_raise_window(window);
         _aes_redraw_window_change(&window->outer, &window->outer);
+        _aes_redraw_window_title_states(previous_top, window);
         break;
+    }
     case WF_WXYWH:
     case WF_CXYWH:
         window->previous_outer = window->outer;

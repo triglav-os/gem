@@ -9,6 +9,8 @@
 
 #include "_aes.h"
 
+#include "../vdi/_vdi.h"
+
 #include "platform/os.h"
 
 #include <stdarg.h>
@@ -30,6 +32,7 @@ static int _aes_window_title_rect(const aes_window_t *window, GRECT *rect);
 static int _aes_window_closer_rect(const aes_window_t *window, GRECT *rect);
 static int _aes_window_fuller_rect(const aes_window_t *window, GRECT *rect);
 static int _aes_window_sizer_rect(const aes_window_t *window, GRECT *rect);
+static LONG _aes_resolve_spec(const OBJECT *obj);
 static void _aes_draw_text(WORD x, WORD y, WORD color, const char *text);
 static void _aes_fill_rect(WORD x0, WORD y0, WORD x1, WORD y1, WORD color);
 static void _aes_fill_checker_rect(WORD x0, WORD y0, WORD x1, WORD y1);
@@ -51,6 +54,13 @@ static WORD _aes_subtract_rect(const GRECT *source, const GRECT *cover,
 static void _aes_expand_window_damage_rect(const GRECT *src, GRECT *out);
 static void _aes_redraw_region(const GRECT *dirty);
 static void _aes_desktop_rect_local(GRECT *rect);
+static int _aes_menu_subtree_rect(OBJECT *tree, WORD object, GRECT *rect);
+static int _aes_menu_is_separator_text(const char *text);
+static int _aes_menu_item_selectable(OBJECT *tree, WORD item);
+static void _aes_menu_free_saved_pixels(void);
+static void _aes_menu_restore_saved_region(void);
+static int _aes_menu_save_region(const GRECT *rect);
+static int _aes_window_is_top_local(const aes_window_t *window);
 
 /*
  * Provides a default "resource not found" answer when the desktop does
@@ -157,7 +167,57 @@ static WORD _aes_menu_popup_container(OBJECT *tree)
         return NIL;
     }
 
+    if (_aes.menu_popup_root_direct != 0) {
+        return ROOT;
+    }
+
     return tree[ROOT].ob_tail;
+}
+
+/*
+ * Returns the first popup-root object in the current menu layout.
+ */
+static WORD _aes_menu_first_popup_child(OBJECT *tree, WORD popup_parent)
+{
+    WORD child;
+
+    if (tree == NULL || popup_parent == NIL) {
+        return NIL;
+    }
+
+    child = tree[popup_parent].ob_head;
+    if (child == NIL) {
+        return NIL;
+    }
+
+    if (popup_parent == ROOT && _aes.menu_popup_root_direct != 0) {
+        child = tree[child].ob_next;
+        if (child == ROOT) {
+            return NIL;
+        }
+    }
+
+    return child;
+}
+
+/*
+ * Returns the highest object index in one menu tree.
+ */
+static WORD _aes_menu_last_object(OBJECT *tree)
+{
+    WORD i;
+
+    if (tree == NULL) {
+        return ROOT;
+    }
+
+    for (i = ROOT; i < 256; ++i) {
+        if ((tree[i].ob_flags & LASTOB) != 0u) {
+            return i;
+        }
+    }
+
+    return ROOT;
 }
 
 /*
@@ -166,6 +226,7 @@ static WORD _aes_menu_popup_container(OBJECT *tree)
 static WORD _aes_menu_title_container(OBJECT *tree)
 {
     WORD root_child;
+    WORD first_child;
 
     if (tree == NULL) {
         return NIL;
@@ -175,7 +236,15 @@ static WORD _aes_menu_title_container(OBJECT *tree)
     if (root_child == NIL) {
         return NIL;
     }
-    return tree[root_child].ob_head;
+
+    first_child = tree[root_child].ob_head;
+    if (first_child == NIL) {
+        return root_child;
+    }
+    if (tree[first_child].ob_head != NIL) {
+        return first_child;
+    }
+    return root_child;
 }
 
 /*
@@ -186,11 +255,11 @@ static WORD _aes_menu_nth_child(OBJECT *tree, WORD parent, WORD index)
     WORD child;
     WORD current_index = 0;
 
-    if (tree == NULL || parent == NIL || tree[parent].ob_head == NIL) {
+    if (tree == NULL || parent == NIL) {
         return NIL;
     }
 
-    child = tree[parent].ob_head;
+    child = _aes_menu_first_popup_child(tree, parent);
     while (child != NIL) {
         WORD next = tree[child].ob_next;
 
@@ -198,7 +267,8 @@ static WORD _aes_menu_nth_child(OBJECT *tree, WORD parent, WORD index)
             return child;
         }
         ++current_index;
-        if (child == tree[parent].ob_tail || next == parent || next == NIL) {
+        if (child == tree[parent].ob_tail || next == parent || next == NIL ||
+            next == ROOT) {
             break;
         }
         child = next;
@@ -287,13 +357,13 @@ void _aes_menu_hide_popups(OBJECT *tree)
         return;
     }
 
-    child = tree[popup_parent].ob_head;
+    child = _aes_menu_first_popup_child(tree, popup_parent);
     while (child != NIL) {
         WORD next = tree[child].ob_next;
 
         tree[child].ob_flags |= HIDETREE;
         if (child == tree[popup_parent].ob_tail || next == popup_parent ||
-            next == NIL) {
+            next == NIL || next == ROOT) {
             break;
         }
         child = next;
@@ -343,25 +413,451 @@ static void _aes_menu_set_title_selected(OBJECT *tree,
 /*
  * Redraws the full menu tree after a title or popup state change.
  */
-static void _aes_menu_redraw(OBJECT *tree)
+void _aes_menu_redraw_tree(OBJECT *tree)
 {
-    WORD width;
-    WORD height;
-    WORD rect[4];
+    WORD bar;
+    WORD popup_parent;
+    WORD popup;
+    GRECT redraw_rect;
 
     if (tree == NULL || _aes_ensure_vdi() == 0) {
         return;
     }
 
-    width = tree[ROOT].ob_width;
-    height = tree[ROOT].ob_height;
-    rect[0] = tree[ROOT].ob_x;
-    rect[1] = tree[ROOT].ob_y;
-    rect[2] = (WORD) (rect[0] + width - 1);
-    rect[3] = (WORD) (rect[1] + height - 1);
-    vsf_color(_aes.vdi_handle, _aes_light_color());
-    v_bar(_aes.vdi_handle, rect);
-    objc_draw(tree, ROOT, MAX_DEPTH, 0, 0, width, height);
+    _vdi_begin_update();
+    v_hide_c(_aes.vdi_handle);
+
+    _aes_menu_restore_saved_region();
+
+    bar = tree[ROOT].ob_head;
+    popup_parent = _aes_menu_popup_container(tree);
+    popup = _aes_menu_first_popup_child(tree, popup_parent);
+    _aes_menu_free_saved_pixels();
+
+    if (bar != NIL && _aes_menu_subtree_rect(tree, bar, &redraw_rect) != 0) {
+        (void) _aes_menu_save_region(&redraw_rect);
+    }
+
+    while (popup != NIL) {
+        WORD next = tree[popup].ob_next;
+
+        if ((tree[popup].ob_flags & HIDETREE) == 0u &&
+            _aes_menu_subtree_rect(tree, popup, &redraw_rect) != 0) {
+            (void) _aes_menu_save_region(&redraw_rect);
+        }
+
+        if (popup == tree[popup_parent].ob_tail || next == popup_parent ||
+            next == NIL || next == ROOT) {
+            break;
+        }
+        popup = next;
+    }
+
+    if (bar != NIL && _aes_menu_subtree_rect(tree, bar, &redraw_rect) != 0) {
+        WORD fill[4];
+
+        fill[0] = redraw_rect.g_x;
+        fill[1] = redraw_rect.g_y;
+        fill[2] = (WORD) (redraw_rect.g_x + redraw_rect.g_w - 1);
+        fill[3] = (WORD) (redraw_rect.g_y + redraw_rect.g_h - 1);
+        vsf_color(_aes.vdi_handle, _aes_light_color());
+        v_bar(_aes.vdi_handle, fill);
+        objc_draw(tree, bar, MAX_DEPTH, redraw_rect.g_x, redraw_rect.g_y,
+            redraw_rect.g_w, redraw_rect.g_h);
+    }
+
+    popup = _aes_menu_first_popup_child(tree, popup_parent);
+    while (popup != NIL) {
+        WORD next = tree[popup].ob_next;
+
+        if ((tree[popup].ob_flags & HIDETREE) == 0u &&
+            _aes_menu_subtree_rect(tree, popup, &redraw_rect) != 0) {
+            WORD fill[4];
+
+            fill[0] = redraw_rect.g_x;
+            fill[1] = redraw_rect.g_y;
+            fill[2] = (WORD) (redraw_rect.g_x + redraw_rect.g_w - 1);
+            fill[3] = (WORD) (redraw_rect.g_y + redraw_rect.g_h - 1);
+            vsf_color(_aes.vdi_handle, _aes_light_color());
+            v_bar(_aes.vdi_handle, fill);
+            objc_draw(tree, popup, MAX_DEPTH, redraw_rect.g_x,
+                redraw_rect.g_y, redraw_rect.g_w, redraw_rect.g_h);
+        }
+
+        if (popup == tree[popup_parent].ob_tail || next == popup_parent ||
+            next == NIL || next == ROOT) {
+            break;
+        }
+        popup = next;
+    }
+
+    v_show_c(_aes.vdi_handle, 1);
+    _vdi_end_update();
+}
+
+void _aes_menu_clear_saved_region(void)
+{
+    _vdi_begin_update();
+    v_hide_c(_aes.vdi_handle);
+    _aes_menu_restore_saved_region();
+    v_show_c(_aes.vdi_handle, 1);
+    _vdi_end_update();
+}
+
+/*
+ * Normalizes one hosted menu tree enough for classic samples to draw.
+ */
+void _aes_menu_prepare_tree(OBJECT *tree)
+{
+    WORD last_object;
+    WORD wchar = AES_CHAR_WIDTH;
+    WORD hchar = AES_CHAR_HEIGHT;
+    WORD boxw = AES_DECOR;
+    WORD boxh = (WORD) (AES_CHAR_HEIGHT + AES_DECOR);
+    WORD menu_bar_height;
+    WORD menu_item_height;
+    WORD menu_separator_height;
+    WORD bar;
+    WORD title_parent;
+    WORD popup_parent;
+    WORD i;
+    int looks_char_sized = 0;
+    WORD max_right = 0;
+    WORD max_bottom = 0;
+    WORD first_title = NIL;
+    WORD last_title = NIL;
+    WORD popup_roots[16];
+    WORD popup_count = 0;
+
+    if (tree == NULL || _aes_ensure_vdi() == 0) {
+        return;
+    }
+
+    _aes.menu_popup_root_direct = 0;
+    last_object = _aes_menu_last_object(tree);
+    bar = tree[ROOT].ob_head;
+    title_parent = _aes_menu_title_container(tree);
+    popup_parent = _aes_menu_popup_container(tree);
+
+    if (bar != NIL) {
+        WORD candidate = tree[bar].ob_head;
+        WORD j;
+
+        if (candidate == NIL || tree[candidate].ob_type != G_TITLE) {
+            if (title_parent != NIL && tree[title_parent].ob_head != NIL &&
+                tree[tree[title_parent].ob_head].ob_type == G_TITLE) {
+                candidate = tree[title_parent].ob_head;
+            } else {
+                candidate = (WORD) (bar + 1);
+            }
+        }
+        if (candidate <= last_object && tree[candidate].ob_type == G_TITLE) {
+            first_title = candidate;
+            last_title = candidate;
+            for (j = (WORD) (candidate + 1); j <= last_object; ++j) {
+                if (tree[j].ob_type != G_TITLE) {
+                    break;
+                }
+                last_title = j;
+            }
+        }
+    }
+
+    if (bar != NIL && first_title != NIL && last_title != NIL &&
+        (title_parent == bar || title_parent == tree[bar].ob_head) &&
+        tree[ROOT].ob_tail <= last_title) {
+        WORD j;
+        WORD first_popup = NIL;
+        WORD previous_popup = NIL;
+
+        tree[ROOT].ob_head = bar;
+        if (title_parent != bar && title_parent != NIL) {
+            tree[bar].ob_head = title_parent;
+            tree[bar].ob_tail = title_parent;
+            tree[title_parent].ob_next = bar;
+            tree[title_parent].ob_head = first_title;
+            tree[title_parent].ob_tail = last_title;
+        } else {
+            tree[bar].ob_head = first_title;
+            tree[bar].ob_tail = last_title;
+        }
+        for (j = first_title; j <= last_title; ++j) {
+            if (j < last_title) {
+                tree[j].ob_next = (WORD) (j + 1);
+            } else {
+                tree[j].ob_next = (title_parent != bar && title_parent != NIL) ?
+                    title_parent : bar;
+            }
+        }
+
+        if ((WORD) (last_title + 1) <= last_object &&
+            (tree[last_title + 1].ob_type == G_BOX ||
+             tree[last_title + 1].ob_type == G_IBOX) &&
+            tree[last_title + 1].ob_head != NIL) {
+            WORD popup_container = (WORD) (last_title + 1);
+            WORD popup_child;
+
+            for (popup_child = (WORD) (popup_container + 1);
+                 popup_child <= last_object;
+                 ++popup_child) {
+                if (tree[popup_child].ob_type == G_BOX ||
+                    tree[popup_child].ob_type == G_IBOX) {
+                    if (popup_count < (WORD) (sizeof(popup_roots) /
+                        sizeof(popup_roots[0]))) {
+                        popup_roots[popup_count++] = popup_child;
+                    }
+                }
+            }
+        } else {
+            for (j = (WORD) (last_title + 1); j <= last_object; ++j) {
+                if (tree[j].ob_type == G_BOX || tree[j].ob_type == G_IBOX) {
+                    if (popup_count < (WORD) (sizeof(popup_roots) /
+                        sizeof(popup_roots[0]))) {
+                        popup_roots[popup_count++] = j;
+                    }
+                }
+            }
+        }
+
+        for (j = 0; j < popup_count; ++j) {
+            WORD popup_root = popup_roots[j];
+            WORD child_first = (WORD) (popup_root + 1);
+            WORD child_last = (j + 1 < popup_count) ?
+                (WORD) (popup_roots[j + 1] - 1) : last_object;
+            WORD k;
+
+            if (first_popup == NIL) {
+                first_popup = popup_root;
+            }
+            if (previous_popup != NIL) {
+                tree[previous_popup].ob_next = popup_root;
+            }
+            previous_popup = popup_root;
+
+            if (child_first <= child_last) {
+                tree[popup_root].ob_head = child_first;
+                tree[popup_root].ob_tail = child_last;
+                for (k = child_first; k <= child_last; ++k) {
+                    if (k < child_last) {
+                        tree[k].ob_next = (WORD) (k + 1);
+                    } else {
+                        tree[k].ob_next = popup_root;
+                    }
+                }
+            } else {
+                tree[popup_root].ob_head = NIL;
+                tree[popup_root].ob_tail = NIL;
+            }
+        }
+
+        if (first_popup != NIL) {
+            tree[bar].ob_next = first_popup;
+            tree[ROOT].ob_tail = popup_roots[popup_count - 1];
+            tree[popup_roots[popup_count - 1]].ob_next = ROOT;
+            _aes.menu_popup_root_direct = 1;
+        } else {
+            tree[bar].ob_next = ROOT;
+            tree[ROOT].ob_tail = bar;
+        }
+
+        popup_parent = _aes_menu_popup_container(tree);
+    }
+
+    (void) graf_handle(&wchar, &hchar, &boxw, &boxh);
+    menu_bar_height = boxh;
+    menu_item_height = boxh;
+    menu_separator_height = (WORD) _aes_max_word((WORD) 8,
+        (WORD) (boxh - 4));
+    if (bar != NIL && tree[bar].ob_height > 0 && tree[bar].ob_height <= 4) {
+        looks_char_sized = 1;
+    }
+    if (tree[ROOT].ob_width > 0 && tree[ROOT].ob_width <= 160 &&
+        tree[ROOT].ob_height <= 8) {
+        looks_char_sized = 1;
+    }
+    if (title_parent != NIL && tree[title_parent].ob_height > 0 &&
+        tree[title_parent].ob_height <= 4) {
+        looks_char_sized = 1;
+    }
+
+    if (looks_char_sized) {
+        for (i = 1; i <= last_object; ++i) {
+            tree[i].ob_x = (WORD) (tree[i].ob_x * wchar);
+            tree[i].ob_y = (WORD) (tree[i].ob_y * boxh);
+            tree[i].ob_width = (WORD) _aes_max_word(wchar,
+                (WORD) (tree[i].ob_width * wchar));
+            tree[i].ob_height = (WORD) _aes_max_word(boxh,
+                (WORD) (tree[i].ob_height * boxh));
+        }
+    }
+
+    if (first_title != NIL && last_title != NIL) {
+        WORD title = first_title;
+        WORD title_x = tree[first_title].ob_x;
+
+        while (title != NIL) {
+            const char *text = (const char *) (intptr_t)
+                _aes_resolve_spec(&tree[title]);
+            WORD title_width = tree[title].ob_width;
+
+            if (text != NULL && *text != '\0') {
+                WORD rendered_width = (WORD) _vdi_string_width(text);
+
+                if (rendered_width > 0) {
+                    title_width = rendered_width;
+                }
+            }
+
+            tree[title].ob_x = title_x;
+            tree[title].ob_width = title_width;
+            title_x = (WORD) (title_x + title_width);
+
+            if (title == last_title) {
+                break;
+            }
+            title = tree[title].ob_next;
+            if (title == bar || title == ROOT || title == NIL) {
+                break;
+            }
+        }
+    }
+
+    if (bar != NIL) {
+        tree[bar].ob_x = 0;
+        tree[bar].ob_y = 0;
+        tree[bar].ob_width = (WORD) (_aes.work_out[0] + 1);
+        tree[bar].ob_height = (WORD) _aes_max_word(tree[bar].ob_height,
+            menu_bar_height);
+    }
+    if (title_parent != NIL && title_parent != bar) {
+        tree[title_parent].ob_y = 0;
+        tree[title_parent].ob_height = (WORD) _aes_max_word(
+            tree[title_parent].ob_height, menu_bar_height);
+    }
+    if (first_title != NIL && last_title != NIL) {
+        WORD title = first_title;
+
+        while (title != NIL) {
+            tree[title].ob_height = menu_bar_height;
+            if (title == last_title) {
+                break;
+            }
+            title = tree[title].ob_next;
+            if (title == bar || title == ROOT || title == NIL) {
+                break;
+            }
+        }
+    }
+    if (popup_parent != NIL && tree[popup_parent].ob_height <= 0) {
+        tree[popup_parent].ob_height = menu_item_height;
+    }
+
+    if (_aes.menu_popup_root_direct != 0) {
+        WORD popup = _aes_menu_first_popup_child(tree, ROOT);
+        WORD title = first_title;
+
+        while (popup != NIL && title != NIL && title <= last_title) {
+            WORD title_x = 0;
+            WORD title_y = 0;
+
+            _aes_object_extent(tree, title, &title_x, &title_y);
+            tree[popup].ob_x = title_x;
+            tree[popup].ob_y = tree[bar].ob_height;
+
+            if (popup == tree[ROOT].ob_tail || tree[popup].ob_next == ROOT ||
+                tree[popup].ob_next == NIL) {
+                break;
+            }
+            popup = tree[popup].ob_next;
+            if (title == last_title) {
+                title = NIL;
+            } else {
+                title = tree[title].ob_next;
+            }
+        }
+    }
+
+    if (_aes.menu_popup_root_direct != 0) {
+        WORD popup = _aes_menu_first_popup_child(tree, ROOT);
+
+        while (popup != NIL) {
+            WORD child = tree[popup].ob_head;
+            WORD popup_width = tree[popup].ob_width;
+            WORD popup_height = 0;
+            WORD row_y = 0;
+
+            while (child != NIL) {
+                LONG child_spec = _aes_resolve_spec(&tree[child]);
+                const char *text = (const char *) (intptr_t) child_spec;
+                WORD row_height = _aes_menu_is_separator_text(text) ?
+                    menu_separator_height : menu_item_height;
+
+                tree[child].ob_y = row_y;
+                tree[child].ob_height = row_height;
+                row_y = (WORD) (row_y + row_height);
+                if (row_y > popup_height) {
+                    popup_height = row_y;
+                }
+
+                if (tree[child].ob_type == G_STRING && child_spec != 0) {
+                    WORD rendered_width = (WORD) _vdi_string_width(text);
+                    WORD needed_width = (WORD) (tree[child].ob_x +
+                        rendered_width + 4);
+
+                    if (rendered_width > 0) {
+                        tree[child].ob_width = (WORD) (rendered_width + 2);
+                    }
+                    if (needed_width > popup_width) {
+                        popup_width = needed_width;
+                    }
+                }
+
+                if (child == tree[popup].ob_tail || tree[child].ob_next == popup ||
+                    tree[child].ob_next == NIL) {
+                    break;
+                }
+                child = tree[child].ob_next;
+            }
+
+            child = tree[popup].ob_head;
+            while (child != NIL) {
+                tree[child].ob_width = popup_width;
+                if (child == tree[popup].ob_tail || tree[child].ob_next == popup ||
+                    tree[child].ob_next == NIL) {
+                    break;
+                }
+                child = tree[child].ob_next;
+            }
+
+            tree[popup].ob_width = popup_width;
+            tree[popup].ob_height = popup_height;
+
+            if (popup == tree[ROOT].ob_tail || tree[popup].ob_next == ROOT ||
+                tree[popup].ob_next == NIL) {
+                break;
+            }
+            popup = tree[popup].ob_next;
+        }
+    }
+
+    for (i = 1; i <= last_object; ++i) {
+        WORD abs_x = 0;
+        WORD abs_y = 0;
+        WORD right;
+        WORD bottom;
+
+        _aes_object_extent(tree, i, &abs_x, &abs_y);
+        right = (WORD) (abs_x + tree[i].ob_width);
+        bottom = (WORD) (abs_y + tree[i].ob_height);
+        max_right = _aes_max_word(max_right, right);
+        max_bottom = _aes_max_word(max_bottom, bottom);
+    }
+
+    tree[ROOT].ob_x = 0;
+    tree[ROOT].ob_y = 0;
+    tree[ROOT].ob_width = (WORD) _aes_max_word((WORD) (_aes.work_out[0] + 1),
+        max_right);
+    tree[ROOT].ob_height = (WORD) _aes_max_word(tree[bar].ob_height, max_bottom);
 }
 
 /*
@@ -376,7 +872,7 @@ static int _aes_menu_show_popup(OBJECT *tree, WORD title, WORD popup)
     _aes_menu_hide_popups(tree);
     tree[popup].ob_flags &= (UWORD) ~HIDETREE;
     _aes_menu_set_title_selected(tree, title, 1);
-    _aes_menu_redraw(tree);
+    _aes_menu_redraw_tree(tree);
     return 1;
 }
 
@@ -472,9 +968,7 @@ WORD _aes_menu_event(OBJECT *tree,
                 WORD hover = objc_find(tree, popup, MAX_DEPTH,
                     (WORD) evt.x, (WORD) evt.y);
 
-                if (hover != NIL && hover != popup &&
-                    tree[hover].ob_type == G_STRING &&
-                    (tree[hover].ob_state & DISABLED) == 0u) {
+                if (_aes_menu_item_selectable(tree, hover)) {
                     item = hover;
                 } else if (objc_find(tree, title, 0, (WORD) evt.x,
                            (WORD) evt.y) == title) {
@@ -490,7 +984,7 @@ WORD _aes_menu_event(OBJECT *tree,
                     _aes_menu_set_item_selected(tree, item, 1);
                 }
                 highlighted_item = item;
-                _aes_menu_redraw(tree);
+                _aes_menu_redraw_tree(tree);
             }
             continue;
         }
@@ -502,9 +996,7 @@ WORD _aes_menu_event(OBJECT *tree,
             WORD release_hit = objc_find(tree, popup, MAX_DEPTH,
                 (WORD) evt.x, (WORD) evt.y);
 
-            if (release_hit != NIL && release_hit != popup &&
-                tree[release_hit].ob_type == G_STRING &&
-                (tree[release_hit].ob_state & DISABLED) == 0u) {
+            if (_aes_menu_item_selectable(tree, release_hit)) {
                 item = release_hit;
             }
 
@@ -525,7 +1017,7 @@ WORD _aes_menu_event(OBJECT *tree,
             }
             _aes_menu_hide_popups(tree);
             _aes_menu_set_title_selected(tree, title, 0);
-            _aes_menu_redraw(tree);
+            _aes_menu_redraw_tree(tree);
 
             if (item == NIL) {
                 return 0;
@@ -688,7 +1180,7 @@ static WORD _aes_window_title_height(const aes_window_t *window)
     }
 
     text_height = _aes.vdi_ready ? _vdi_font_text_height() : AES_CHAR_HEIGHT;
-    return (WORD) (text_height + 10);
+    return (WORD) (text_height + 6);
 }
 
 static int _aes_window_closer_rect(const aes_window_t *window, GRECT *rect)
@@ -1110,6 +1602,34 @@ void _aes_redraw_window_change(const GRECT *before, const GRECT *after)
     _aes_redraw_region(&expanded_after);
 }
 
+void _aes_redraw_window_title_states(const aes_window_t *previous_top,
+                                     const aes_window_t *new_top)
+{
+    GRECT dirty;
+
+    if (previous_top != NULL && previous_top->open != 0 &&
+        previous_top->used != 0) {
+        dirty.g_x = previous_top->outer.g_x;
+        dirty.g_y = previous_top->outer.g_y;
+        dirty.g_w = previous_top->outer.g_w;
+        dirty.g_h = (WORD) (previous_top->work.g_y - previous_top->outer.g_y);
+        if (dirty.g_w > 0 && dirty.g_h > 0) {
+            _aes_redraw_region(&dirty);
+        }
+    }
+
+    if (new_top != NULL && new_top->open != 0 && new_top->used != 0 &&
+        new_top != previous_top) {
+        dirty.g_x = new_top->outer.g_x;
+        dirty.g_y = new_top->outer.g_y;
+        dirty.g_w = new_top->outer.g_w;
+        dirty.g_h = (WORD) (new_top->work.g_y - new_top->outer.g_y);
+        if (dirty.g_w > 0 && dirty.g_h > 0) {
+            _aes_redraw_region(&dirty);
+        }
+    }
+}
+
 static void _aes_fill_rect(WORD x0, WORD y0, WORD x1, WORD y1, WORD color)
 {
     WORD rect[4];
@@ -1143,6 +1663,190 @@ static void _aes_fill_checker_rect(WORD x0, WORD y0, WORD x1, WORD y1)
             _vdi_plot_pixel(x, y, dark_pixel);
         }
     }
+}
+
+static int _aes_menu_subtree_rect(OBJECT *tree, WORD object, GRECT *rect)
+{
+    WORD last_object;
+    WORD i;
+    WORD min_x = 0;
+    WORD min_y = 0;
+    WORD max_x = 0;
+    WORD max_y = 0;
+    int found = 0;
+
+    if (tree == NULL || object == NIL || rect == NULL) {
+        return 0;
+    }
+
+    last_object = _aes_menu_last_object(tree);
+    for (i = object; i <= last_object; ++i) {
+        WORD abs_x;
+        WORD abs_y;
+        WORD right;
+        WORD bottom;
+
+        if (i != object && _aes_find_parent(tree, i) != object) {
+            continue;
+        }
+
+        _aes_object_extent(tree, i, &abs_x, &abs_y);
+        right = (WORD) (abs_x + tree[i].ob_width - 1);
+        bottom = (WORD) (abs_y + tree[i].ob_height - 1);
+
+        if (!found) {
+            min_x = abs_x;
+            min_y = abs_y;
+            max_x = right;
+            max_y = bottom;
+            found = 1;
+        } else {
+            min_x = _aes_min_word(min_x, abs_x);
+            min_y = _aes_min_word(min_y, abs_y);
+            max_x = _aes_max_word(max_x, right);
+            max_y = _aes_max_word(max_y, bottom);
+        }
+    }
+
+    if (!found) {
+        return 0;
+    }
+
+    _aes_set_rect(rect, min_x, min_y,
+        (WORD) (max_x - min_x + 1), (WORD) (max_y - min_y + 1));
+    return 1;
+}
+
+static int _aes_menu_is_separator_text(const char *text)
+{
+    int saw_dash = 0;
+
+    if (text == NULL) {
+        return 0;
+    }
+
+    while (*text != '\0') {
+        if (*text != ' ' && *text != '\t') {
+            if (*text != '-') {
+                return 0;
+            }
+            saw_dash = 1;
+        }
+        ++text;
+    }
+
+    return saw_dash;
+}
+
+static int _aes_menu_item_selectable(OBJECT *tree, WORD item)
+{
+    LONG spec;
+    const char *text;
+
+    if (tree == NULL || item == NIL || tree[item].ob_type != G_STRING ||
+        (tree[item].ob_state & DISABLED) != 0u) {
+        return 0;
+    }
+
+    spec = _aes_resolve_spec(&tree[item]);
+    text = (const char *) (intptr_t) spec;
+    return !_aes_menu_is_separator_text(text);
+}
+
+static void _aes_menu_free_saved_pixels(void)
+{
+    WORD i;
+
+    for (i = 0; i < AES_MAX_MENU_SAVED_REGIONS; ++i) {
+        if (_aes.menu_saved_pixels[i] != NULL) {
+            gem_os_free(_aes.menu_saved_pixels[i]);
+            _aes.menu_saved_pixels[i] = NULL;
+        }
+        _aes_set_rect(&_aes.menu_saved_rects[i], 0, 0, 0, 0);
+    }
+    _aes.menu_saved_count = 0;
+}
+
+static int _aes_window_is_top_local(const aes_window_t *window)
+{
+    size_t i;
+    uint32_t top_z = 0u;
+
+    if (window == NULL || window->used == 0 || window->open == 0) {
+        return 0;
+    }
+
+    for (i = 0; i < AES_MAX_WINDOWS; ++i) {
+        if (_aes.windows[i].used != 0 && _aes.windows[i].open != 0 &&
+            _aes.windows[i].z_order > top_z) {
+            top_z = _aes.windows[i].z_order;
+        }
+    }
+
+    return window->z_order == top_z;
+}
+
+static void _aes_menu_restore_saved_region(void)
+{
+    WORD i;
+
+    if (_aes.menu_saved_count <= 0) {
+        _aes_menu_free_saved_pixels();
+        return;
+    }
+
+    for (i = 0; i < _aes.menu_saved_count; ++i) {
+        WORD x;
+        WORD y;
+        size_t index = 0;
+        GRECT rect = _aes.menu_saved_rects[i];
+        uint8_t *pixels = _aes.menu_saved_pixels[i];
+
+        if (pixels == NULL || rect.g_w <= 0 || rect.g_h <= 0) {
+            continue;
+        }
+
+        for (y = 0; y < rect.g_h; ++y) {
+            for (x = 0; x < rect.g_w; ++x) {
+                _vdi_set_screen_pixel((WORD) (rect.g_x + x),
+                    (WORD) (rect.g_y + y), (WORD) pixels[index++]);
+            }
+        }
+    }
+
+    _aes_menu_free_saved_pixels();
+}
+
+static int _aes_menu_save_region(const GRECT *rect)
+{
+    WORD x;
+    WORD y;
+    size_t count;
+    size_t index = 0;
+    uint8_t *pixels;
+
+    if (rect == NULL || rect->g_w <= 0 || rect->g_h <= 0 ||
+        _aes.menu_saved_count >= AES_MAX_MENU_SAVED_REGIONS) {
+        return 0;
+    }
+
+    count = (size_t) rect->g_w * (size_t) rect->g_h;
+    pixels = (uint8_t *) gem_os_alloc(count);
+    if (pixels == NULL) {
+        return 0;
+    }
+
+    for (y = 0; y < rect->g_h; ++y) {
+        for (x = 0; x < rect->g_w; ++x) {
+            pixels[index++] = (uint8_t) _vdi_get_screen_pixel(
+                (WORD) (rect->g_x + x), (WORD) (rect->g_y + y));
+        }
+    }
+
+    _aes.menu_saved_pixels[_aes.menu_saved_count] = pixels;
+    _aes.menu_saved_rects[_aes.menu_saved_count] = *rect;
+    ++_aes.menu_saved_count;
+    return 1;
 }
 
 static WORD _aes_light_color(void)
@@ -1282,6 +1986,7 @@ static void _aes_draw_window_title(const aes_window_t *window,
     WORD title_x;
     int has_closer;
     int has_fuller;
+    int active_title;
 
     if (window == NULL || title_height <= 0) {
         return;
@@ -1295,6 +2000,7 @@ static void _aes_draw_window_title(const aes_window_t *window,
     }
 
     text_height = _vdi_font_text_height();
+    active_title = _aes_window_is_top_local(window);
     has_closer = _aes_window_closer_rect(window, &closer_rect);
     has_fuller = _aes_window_fuller_rect(window, &fuller_rect);
     title_top = (WORD) (outer_box[1] + 1);
@@ -1372,21 +2078,26 @@ static void _aes_draw_window_title(const aes_window_t *window,
     }
 
     if (title_left <= title_right && title_top <= title_bottom) {
-        if (title_box_left <= title_box_right) {
-            WORD left_fill_right = (WORD) (title_box_left - 2);
-            WORD right_fill_left = (WORD) (title_box_right + 2);
+        if (active_title != 0) {
+            if (title_box_left <= title_box_right) {
+                WORD left_fill_right = (WORD) (title_box_left - 2);
+                WORD right_fill_left = (WORD) (title_box_right + 2);
 
-            if (title_left <= left_fill_right) {
-                _aes_fill_checker_rect(title_left, title_top,
-                    left_fill_right, title_bottom);
-            }
-            if (right_fill_left <= title_right) {
-                _aes_fill_checker_rect(right_fill_left, title_top,
-                    title_right, title_bottom);
+                if (title_left <= left_fill_right) {
+                    _aes_fill_checker_rect(title_left, title_top,
+                        left_fill_right, title_bottom);
+                }
+                if (right_fill_left <= title_right) {
+                    _aes_fill_checker_rect(right_fill_left, title_top,
+                        title_right, title_bottom);
+                }
+            } else {
+                _aes_fill_checker_rect(title_left, title_top, title_right,
+                    title_bottom);
             }
         } else {
-            _aes_fill_checker_rect(title_left, title_top, title_right,
-                title_bottom);
+            _aes_fill_rect(title_left, title_top, title_right, title_bottom,
+                _aes_light_color());
         }
     }
 
@@ -1573,18 +2284,18 @@ WORD _aes_window_hit_part(const aes_window_t *window, WORD x, WORD y)
 static WORD _aes_find_parent(OBJECT *tree, WORD object)
 {
     WORD parent;
+    WORD last_object;
 
     if (tree == NULL || object <= ROOT) {
         return NIL;
     }
 
-    for (parent = ROOT; parent < 1024; ++parent) {
+    last_object = _aes_menu_last_object(tree);
+
+    for (parent = ROOT; parent <= last_object; ++parent) {
         WORD child;
 
         if (parent == object || tree[parent].ob_head == NIL) {
-            if ((tree[parent].ob_flags & LASTOB) != 0u && parent > object) {
-                break;
-            }
             continue;
         }
 
@@ -1600,9 +2311,6 @@ static WORD _aes_find_parent(OBJECT *tree, WORD object)
                 break;
             }
             child = next;
-        }
-        if ((tree[parent].ob_flags & LASTOB) != 0u && parent > object) {
-            break;
         }
     }
 
@@ -1822,6 +2530,7 @@ static void _aes_draw_object(const OBJECT *tree,
     WORD text_x;
     WORD text_y;
     WORD text_color;
+    int checked_menu_item;
 
     if (_aes.vdi_ready == 0 || tree == NULL || object < 0) {
         return;
@@ -1829,7 +2538,12 @@ static void _aes_draw_object(const OBJECT *tree,
 
     obj = &tree[object];
     spec = _aes_resolve_spec(obj);
-    active = ((obj->ob_state & (SELECTED | CHECKED)) != 0u) ? 1 : 0;
+    checked_menu_item = (obj->ob_type == G_STRING &&
+        (obj->ob_state & CHECKED) != 0u) ? 1 : 0;
+    active = ((obj->ob_state & SELECTED) != 0u) ? 1 : 0;
+    if (obj->ob_type == G_BUTTON && (obj->ob_state & CHECKED) != 0u) {
+        active = 1;
+    }
     fill_color = (active != 0) ?
         _aes_dark_color() : _aes_light_color();
     border_color = _aes_dark_color();
@@ -1905,7 +2619,10 @@ static void _aes_draw_object(const OBJECT *tree,
     text_width = 0;
     text_height = _vdi_font_text_height();
     text_ascent = _vdi_font_ascent();
-    text_x = (WORD) (rect[0] + 2);
+    text_x = (obj->ob_type == G_TITLE) ? rect[0] : (WORD) (rect[0] + 2);
+    if (checked_menu_item != 0) {
+        text_x = (WORD) (text_x + 8);
+    }
     text_y = (WORD) (rect[1] +
         ((obj->ob_height - text_height) > 0 ?
         (obj->ob_height - text_height) / 2 : 0) + text_ascent);
@@ -1915,8 +2632,11 @@ static void _aes_draw_object(const OBJECT *tree,
          obj->ob_type == G_BUTTON) && spec != 0) {
         text_width = (WORD) _vdi_string_width((const char *) (intptr_t) spec);
         if ((obj->ob_type == G_BUTTON || obj->ob_type == G_TITLE) &&
-            text_width < obj->ob_width) {
+            text_width <= obj->ob_width) {
             text_x = (WORD) (rect[0] + (obj->ob_width - text_width) / 2);
+        }
+        if (checked_menu_item != 0) {
+            _aes_draw_text((WORD) (rect[0] + 2), text_y, text_color, "\010");
         }
         _aes_draw_text(text_x, text_y, text_color,
             (const char *) (intptr_t) spec);
