@@ -9,6 +9,8 @@
 
 #include "_vdi.h"
 
+#include "gem/aes.h"
+
 #include "platform/hid.h"
 #include "platform/raster.h"
 
@@ -20,22 +22,283 @@
 
 vdi_state_t _vdi;
 
+#define VDI_WORD_HEX(value) ((WORD) (UWORD) (value))
+
 enum {
-    _vdi_cursor_width = 8,
-    _vdi_cursor_height = 12
+    _vdi_cursor_width = 16,
+    _vdi_cursor_height = 16
 };
 
-static const uint8_t g_vdi_cursor_bits[_vdi_cursor_height] = {
-    0x80, 0xc0, 0xe0, 0xf0, 0xf8, 0xfc,
-    0xe0, 0xd0, 0x90, 0x08, 0x08, 0x00
+enum {
+    _vdi_cursor_arrow_hot_x = 0,
+    _vdi_cursor_arrow_hot_y = 0,
+    _vdi_cursor_bee_hot_x = 7,
+    _vdi_cursor_bee_hot_y = 7
 };
-static uint8_t g_vdi_cursor_saved[_vdi_cursor_height];
+
+/*
+ * Built-in GEM mouse forms derived from the supplied Atari ST cursor
+ * artwork. The arrow uses a (0,0) hot spot. The bee is centered so the
+ * user points with the middle of the sprite rather than a corner.
+ */
+static const MFORM g_vdi_arrow_form = {
+    0, 0, 1, BLACK, WHITE,
+    {
+        VDI_WORD_HEX(0xc000), VDI_WORD_HEX(0xe000),
+        VDI_WORD_HEX(0xf000), VDI_WORD_HEX(0xf800),
+        VDI_WORD_HEX(0xfc00), VDI_WORD_HEX(0xfe00),
+        VDI_WORD_HEX(0xff00), VDI_WORD_HEX(0xff80),
+        VDI_WORD_HEX(0xffc0), VDI_WORD_HEX(0xffe0),
+        VDI_WORD_HEX(0xfe00), VDI_WORD_HEX(0xef00),
+        VDI_WORD_HEX(0xcf00), VDI_WORD_HEX(0x8780),
+        VDI_WORD_HEX(0x0780), VDI_WORD_HEX(0x0380)
+    },
+    {
+        VDI_WORD_HEX(0x0000), VDI_WORD_HEX(0x4000),
+        VDI_WORD_HEX(0x6000), VDI_WORD_HEX(0x7000),
+        VDI_WORD_HEX(0x7800), VDI_WORD_HEX(0x7c00),
+        VDI_WORD_HEX(0x7e00), VDI_WORD_HEX(0x7f00),
+        VDI_WORD_HEX(0x7f80), VDI_WORD_HEX(0x7c00),
+        VDI_WORD_HEX(0x6c00), VDI_WORD_HEX(0x4600),
+        VDI_WORD_HEX(0x0600), VDI_WORD_HEX(0x0300),
+        VDI_WORD_HEX(0x0300), VDI_WORD_HEX(0x0000)
+    }
+};
+static const MFORM g_vdi_bee_form = {
+    7, 7, 1, BLACK, WHITE,
+    {
+        VDI_WORD_HEX(0x0e00), VDI_WORD_HEX(0x0e1f),
+        VDI_WORD_HEX(0x0e3f), VDI_WORD_HEX(0x077f),
+        VDI_WORD_HEX(0xe7ff), VDI_WORD_HEX(0xffff),
+        VDI_WORD_HEX(0xffff), VDI_WORD_HEX(0x1fff),
+        VDI_WORD_HEX(0x0fff), VDI_WORD_HEX(0x1ffe),
+        VDI_WORD_HEX(0x3fff), VDI_WORD_HEX(0x7fff),
+        VDI_WORD_HEX(0x7fff), VDI_WORD_HEX(0x7fff),
+        VDI_WORD_HEX(0x7fff), VDI_WORD_HEX(0x7fbf)
+    },
+    {
+        VDI_WORD_HEX(0x0000), VDI_WORD_HEX(0x0400),
+        VDI_WORD_HEX(0x041e), VDI_WORD_HEX(0x0031),
+        VDI_WORD_HEX(0x0361), VDI_WORD_HEX(0x6342),
+        VDI_WORD_HEX(0x0cc5), VDI_WORD_HEX(0x0daa),
+        VDI_WORD_HEX(0x0370), VDI_WORD_HEX(0x0eac),
+        VDI_WORD_HEX(0x19fe), VDI_WORD_HEX(0x30b0),
+        VDI_WORD_HEX(0x216f), VDI_WORD_HEX(0x226c),
+        VDI_WORD_HEX(0x252b), VDI_WORD_HEX(0x1a0a)
+    }
+};
+static uint16_t g_vdi_cursor_saved[_vdi_cursor_height];
 
 static void _vdi_set_screen_pixel_raw(WORD x, WORD y, WORD color);
 static WORD _vdi_get_screen_pixel_raw(WORD x, WORD y);
 static void _vdi_cursor_restore(void);
 static void _vdi_cursor_draw(void);
 void _vdi_prepare_screen_write(void);
+
+static const char *cursor_resource_path(void)
+{
+#ifdef GEM_CURSOR_RSC
+    return GEM_CURSOR_RSC;
+#else
+    return "bin/cursors.rsc";
+#endif
+}
+
+static int _vdi_load_binary_file(const char *path,
+                                 uint8_t **data_out,
+                                 size_t *size_out)
+{
+    FILE *stream;
+    long size;
+    uint8_t *data;
+
+    if (path == NULL || data_out == NULL || size_out == NULL) {
+        return 0;
+    }
+
+    stream = fopen(path, "rb");
+    if (stream == NULL) {
+        return 0;
+    }
+    if (fseek(stream, 0L, SEEK_END) != 0) {
+        fclose(stream);
+        return 0;
+    }
+    size = ftell(stream);
+    if (size < 0 || fseek(stream, 0L, SEEK_SET) != 0) {
+        fclose(stream);
+        return 0;
+    }
+
+    data = malloc((size_t) size);
+    if (data == NULL) {
+        fclose(stream);
+        return 0;
+    }
+    if (size > 0 && fread(data, (size_t) size, 1, stream) != 1) {
+        free(data);
+        fclose(stream);
+        return 0;
+    }
+    fclose(stream);
+
+    *data_out = data;
+    *size_out = (size_t) size;
+    return 1;
+}
+
+static const void *_vdi_resource_ptr(const uint8_t *base,
+                                     size_t size,
+                                     LONG offset,
+                                     size_t bytes)
+{
+    size_t start;
+
+    if (base == NULL || offset < 0) {
+        return NULL;
+    }
+
+    start = (size_t) offset;
+    if (start > size || bytes > size - start) {
+        return NULL;
+    }
+    return base + start;
+}
+
+static WORD _vdi_cursor_hot_x_for_selector(WORD selector)
+{
+    return (selector == HGLASS) ? _vdi_cursor_bee_hot_x :
+        _vdi_cursor_arrow_hot_x;
+}
+
+static WORD _vdi_cursor_hot_y_for_selector(WORD selector)
+{
+    return (selector == HGLASS) ? _vdi_cursor_bee_hot_y :
+        _vdi_cursor_arrow_hot_y;
+}
+
+static void _vdi_copy_builtin_cursor_forms(void)
+{
+    WORD selector;
+
+    for (selector = 0; selector < _vdi_standard_cursor_count; ++selector) {
+        _vdi.standard_mouse_forms[selector] = g_vdi_arrow_form;
+    }
+    _vdi.standard_mouse_forms[ARROW] = g_vdi_arrow_form;
+    _vdi.standard_mouse_forms[HGLASS] = g_vdi_bee_form;
+}
+
+static int _vdi_load_iconblk_cursor(const uint8_t *base,
+                                    size_t size,
+                                    const ICONBLK *icon,
+                                    WORD selector,
+                                    MFORM *out)
+{
+    const WORD *mask;
+    const WORD *data;
+    WORD row;
+
+    if (base == NULL || icon == NULL || out == NULL ||
+        icon->ib_wicon != _vdi_cursor_width ||
+        icon->ib_hicon != _vdi_cursor_height) {
+        return 0;
+    }
+
+    mask = _vdi_resource_ptr(base, size, icon->ib_pmask,
+        sizeof(out->mf_mask));
+    data = _vdi_resource_ptr(base, size, icon->ib_pdata,
+        sizeof(out->mf_data));
+    if (mask == NULL || data == NULL) {
+        return 0;
+    }
+
+    memset(out, 0, sizeof(*out));
+    if (icon->ib_xchar >= 0 && icon->ib_xchar < icon->ib_wicon &&
+        icon->ib_ychar >= 0 && icon->ib_ychar < icon->ib_hicon) {
+        out->mf_xhot = icon->ib_xchar;
+        out->mf_yhot = icon->ib_ychar;
+    } else {
+        out->mf_xhot = _vdi_cursor_hot_x_for_selector(selector);
+        out->mf_yhot = _vdi_cursor_hot_y_for_selector(selector);
+    }
+    out->mf_nplanes = 1;
+    out->mf_fg = BLACK;
+    out->mf_bg = WHITE;
+    for (row = 0; row < _vdi_cursor_height; ++row) {
+        out->mf_mask[row] = mask[row];
+        out->mf_data[row] = data[row];
+    }
+    return 1;
+}
+
+WORD _vdi_load_standard_mouse_forms(void)
+{
+    const char *path = cursor_resource_path();
+    uint8_t *resource = NULL;
+    size_t resource_size = 0;
+    const RSHDR *header;
+    const ICONBLK *icons;
+    WORD selector;
+
+    _vdi_copy_builtin_cursor_forms();
+
+    if (!_vdi_load_binary_file(path, &resource, &resource_size)) {
+        _vdi.mouse_form = _vdi.standard_mouse_forms[ARROW];
+        return 1;
+    }
+    if (resource_size < sizeof(RSHDR)) {
+        free(resource);
+        _vdi.mouse_form = _vdi.standard_mouse_forms[ARROW];
+        return 1;
+    }
+
+    header = (const RSHDR *) resource;
+    icons = _vdi_resource_ptr(resource, resource_size, header->rsh_iconblk,
+        sizeof(ICONBLK) * (size_t) _vdi_standard_cursor_count);
+    if (header->rsh_nib >= _vdi_standard_cursor_count && icons != NULL) {
+        for (selector = 0; selector < _vdi_standard_cursor_count;
+            ++selector) {
+            MFORM form;
+
+            if (_vdi_load_iconblk_cursor(resource, resource_size,
+                &icons[selector], selector, &form)) {
+                _vdi.standard_mouse_forms[selector] = form;
+            }
+        }
+    }
+
+    free(resource);
+    _vdi.mouse_form = _vdi.standard_mouse_forms[ARROW];
+    return 1;
+}
+
+WORD _vdi_set_mouse_form(const MFORM *form)
+{
+    if (form == NULL) {
+        return 0;
+    }
+
+    _vdi_cursor_restore();
+    _vdi.mouse_form = *form;
+    _vdi.cursor_x = (WORD) (_vdi.mouse_x - _vdi.mouse_form.mf_xhot);
+    _vdi.cursor_y = (WORD) (_vdi.mouse_y - _vdi.mouse_form.mf_yhot);
+    _vdi_cursor_draw();
+    if (_vdi.update_depth == 0) {
+        gem_raster_present();
+    } else {
+        _vdi.present_pending = 1;
+    }
+    return 1;
+}
+
+WORD _vdi_select_system_mouse_form(WORD selector)
+{
+    if (selector < 0 || selector >= _vdi_standard_cursor_count) {
+        selector = ARROW;
+    }
+
+    return _vdi_set_mouse_form(&_vdi.standard_mouse_forms[selector]);
+}
 
 enum {
     _vdi_max_fonts = 16,
@@ -64,6 +327,7 @@ typedef struct vdi_font {
     uint32_t off_offset;
     uint8_t *data;
     size_t data_size;
+    WORD uniform_width;
     int present;
     int resident;
 } vdi_font_t;
@@ -196,32 +460,19 @@ static WORD glyph_end_bit(const vdi_font_t *font, WORD index)
 
 static WORD glyph_width(const vdi_font_t *font, unsigned int ch)
 {
-    WORD index = glyph_index(font, ch);
+    WORD index;
 
+    if (font == NULL || !font->resident) {
+        return 0;
+    }
+    if (font->uniform_width > 0) {
+        return font->uniform_width;
+    }
+    index = glyph_index(font, ch);
     if (index < 0) {
-        return (font != NULL && font->resident) ? font->max_char_width : 0;
+        return font->max_char_width;
     }
     return (WORD) (glyph_end_bit(font, index) - glyph_start_bit(font, index));
-}
-
-static int glyph_bit(const vdi_font_t *font, WORD row, WORD bit)
-{
-    size_t byte_index;
-    uint8_t mask;
-
-    if (font == NULL || !font->resident || row < 0 ||
-        row >= font->form_height || bit < 0) {
-        return 0;
-    }
-
-    byte_index = font->data_offset + (size_t) row * (size_t) font->form_width +
-        (size_t) bit / 8u;
-    if (byte_index >= font->data_size) {
-        return 0;
-    }
-
-    mask = (uint8_t) (1u << (7u - ((unsigned int) bit & 7u)));
-    return (font->data[byte_index] & mask) != 0u;
 }
 
 static void clear_font_runtime(vdi_font_t *font)
@@ -246,6 +497,7 @@ static void clear_font_runtime(vdi_font_t *font)
     font->off_offset = 0u;
     font->data = NULL;
     font->data_size = 0u;
+    font->uniform_width = 0;
     font->resident = 0;
 }
 
@@ -347,6 +599,33 @@ static int load_font_file(vdi_font_t *font, WORD font_id, const char *file_name)
 
     font->data_offset = data_offset;
     font->off_offset = off_offset;
+
+    /* Check if all glyphs have uniform width for O(1) width lookup */
+    {
+        WORD num_glyphs = (WORD) (font->last_ade - font->first_ade + 1);
+        WORD w0 = 0;
+        WORD uniform = 1;
+        WORD g;
+
+        if (num_glyphs > 0 && off_offset + (size_t)(num_glyphs + 1u) * 2u <= (size_t) file_size) {
+            const uint8_t *ot = data + off_offset;
+
+            w0 = (WORD) (read_le16(ot + 2u) - read_le16(ot));
+            for (g = 1; g < num_glyphs; ++g) {
+                WORD w = (WORD) (read_le16(ot + (size_t)(g + 1u) * 2u) -
+                    read_le16(ot + (size_t) g * 2u));
+
+                if (w != w0) {
+                    uniform = 0;
+                    break;
+                }
+            }
+        } else {
+            uniform = 0;
+        }
+        font->uniform_width = (uniform != 0) ? w0 : 0;
+    }
+
     font->present = 1;
     font->resident = 1;
     return 1;
@@ -641,12 +920,19 @@ WORD _vdi_char_cell_width(char ch)
 
 WORD _vdi_string_width(const char *string)
 {
-    WORD width = 0;
+    vdi_font_t *font;
+    WORD width;
 
     if (string == NULL) {
         return 0;
     }
 
+    font = current_font();
+    if (font != NULL && font->uniform_width > 0) {
+        return (WORD) (strlen(string) * (size_t) font->uniform_width);
+    }
+
+    width = 0;
     while (*string != '\0') {
         width = (WORD) (width + _vdi_char_cell_width(*string));
         ++string;
@@ -715,16 +1001,10 @@ static void _vdi_apply_mask(uint8_t *byte, uint8_t mask, WORD color)
     }
 }
 
-static uint8_t _vdi_mfdb_mask_for_range(unsigned int start_bit,
-                                        unsigned int end_bit)
-{
-    return (uint8_t) ((0xffu >> start_bit) & (0xffu << (7u - end_bit)));
-}
-
 static uint8_t _vdi_mfdb_sample_direct(const MFDB *mfdb, WORD x, WORD y)
 {
-    const uint8_t *row;
-    uint8_t mask;
+    const UWORD *row;
+    UWORD mask;
 
     if (_vdi_uses_screen(mfdb)) {
         const uint8_t *screen_row = _vdi_screen_row_const(y);
@@ -740,10 +1020,10 @@ static uint8_t _vdi_mfdb_sample_direct(const MFDB *mfdb, WORD x, WORD y)
         return 0;
     }
 
-    row = (const uint8_t *) mfdb->fd_addr +
-        (size_t) y * (size_t) mfdb->fd_wdwidth * 2u;
-    mask = (uint8_t) (1u << (7u - ((unsigned int) x & 7u)));
-    return (row[(size_t) x / 8u] & mask) != 0u ? 1u : 0u;
+    row = (const UWORD *) mfdb->fd_addr +
+        (size_t) y * (size_t) mfdb->fd_wdwidth;
+    mask = (UWORD) (0x8000u >> ((unsigned int) x & 15u));
+    return (row[(size_t) x / 16u] & mask) != 0u ? 1u : 0u;
 }
 
 WORD _vdi_parse_env_word(const char *name, WORD fallback)
@@ -770,12 +1050,15 @@ void _vdi_pump_events(void)
 
 void _vdi_set_mouse_state(WORD x, WORD y, WORD status)
 {
+    WORD hot_x = _vdi.mouse_form.mf_xhot;
+    WORD hot_y = _vdi.mouse_form.mf_yhot;
+
     _vdi_cursor_restore();
     _vdi.mouse_x = x;
     _vdi.mouse_y = y;
     _vdi.mouse_status = status;
-    _vdi.cursor_x = x;
-    _vdi.cursor_y = y;
+    _vdi.cursor_x = (WORD) (x - hot_x);
+    _vdi.cursor_y = (WORD) (y - hot_y);
     _vdi_cursor_draw();
     if (_vdi.update_depth == 0) {
         gem_raster_present();
@@ -854,9 +1137,9 @@ static void _vdi_cursor_restore(void)
         WORD x;
 
         for (x = 0; x < _vdi_cursor_width; ++x) {
-            uint8_t bit = (uint8_t) (0x80u >> x);
+            uint16_t bit = (uint16_t) (0x8000u >> x);
 
-            if ((g_vdi_cursor_bits[y] & bit) == 0u) {
+            if ((_vdi.mouse_form.mf_mask[y] & bit) == 0u) {
                 continue;
             }
             _vdi_set_screen_pixel_raw((WORD) (_vdi.cursor_x + x),
@@ -871,27 +1154,36 @@ static void _vdi_cursor_restore(void)
 static void _vdi_cursor_draw(void)
 {
     WORD y;
+    WORD fg_color;
+    WORD bg_color;
 
     if (!_vdi.open || _vdi.cursor_hidden != 0 || _vdi.cursor_drawn != 0) {
         return;
     }
 
+    fg_color = (_vdi.mouse_form.mf_fg == WHITE) ? 1 : 0;
+    bg_color = (_vdi.mouse_form.mf_bg == WHITE) ? 1 : 0;
+
     for (y = 0; y < _vdi_cursor_height; ++y) {
         WORD x;
-        uint8_t saved = 0u;
+        uint16_t saved = 0u;
 
         for (x = 0; x < _vdi_cursor_width; ++x) {
             WORD px = (WORD) (_vdi.cursor_x + x);
             WORD py = (WORD) (_vdi.cursor_y + y);
-            uint8_t bit = (uint8_t) (0x80u >> x);
+            uint16_t bit = (uint16_t) (0x8000u >> x);
 
-            if ((g_vdi_cursor_bits[y] & bit) == 0u) {
+            if ((_vdi.mouse_form.mf_mask[y] & bit) == 0u) {
                 continue;
             }
             if (_vdi_get_screen_pixel_raw(px, py) != 0) {
                 saved |= bit;
             }
-            _vdi_set_screen_pixel_raw(px, py, 1);
+            if ((_vdi.mouse_form.mf_data[y] & bit) != 0u) {
+                _vdi_set_screen_pixel_raw(px, py, fg_color);
+            } else {
+                _vdi_set_screen_pixel_raw(px, py, bg_color);
+            }
         }
         g_vdi_cursor_saved[y] = saved;
     }
@@ -1017,16 +1309,93 @@ int _vdi_clip_line_segment(WORD *x0, WORD *y0, WORD *x1, WORD *y1)
     }
 }
 
+static void _vdi_hline_to_row(uint8_t *row, WORD left, WORD right, WORD color)
+{
+    WORD mode = _vdi_write_mode();
+    size_t start_byte = (size_t) left / 8u;
+    size_t end_byte = (size_t) right / 8u;
+    unsigned int start_bit = (unsigned int) left & 7u;
+    unsigned int end_bit = (unsigned int) right & 7u;
+    uint8_t left_mask = (uint8_t) (0xffu >> start_bit);
+    uint8_t right_mask = (uint8_t) (0xffu << (7u - end_bit));
+
+#define _APPLY(byte_ref, mask) \
+    switch (mode) { \
+    case 2: if (color != 0) (byte_ref) |= (mask); break; \
+    case 3: if (color != 0) (byte_ref) ^= (mask); break; \
+    case 4: (byte_ref) &= (uint8_t) ~(mask); break; \
+    default: \
+        if (color != 0) (byte_ref) |= (mask); \
+        else (byte_ref) &= (uint8_t) ~(mask); \
+        break; \
+    }
+
+    if (start_byte == end_byte) {
+        uint8_t mask = left_mask & right_mask;
+
+        _APPLY(row[start_byte], mask);
+        return;
+    }
+
+    _APPLY(row[start_byte], left_mask);
+
+    if (end_byte > start_byte + 1u) {
+        size_t mid_start = start_byte + 1u;
+        size_t mid_count = end_byte - mid_start;
+
+        switch (mode) {
+        case 2:
+            if (color != 0) {
+                memset(&row[mid_start], 0xffu, mid_count);
+            }
+            break;
+        case 4:
+            memset(&row[mid_start], 0x00u, mid_count);
+            break;
+        case 3:
+            if (color != 0) {
+                size_t i;
+
+                for (i = mid_start; i < end_byte; ++i) {
+                    row[i] ^= 0xffu;
+                }
+            }
+            break;
+        case 1:
+        default:
+            memset(&row[mid_start], (color != 0) ? 0xffu : 0x00u, mid_count);
+            break;
+        }
+    }
+
+    _APPLY(row[end_byte], right_mask);
+
+#undef _APPLY
+}
+
+void _vdi_draw_screen_hline_direct(WORD y, WORD left, WORD right, WORD color)
+{
+    uint8_t *row;
+
+    if (left > right) {
+        WORD tmp = left;
+
+        left = right;
+        right = tmp;
+    }
+    row = _vdi_screen_row_mutable(y);
+    if (row == NULL) {
+        return;
+    }
+    _vdi_hline_to_row(row, left, right, color);
+}
+
 void _vdi_draw_screen_hline(WORD y, WORD x0, WORD x1, WORD color)
 {
     vdi_rect_t clip;
     uint8_t *row;
     WORD left;
     WORD right;
-    size_t start_byte;
-    size_t end_byte;
-    unsigned int start_bit;
-    unsigned int end_bit;
 
     if (x0 > x1) {
         WORD tmp = x0;
@@ -1051,52 +1420,77 @@ void _vdi_draw_screen_hline(WORD y, WORD x0, WORD x1, WORD color)
         return;
     }
 
-    start_byte = (size_t) left / 8u;
-    end_byte = (size_t) right / 8u;
-    start_bit = (unsigned int) left & 7u;
-    end_bit = (unsigned int) right & 7u;
-
-    if (start_byte == end_byte) {
-        uint8_t mask = _vdi_mfdb_mask_for_range(start_bit, end_bit);
-
-        _vdi_apply_mask(&row[start_byte], mask, color);
-        return;
-    }
-
-    _vdi_apply_mask(&row[start_byte], (uint8_t) (0xffu >> start_bit), color);
-
-    if (end_byte > start_byte + 1u) {
-        size_t byte_index;
-
-        for (byte_index = start_byte + 1u; byte_index < end_byte; ++byte_index) {
-            _vdi_apply_mask(&row[byte_index], 0xffu, color);
-        }
-    }
-
-    _vdi_apply_mask(&row[end_byte], (uint8_t) (0xffu << (7u - end_bit)),
-        color);
+    _vdi_hline_to_row(row, left, right, color);
 }
 
 void _vdi_draw_line_segment(WORD x0, WORD y0, WORD x1, WORD y1, WORD color)
 {
+    WORD dx;
+    WORD sx;
+    WORD dy;
+    WORD sy;
+    WORD err;
+
     if (!_vdi_clip_line_segment(&x0, &y0, &x1, &y1)) {
         return;
     }
+
+    _vdi_prepare_screen_write();
+
     if (y0 == y1) {
-        _vdi_draw_screen_hline(y0, x0, x1, color);
+        _vdi_draw_screen_hline_direct(y0, x0, x1, color);
         return;
     }
 
-    WORD dx = (WORD) abs(x1 - x0);
-    WORD sx = (WORD) ((x0 < x1) ? 1 : -1);
-    WORD dy = (WORD) -abs(y1 - y0);
-    WORD sy = (WORD) ((y0 < y1) ? 1 : -1);
-    WORD err = (WORD) (dx + dy);
+    if (x0 == x1) {
+        /* Vertical line: compute mask and byte offset once, advance by pitch */
+        uint8_t mask = _vdi_screen_mask_for_x(x0);
+        size_t byte_off = (size_t) x0 / 8u;
+        WORD mode = _vdi_write_mode();
+        WORD min_y = (y0 < y1) ? y0 : y1;
+        WORD max_y = (y0 < y1) ? y1 : y0;
+        size_t pitch = _vdi.surface->pitch;
+        uint8_t *row = (uint8_t *) _vdi.surface->pixels +
+            (size_t) min_y * pitch;
+        WORD scan_y;
+
+        for (scan_y = min_y; scan_y <= max_y; ++scan_y, row += pitch) {
+            switch (mode) {
+            case 2:
+                if (color != 0) {
+                    row[byte_off] |= mask;
+                }
+                break;
+            case 3:
+                if (color != 0) {
+                    row[byte_off] ^= mask;
+                }
+                break;
+            case 4:
+                row[byte_off] &= (uint8_t) ~mask;
+                break;
+            default:
+                if (color != 0) {
+                    row[byte_off] |= mask;
+                } else {
+                    row[byte_off] &= (uint8_t) ~mask;
+                }
+                break;
+            }
+        }
+        return;
+    }
+
+    dx = (WORD) abs(x1 - x0);
+    sx = (WORD) ((x0 < x1) ? 1 : -1);
+    dy = (WORD) -abs(y1 - y0);
+    sy = (WORD) ((y0 < y1) ? 1 : -1);
+    err = (WORD) (dx + dy);
 
     FOREVER {
         WORD e2 = (WORD) (2 * err);
 
-        _vdi_set_screen_pixel(x0, y0, color);
+        _vdi_set_screen_pixel_raw(x0, y0, color);
         if (x0 == x1 && y0 == y1) {
             return;
         }
@@ -1116,7 +1510,18 @@ void _vdi_fill_rect(WORD x0, WORD y0, WORD x1, WORD y1, WORD color)
 {
     vdi_rect_t rect;
     vdi_rect_t clip;
-    WORD y;
+    WORD mode;
+    size_t pitch;
+    WORD height;
+    uint8_t *base;
+    size_t start_byte;
+    size_t end_byte;
+    unsigned int start_bit;
+    unsigned int end_bit;
+    uint8_t fill_byte;
+    uint8_t left_mask;
+    uint8_t right_mask;
+    WORD row;
 
     rect.x0 = (x0 < x1) ? x0 : x1;
     rect.x1 = (x0 < x1) ? x1 : x0;
@@ -1128,8 +1533,65 @@ void _vdi_fill_rect(WORD x0, WORD y0, WORD x1, WORD y1, WORD color)
         return;
     }
 
-    for (y = rect.y0; y <= rect.y1; ++y) {
-        _vdi_draw_screen_hline(y, rect.x0, rect.x1, color);
+    _vdi_prepare_screen_write();
+
+    mode = _vdi_write_mode();
+    pitch = _vdi.surface->pitch;
+    height = (WORD) (rect.y1 - rect.y0 + 1);
+    base = (uint8_t *) _vdi.surface->pixels + (size_t) rect.y0 * pitch;
+    start_byte = (size_t) rect.x0 / 8u;
+    end_byte = (size_t) rect.x1 / 8u;
+    start_bit = (unsigned int) rect.x0 & 7u;
+    end_bit = (unsigned int) rect.x1 & 7u;
+
+    if (mode == 1 || mode == 4) {
+        fill_byte = (mode == 1 && color != 0) ? 0xffu : 0x00u;
+
+        /* Full-width fill: single memset over all rows */
+        if (start_byte == 0 && end_byte == pitch - 1 &&
+            start_bit == 0 && end_bit == 7) {
+            memset(base, fill_byte, pitch * (size_t) height);
+            return;
+        }
+
+        left_mask = (uint8_t) (0xffu >> start_bit);
+        right_mask = (uint8_t) (0xffu << (7u - end_bit));
+
+        if (start_byte == end_byte) {
+            uint8_t mask = left_mask & right_mask;
+
+            for (row = 0; row < height; ++row, base += pitch) {
+                if (fill_byte != 0u) {
+                    base[start_byte] |= mask;
+                } else {
+                    base[start_byte] &= (uint8_t) ~mask;
+                }
+            }
+            return;
+        }
+
+        for (row = 0; row < height; ++row, base += pitch) {
+            if (fill_byte != 0u) {
+                base[start_byte] |= left_mask;
+            } else {
+                base[start_byte] &= (uint8_t) ~left_mask;
+            }
+            if (end_byte > start_byte + 1u) {
+                memset(&base[start_byte + 1u], fill_byte,
+                    end_byte - start_byte - 1u);
+            }
+            if (fill_byte != 0u) {
+                base[end_byte] |= right_mask;
+            } else {
+                base[end_byte] &= (uint8_t) ~right_mask;
+            }
+        }
+        return;
+    }
+
+    /* General case for modes 2, 3, 4 */
+    for (row = 0; row < height; ++row, base += pitch) {
+        _vdi_hline_to_row(base, rect.x0, rect.x1, color);
     }
 }
 
@@ -1138,10 +1600,12 @@ void _vdi_draw_glyph(WORD x, WORD y, char ch, WORD color)
     vdi_font_t *font = current_font();
     vdi_rect_t clip;
     WORD opaque_background = _vdi_text_background_mode();
-    WORD row_index;
     WORD index;
     WORD start_bit;
     WORD width;
+    WORD clip_col0;
+    WORD clip_col1;
+    WORD row_index;
 
     if (font == NULL) {
         return;
@@ -1155,40 +1619,76 @@ void _vdi_draw_glyph(WORD x, WORD y, char ch, WORD color)
         }
     }
 
-    start_bit = glyph_start_bit(font, index);
-    width = (WORD) (glyph_end_bit(font, index) - start_bit);
+    if (font->uniform_width > 0) {
+        start_bit = (WORD) ((LONG) index * font->uniform_width);
+        width = font->uniform_width;
+    } else {
+        start_bit = glyph_start_bit(font, index);
+        width = (WORD) (glyph_end_bit(font, index) - start_bit);
+    }
+    if (width <= 0) {
+        return;
+    }
+
     _vdi_get_active_clip_rect(&clip);
+
+    /* Pre-clip the glyph column range to avoid per-hline clip lookups */
+    clip_col0 = (clip.x0 > x) ? (WORD) (clip.x0 - x) : 0;
+    clip_col1 = (clip.x1 < (WORD) (x + width - 1))
+        ? (WORD) (clip.x1 - x) : (WORD) (width - 1);
+    if (clip_col0 > clip_col1) {
+        return;
+    }
+
+    _vdi_prepare_screen_write();
+
     for (row_index = 0; row_index < font->form_height; ++row_index) {
         WORD draw_y = (WORD) (y + row_index);
-        WORD col_index = 0;
+        const uint8_t *glyph_row;
+        WORD col;
 
         if (draw_y < clip.y0 || draw_y > clip.y1) {
             continue;
         }
 
-        if (opaque_background != 0 && width > 0) {
-            _vdi_draw_screen_hline(draw_y, x, (WORD) (x + width - 1), 0);
+        if (opaque_background != 0) {
+            _vdi_draw_screen_hline_direct(draw_y, (WORD) (x + clip_col0),
+                (WORD) (x + clip_col1), 0);
         }
 
-        while (col_index < width) {
-            if (!glyph_bit(font, row_index,
-                    (WORD) (start_bit + col_index))) {
-                ++col_index;
+        /* Direct byte access into font bitmap — avoids per-bit glyph_bit() call */
+        glyph_row = font->data + font->data_offset +
+            (size_t) row_index * (size_t) font->form_width;
+
+        col = clip_col0;
+        while (col <= clip_col1) {
+            WORD abs_bit = (WORD) (start_bit + col);
+            size_t byte_off = (size_t) abs_bit / 8u;
+            unsigned int bit_in_byte = 7u - ((unsigned int) abs_bit & 7u);
+
+            if (byte_off < font->data_size &&
+                !(glyph_row[byte_off] & (uint8_t) (1u << bit_in_byte))) {
+                ++col;
                 continue;
             }
 
             {
-                WORD run_start = col_index;
+                WORD run_start = col;
 
-                while (col_index + 1 < width &&
-                    glyph_bit(font, row_index,
-                        (WORD) (start_bit + col_index + 1))) {
-                    ++col_index;
+                ++col;
+                while (col <= clip_col1) {
+                    abs_bit = (WORD) (start_bit + col);
+                    byte_off = (size_t) abs_bit / 8u;
+                    bit_in_byte = 7u - ((unsigned int) abs_bit & 7u);
+                    if (byte_off >= font->data_size ||
+                        !(glyph_row[byte_off] & (uint8_t) (1u << bit_in_byte))) {
+                        break;
+                    }
+                    ++col;
                 }
-                _vdi_draw_screen_hline(draw_y, (WORD) (x + run_start),
-                    (WORD) (x + col_index), color);
+                _vdi_draw_screen_hline_direct(draw_y, (WORD) (x + run_start),
+                    (WORD) (x + col - 1), color);
             }
-            ++col_index;
         }
     }
 }
@@ -1256,14 +1756,10 @@ void _vdi_mfdb_set_pixel(MFDB *mfdb, WORD x, WORD y, WORD color)
 
 void _vdi_mfdb_draw_hline(MFDB *mfdb, WORD y, WORD x0, WORD x1, WORD color)
 {
-    uint8_t *row;
+    UWORD *row_words;
     WORD left;
     WORD right;
-    size_t row_bytes;
-    size_t start_byte;
-    size_t end_byte;
-    unsigned int start_bit;
-    unsigned int end_bit;
+    WORD x;
 
     if (x0 > x1) {
         WORD tmp = x0;
@@ -1285,33 +1781,18 @@ void _vdi_mfdb_draw_hline(MFDB *mfdb, WORD y, WORD x0, WORD x1, WORD color)
     if (left > right) {
         return;
     }
+    row_words = (UWORD *) mfdb->fd_addr +
+        (size_t) y * (size_t) mfdb->fd_wdwidth;
+    for (x = left; x <= right; ++x) {
+        UWORD mask = (UWORD) (0x8000u >> ((unsigned int) x & 15u));
+        UWORD *word = &row_words[(size_t) x / 16u];
 
-    row_bytes = (size_t) mfdb->fd_wdwidth * 2u;
-    row = (uint8_t *) mfdb->fd_addr + (size_t) y * row_bytes;
-    start_byte = (size_t) left / 8u;
-    end_byte = (size_t) right / 8u;
-    start_bit = (unsigned int) left & 7u;
-    end_bit = (unsigned int) right & 7u;
-
-    if (start_byte == end_byte) {
-        uint8_t mask = _vdi_mfdb_mask_for_range(start_bit, end_bit);
-
-        _vdi_apply_mask(&row[start_byte], mask, color);
-        return;
-    }
-
-    _vdi_apply_mask(&row[start_byte], (uint8_t) (0xffu >> start_bit), color);
-
-    if (end_byte > start_byte + 1u) {
-        size_t byte_index;
-
-        for (byte_index = start_byte + 1u; byte_index < end_byte; ++byte_index) {
-            _vdi_apply_mask(&row[byte_index], 0xffu, color);
+        if (color != 0) {
+            *word |= mask;
+        } else {
+            *word &= (UWORD) ~mask;
         }
     }
-
-    _vdi_apply_mask(&row[end_byte], (uint8_t) (0xffu << (7u - end_bit)),
-        color);
 }
 
 void _vdi_fill_work_out(WORD work_out[57])

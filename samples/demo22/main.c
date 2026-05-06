@@ -42,13 +42,13 @@ OBJECT menu_tree[] = {
     {6, 8, 10, G_BOX, NONE, NORMAL, 0x1100L, 0, 0, 20, 4},
     {7, -1, -1, G_STRING, NONE, NORMAL, (LONG) "  About Demo 22 ", 0, 0, 20, 1},
     {7, -1, -1, G_STRING, NONE, NORMAL, (LONG) "  ------------ ", 0, 1, 20, 1},
-    {7, -1, -1, G_STRING, NONE, NORMAL, (LONG) "  Quit ", 0, 2, 20, 1},
+    {7, -1, -1, G_STRING, NONE, NORMAL, (LONG) "  Quit \t^Q", 0, 2, 20, 1},
     {6, 12, 13, G_BOX, NONE, NORMAL, 0x1100L, 0, 0, 20, 3},
     {11, -1, -1, G_STRING, NONE, NORMAL, (LONG) "  Toggle option ", 0, 0, 20, 1},
     {11, -1, -1, G_STRING, NONE, NORMAL, (LONG) "  Reset defaults ", 0, 1, 20, 1},
     {6, 15, 16, G_BOX, NONE, NORMAL, 0x1100L, 0, 0, 24, 3},
-    {14, -1, -1, G_STRING, NONE, NORMAL, (LONG) "  Esc closes app ", 0, 0, 24, 1},
-    {14, -1, -1, G_STRING, LASTOB, NORMAL, (LONG) "  About GEM Demo ", 0, 1, 24, 1}
+    {14, -1, -1, G_STRING, NONE, NORMAL, (LONG) "  Esc closes app \tEsc", 0, 0, 24, 1},
+    {14, -1, -1, G_STRING, LASTOB, NORMAL, (LONG) "  About GEM Demo \tF1", 0, 1, 24, 1}
 };
 
 void redraw_window(GRECT *clip);
@@ -105,6 +105,31 @@ int main(void)
         case WM_TOPPED:
             wind_set(win_handle, WF_TOP, 0, 0, 0, 0);
             break;
+
+        case WM_FULLED:
+        {
+            GRECT current;
+            GRECT previous;
+            GRECT full_work;
+
+            wind_get(win_handle, WF_CURRXYWH, &current.g_x, &current.g_y,
+                &current.g_w, &current.g_h);
+            wind_get(win_handle, WF_PXYWH, &previous.g_x, &previous.g_y,
+                &previous.g_w, &previous.g_h);
+            wind_get(win_handle, WF_FXYWH, &full_work.g_x, &full_work.g_y,
+                &full_work.g_w, &full_work.g_h);
+
+            if (current.g_x == full_work.g_x && current.g_y == full_work.g_y &&
+                current.g_w == full_work.g_w &&
+                current.g_h == full_work.g_h) {
+                wind_set(win_handle, WF_CURRXYWH, previous.g_x, previous.g_y,
+                    previous.g_w, previous.g_h);
+            } else {
+                wind_set(win_handle, WF_CURRXYWH, full_work.g_x,
+                    full_work.g_y, full_work.g_w, full_work.g_h);
+            }
+            break;
+        }
 
         case MN_SELECTED:
             handle_menu(msg[3], msg[4]);

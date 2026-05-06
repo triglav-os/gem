@@ -30,6 +30,9 @@ static void _aes_queue_window_message(const aes_window_t *window,
     WORD message, WORD w4, WORD w5, WORD w6, WORD w7);
 static WORD _aes_dequeue_message(WORD msg[8]);
 static void _aes_draw_drag_outline(const GRECT *rect);
+static void _aes_clamp_dragged_window_position(const aes_window_t *window,
+    const GRECT *desktop, WORD *x, WORD *y);
+static void _aes_toggle_window_iconified(aes_window_t *window);
 static int _aes_rects_intersect_local(const GRECT *left, const GRECT *right);
 static int _aes_intersect_rects_local(const GRECT *left, const GRECT *right,
     GRECT *out);
@@ -38,6 +41,12 @@ static WORD _aes_subtract_rect_local(const GRECT *source, const GRECT *cover,
 static WORD _aes_build_visible_rects(WORD handle, GRECT out[], WORD max_rects);
 static WORD _aes_track_window_interaction(const gem_hid_event_t *first_evt,
     WORD flags, WORD mepbuff[8], WORD *pmx, WORD *pmy, WORD *pmb, WORD *pks);
+static int _aes_resource_contains_ptr(const void *ptr);
+static LONG _aes_resource_fix_offset(LONG value);
+static void _aes_resource_fix_tedinfo(TEDINFO *ted);
+static void _aes_resource_fix_iconblk(ICONBLK *icon);
+static void _aes_resource_fix_bitblk(BITBLK *bitblk);
+extern WORD _vdi_select_system_mouse_form(WORD selector);
 
 static void _aes_desktop_rect(GRECT *rect)
 {
@@ -146,6 +155,83 @@ static void _aes_draw_drag_outline(const GRECT *rect)
     vsl_color(_aes.vdi_handle, WHITE);
     v_pline(_aes.vdi_handle, 5, box);
     (void) vswr_mode(_aes.vdi_handle, previous_mode);
+}
+
+static void _aes_clamp_dragged_window_position(const aes_window_t *window,
+    const GRECT *desktop, WORD *x, WORD *y)
+{
+    WORD title_height;
+    WORD visible_width;
+    WORD min_x;
+    WORD max_x;
+    WORD min_y;
+    WORD max_y;
+
+    if (window == NULL || desktop == NULL || x == NULL || y == NULL) {
+        return;
+    }
+
+    /*
+     * Permit windows to move partially off-screen while keeping a small
+     * reachable strip of the title area visible so the user can always
+     * drag the window back.
+     */
+    title_height = (WORD) (window->work.g_y - window->outer.g_y);
+    if (title_height <= 0) {
+        title_height = _aes_chrome_height();
+    }
+
+    visible_width = 32;
+    if (visible_width > window->outer.g_w) {
+        visible_width = window->outer.g_w;
+    }
+    if (visible_width <= 0) {
+        visible_width = 1;
+    }
+
+    min_x = (WORD) (desktop->g_x - window->outer.g_w + visible_width);
+    max_x = (WORD) (desktop->g_x + desktop->g_w - visible_width);
+    min_y = _aes_menu_bar_height();
+    max_y = (WORD) (desktop->g_y + desktop->g_h - title_height);
+
+    *x = _aes_max_word(min_x, _aes_min_word(*x, max_x));
+    *y = _aes_max_word(min_y, _aes_min_word(*y, max_y));
+}
+
+static void _aes_toggle_window_iconified(aes_window_t *window)
+{
+    GRECT previous_outer;
+    WORD title_height;
+    WORD bottom_border;
+
+    if (window == NULL) {
+        return;
+    }
+
+    previous_outer = window->outer;
+    if (window->iconified != 0) {
+        window->outer = window->restored_outer;
+        window->iconified = 0;
+    } else {
+        window->restored_outer = window->outer;
+        title_height = (WORD) (window->work.g_y - window->outer.g_y);
+        if (title_height <= 0) {
+            title_height = _aes_chrome_height();
+        }
+        bottom_border = (WORD) (window->outer.g_h -
+            (window->work.g_y - window->outer.g_y) - window->work.g_h);
+        if (bottom_border < 1) {
+            bottom_border = 1;
+        }
+        window->outer.g_h = (WORD) (title_height + bottom_border);
+        window->iconified = 1;
+    }
+
+    window->previous_outer = previous_outer;
+    _aes_compute_work(window);
+    if (window->open != 0) {
+        _aes_redraw_window_change(&previous_outer, &window->outer);
+    }
 }
 
 static int _aes_rects_intersect_local(const GRECT *left, const GRECT *right)
@@ -322,8 +408,12 @@ static WORD _aes_track_window_interaction(const gem_hid_event_t *first_evt,
     WORD raised;
 
     if (first_evt == NULL || first_evt->type != GEM_HID_MOUSE_BUTTON ||
-        first_evt->button != GEM_HID_BUTTON_LEFT ||
-        (first_evt->flags & GEM_HID_BUTTON_LEFT) == 0u) {
+        ((first_evt->button != GEM_HID_BUTTON_LEFT &&
+        first_evt->button != GEM_HID_BUTTON_RIGHT)) ||
+        ((first_evt->button == GEM_HID_BUTTON_LEFT &&
+        (first_evt->flags & GEM_HID_BUTTON_LEFT) == 0u) ||
+        (first_evt->button == GEM_HID_BUTTON_RIGHT &&
+        (first_evt->flags & GEM_HID_BUTTON_RIGHT) == 0u))) {
         return 0;
     }
 
@@ -386,6 +476,10 @@ static WORD _aes_track_window_interaction(const gem_hid_event_t *first_evt,
     }
 
     if (part == AES_WINDOW_PART_FULLER) {
+        if (first_evt->button == GEM_HID_BUTTON_RIGHT) {
+            _aes_toggle_window_iconified(window);
+            return 0;
+        }
         _aes_queue_window_message(window, WM_FULLED, 0, 0, 0, 0);
         if ((flags & MU_MESAG) != 0u && mepbuff != NULL &&
             _aes_dequeue_message(mepbuff) != 0) {
@@ -402,9 +496,11 @@ static WORD _aes_track_window_interaction(const gem_hid_event_t *first_evt,
         int drag_drawn = 0;
 
         _aes_desktop_rect(&desktop);
+        _vdi_begin_update();
         v_hide_c(_aes.vdi_handle);
         _aes_draw_drag_outline(&drag_rect);
         v_show_c(_aes.vdi_handle, 1);
+        _vdi_end_update();
         drag_drawn = 1;
 
         FOREVER {
@@ -417,15 +513,14 @@ static WORD _aes_track_window_interaction(const gem_hid_event_t *first_evt,
                 WORD new_x;
                 WORD new_y;
 
+                _vdi_begin_update();
                 v_hide_c(_aes.vdi_handle);
                 _aes_store_mouse_state(&evt);
 
                 new_x = (WORD) (original.g_x + evt.x - start_x);
                 new_y = (WORD) (original.g_y + evt.y - start_y);
-                new_x = _aes_max_word(desktop.g_x, _aes_min_word(new_x,
-                    (WORD) (desktop.g_x + desktop.g_w - window->outer.g_w)));
-                new_y = _aes_max_word(desktop.g_y, _aes_min_word(new_y,
-                    (WORD) (desktop.g_y + desktop.g_h - window->outer.g_h)));
+                _aes_clamp_dragged_window_position(window, &desktop,
+                    &new_x, &new_y);
                 if (new_x != drag_rect.g_x || new_y != drag_rect.g_y) {
                     if (drag_drawn != 0) {
                         _aes_draw_drag_outline(&last_rect);
@@ -437,17 +532,24 @@ static WORD _aes_track_window_interaction(const gem_hid_event_t *first_evt,
                     drag_drawn = 1;
                 }
                 v_show_c(_aes.vdi_handle, 1);
+                _vdi_end_update();
                 graf_mkstate(pmx, pmy, pmb, pks);
             }
             if (evt.type == GEM_HID_MOUSE_BUTTON &&
                 evt.button == GEM_HID_BUTTON_LEFT &&
                 (evt.flags & GEM_HID_BUTTON_LEFT) == 0u) {
+                _vdi_begin_update();
                 v_hide_c(_aes.vdi_handle);
                 _aes_store_mouse_state(&evt);
                 if (drag_drawn != 0) {
                     _aes_draw_drag_outline(&last_rect);
                 }
                 v_show_c(_aes.vdi_handle, 1);
+                _vdi_end_update();
+                if (window->iconified != 0) {
+                    window->restored_outer.g_x = drag_rect.g_x;
+                    window->restored_outer.g_y = drag_rect.g_y;
+                }
                 _aes_queue_window_message(window, WM_MOVED, drag_rect.g_x,
                     drag_rect.g_y, drag_rect.g_w, drag_rect.g_h);
                 if ((flags & MU_MESAG) != 0u && mepbuff != NULL &&
@@ -467,9 +569,11 @@ static WORD _aes_track_window_interaction(const gem_hid_event_t *first_evt,
         int drag_drawn = 0;
 
         _aes_desktop_rect(&desktop);
+        _vdi_begin_update();
         v_hide_c(_aes.vdi_handle);
         _aes_draw_drag_outline(&drag_rect);
         v_show_c(_aes.vdi_handle, 1);
+        _vdi_end_update();
         drag_drawn = 1;
 
         FOREVER {
@@ -482,6 +586,7 @@ static WORD _aes_track_window_interaction(const gem_hid_event_t *first_evt,
                 WORD new_w;
                 WORD new_h;
 
+                _vdi_begin_update();
                 v_hide_c(_aes.vdi_handle);
                 _aes_store_mouse_state(&evt);
                 new_w = (WORD) (original.g_w + evt.x - start_x);
@@ -501,17 +606,20 @@ static WORD _aes_track_window_interaction(const gem_hid_event_t *first_evt,
                     drag_drawn = 1;
                 }
                 v_show_c(_aes.vdi_handle, 1);
+                _vdi_end_update();
                 graf_mkstate(pmx, pmy, pmb, pks);
             }
             if (evt.type == GEM_HID_MOUSE_BUTTON &&
                 evt.button == GEM_HID_BUTTON_LEFT &&
                 (evt.flags & GEM_HID_BUTTON_LEFT) == 0u) {
+                _vdi_begin_update();
                 v_hide_c(_aes.vdi_handle);
                 _aes_store_mouse_state(&evt);
                 if (drag_drawn != 0) {
                     _aes_draw_drag_outline(&last_rect);
                 }
                 v_show_c(_aes.vdi_handle, 1);
+                _vdi_end_update();
                 _aes_queue_window_message(window, WM_SIZED, drag_rect.g_x,
                     drag_rect.g_y, drag_rect.g_w, drag_rect.g_h);
                 if ((flags & MU_MESAG) != 0u && mepbuff != NULL &&
@@ -531,6 +639,69 @@ static WORD _aes_track_window_interaction(const gem_hid_event_t *first_evt,
         }
     }
     return 0;
+}
+
+static int _aes_resource_contains_ptr(const void *ptr)
+{
+    uintptr_t base;
+    uintptr_t end;
+    uintptr_t value;
+
+    if (_aes.resource_data == NULL || ptr == NULL) {
+        return 0;
+    }
+
+    base = (uintptr_t) _aes.resource_data;
+    end = base + _aes.resource_size;
+    value = (uintptr_t) ptr;
+    return value >= base && value < end;
+}
+
+static LONG _aes_resource_fix_offset(LONG value)
+{
+    uintptr_t offset;
+
+    if (_aes.resource_data == NULL || value <= 0) {
+        return value;
+    }
+
+    offset = (uintptr_t) value;
+    if (offset >= _aes.resource_size) {
+        return value;
+    }
+
+    return (LONG) ((uintptr_t) _aes.resource_data + offset);
+}
+
+static void _aes_resource_fix_tedinfo(TEDINFO *ted)
+{
+    if (ted == NULL || !_aes_resource_contains_ptr(ted)) {
+        return;
+    }
+
+    ted->te_ptext = _aes_resource_fix_offset(ted->te_ptext);
+    ted->te_ptmplt = _aes_resource_fix_offset(ted->te_ptmplt);
+    ted->te_pvalid = _aes_resource_fix_offset(ted->te_pvalid);
+}
+
+static void _aes_resource_fix_iconblk(ICONBLK *icon)
+{
+    if (icon == NULL || !_aes_resource_contains_ptr(icon)) {
+        return;
+    }
+
+    icon->ib_pmask = _aes_resource_fix_offset(icon->ib_pmask);
+    icon->ib_pdata = _aes_resource_fix_offset(icon->ib_pdata);
+    icon->ib_ptext = _aes_resource_fix_offset(icon->ib_ptext);
+}
+
+static void _aes_resource_fix_bitblk(BITBLK *bitblk)
+{
+    if (bitblk == NULL || !_aes_resource_contains_ptr(bitblk)) {
+        return;
+    }
+
+    bitblk->bi_pdata = _aes_resource_fix_offset(bitblk->bi_pdata);
 }
 
 /*
@@ -1152,6 +1323,11 @@ WORD objc_draw(OBJECT *tree,
                WORD hc)
 {
     WORD clip[4];
+    WORD origin_x = 0;
+    WORD origin_y = 0;
+    WORD text_attrib[10];
+    WORD previous_font = 0;
+    WORD restore_font = 0;
 
     (void) depth;
 
@@ -1165,13 +1341,25 @@ WORD objc_draw(OBJECT *tree,
         (void *) tree, startob, depth, xc, yc, wc, hc,
         (unsigned) tree[startob].ob_type);
 
+    if (vqt_attributes(_aes.vdi_handle, text_attrib) != 0) {
+        previous_font = text_attrib[0];
+        restore_font = 1;
+    }
+    (void) vst_font(_aes.vdi_handle, 1);
+
     clip[0] = xc;
     clip[1] = yc;
     clip[2] = (WORD) (xc + wc - 1);
     clip[3] = (WORD) (yc + hc - 1);
+    _aes_object_extent(tree, startob, &origin_x, &origin_y);
     vs_clip(_aes.vdi_handle, 1, clip);
-    _aes_draw_tree_recursive(tree, startob, 0, 0, depth, clip);
+    _aes_draw_tree_recursive(tree, startob,
+        (WORD) (origin_x - tree[startob].ob_x),
+        (WORD) (origin_y - tree[startob].ob_y), depth, clip);
     vs_clip(_aes.vdi_handle, 0, clip);
+    if (restore_font != 0) {
+        (void) vst_font(_aes.vdi_handle, previous_font);
+    }
     return 1;
 }
 
@@ -1224,6 +1412,20 @@ WORD objc_edit(OBJECT *tree, WORD object, WORD charidx, WORD *idx, WORD kind)
     if (tree == NULL || object < 0 || idx == NULL) {
         return 0;
     }
+    if (kind == EDSTART || kind == EDINIT) {
+        _aes.edit_tree = tree;
+        _aes.edit_object = object;
+        _aes.edit_index = *idx;
+        return 1;
+    }
+    if (kind == EDEND) {
+        if (_aes.edit_tree == tree && _aes.edit_object == object) {
+            _aes.edit_tree = NULL;
+            _aes.edit_object = NIL;
+            _aes.edit_index = 0;
+        }
+        return 1;
+    }
     if (kind != EDCHAR || tree[object].ob_spec == 0) {
         return 1;
     }
@@ -1236,12 +1438,29 @@ WORD objc_edit(OBJECT *tree, WORD object, WORD charidx, WORD *idx, WORD kind)
 
     length = strlen(text);
     if (*idx < ted->te_txtlen - 1 && charidx >= 32 && charidx <= 126) {
-        text[*idx] = (char) charidx;
-        if ((size_t) *idx >= length) {
-            text[*idx + 1] = '\0';
+        if ((size_t) *idx > length) {
+            *idx = (WORD) length;
         }
-        ++(*idx);
+        if (length < (size_t) (ted->te_txtlen - 1)) {
+            memmove(&text[*idx + 1], &text[*idx],
+                length - (size_t) *idx + 1u);
+            text[*idx] = (char) charidx;
+            ++(*idx);
+        } else if ((size_t) *idx < length) {
+            memmove(&text[*idx + 1], &text[*idx],
+                length - (size_t) *idx);
+            text[*idx] = (char) charidx;
+            text[ted->te_txtlen - 1] = '\0';
+            ++(*idx);
+        } else {
+            text[*idx] = (char) charidx;
+            text[*idx + 1] = '\0';
+            ++(*idx);
+        }
     }
+    _aes.edit_tree = tree;
+    _aes.edit_object = object;
+    _aes.edit_index = *idx;
     return 1;
 }
 
@@ -1295,6 +1514,9 @@ WORD form_dial(WORD flag,
                WORD w2,
                WORD h2)
 {
+    GRECT dirty;
+    GRECT desktop;
+
     (void) flag;
     (void) x1;
     (void) y1;
@@ -1304,6 +1526,19 @@ WORD form_dial(WORD flag,
     (void) y2;
     (void) w2;
     (void) h2;
+
+    if (flag == FMD_START || flag == FMD_GROW) {
+        _aes_desktop_rect(&desktop);
+        if (desktop.g_w > 0 && desktop.g_h > 0) {
+            _aes_redraw_region(&desktop);
+        }
+    }
+
+    if (flag == FMD_FINISH || flag == FMD_SHRINK) {
+        _aes_set_rect(&dirty, x2, y2, w2, h2);
+        _aes_redraw_region(&dirty);
+    }
+
     return 1;
 }
 
@@ -1549,7 +1784,7 @@ WORD graf_handle(WORD *charw, WORD *charh, WORD *boxw, WORD *boxh)
         *boxw = 8;
     }
     if (boxh != NULL) {
-        *boxh = 16;
+        *boxh = _aes_menu_chrome_height();
     }
     return _aes.vdi_handle;
 }
@@ -1569,6 +1804,8 @@ WORD graf_mouse(WORD mode, void *form)
         v_show_c(_aes.vdi_handle, 1);
     } else if (mode == USER_DEF && form != NULL) {
         (void) vsc_form(_aes.vdi_handle, (MFORM *) form);
+    } else if (mode >= ARROW && mode <= OUTLN_CROSS) {
+        (void) _vdi_select_system_mouse_form(mode);
     }
     return 1;
 }
@@ -1667,6 +1904,7 @@ WORD wind_create(UWORD kind, WORD x, WORD y, WORD w, WORD h)
             _aes.windows[i].kind = kind;
             _aes_set_rect(&_aes.windows[i].outer, x, y, w, h);
             _aes.windows[i].previous_outer = _aes.windows[i].outer;
+            _aes.windows[i].restored_outer = _aes.windows[i].outer;
             _aes_compute_work(&_aes.windows[i]);
             return _aes.windows[i].handle;
         }
@@ -1680,17 +1918,47 @@ WORD wind_create(UWORD kind, WORD x, WORD y, WORD w, WORD h)
 WORD wind_open(WORD handle, WORD x, WORD y, WORD w, WORD h)
 {
     aes_window_t *window = _aes_find_window(handle);
+    aes_window_t *previous_top = NULL;
     GRECT previous_outer;
+    GRECT desktop;
+    size_t i;
+    int had_open_windows = 0;
+    int was_open = 0;
 
     if (window == NULL) {
         return 0;
     }
-    previous_outer = window->outer;
+    was_open = (window->open != 0);
+    previous_top = _aes_find_top_window();
+    for (i = 0; i < AES_MAX_WINDOWS; ++i) {
+        if (_aes.windows[i].used != 0 && _aes.windows[i].open != 0 &&
+            _aes.windows[i].handle != handle) {
+            had_open_windows = 1;
+            break;
+        }
+    }
+    if (was_open != 0) {
+        previous_outer = window->outer;
+    } else {
+        _aes_set_rect(&previous_outer, 0, 0, 0, 0);
+        _aes_raise_window(window);
+    }
     _aes_set_rect(&window->outer, x, y, w, h);
+    window->restored_outer = window->outer;
+    window->iconified = 0;
     window->previous_outer = window->outer;
     _aes_compute_work(window);
     window->open = 1;
+    if (had_open_windows == 0) {
+        _aes_desktop_rect(&desktop);
+        if (desktop.g_w > 0 && desktop.g_h > 0) {
+            _aes_redraw_region(&desktop);
+        }
+    }
     _aes_redraw_window_change(&previous_outer, &window->outer);
+    if (was_open == 0) {
+        _aes_redraw_window_title_states(previous_top, window);
+    }
     return 1;
 }
 
@@ -1753,9 +2021,10 @@ WORD wind_get(WORD handle, WORD field, WORD *w1, WORD *w2, WORD *w3, WORD *w4)
 
         if (_aes.menu_visible != 0 && _aes.menu_tree != NULL) {
             (void) graf_handle(NULL, NULL, NULL, &box_height);
-            menu_height = (box_height > 0) ? box_height : 16;
+            menu_height = (box_height > 0) ? box_height :
+                _aes_menu_chrome_height();
             if (menu_height <= 0) {
-                menu_height = 16;
+                menu_height = _aes_menu_chrome_height();
             }
         } else {
             menu_height = 0;
@@ -1834,8 +2103,21 @@ WORD wind_get(WORD handle, WORD field, WORD *w1, WORD *w2, WORD *w3, WORD *w4)
             _aes.enum_index = 0;
             _aes_set_rect(&rect_value, 0, 0, 0, 0);
         }
+    } else if (field == WF_WXYWH) {
+        rect = &window->outer;
+    } else if (field == WF_CXYWH) {
+        rect = &window->work;
+    } else if (field == WF_PXYWH) {
+        rect = &window->previous_outer;
+    } else if (field == WF_FXYWH) {
+        rect_value.g_x = 0;
+        rect_value.g_y = _aes_menu_bar_height();
+        rect_value.g_w = (WORD) (_aes.work_out[0] + 1);
+        rect_value.g_h = (WORD) _aes_max_word((WORD) 0,
+            (WORD) (_aes.work_out[1] + 1 - rect_value.g_y));
+        rect = &rect_value;
     } else {
-        rect = (field == WF_WXYWH) ? &window->outer : &window->work;
+        rect = &window->work;
     }
 
     if (w1 != NULL) {
@@ -1883,6 +2165,14 @@ WORD wind_set(WORD handle, WORD field, WORD w1, WORD w2, WORD w3, WORD w4)
     case WF_CXYWH:
         window->previous_outer = window->outer;
         _aes_set_rect(&window->outer, w1, w2, w3, w4);
+        if (window->iconified != 0) {
+            window->restored_outer.g_x = w1;
+            window->restored_outer.g_y = w2;
+            window->restored_outer.g_w = w3;
+        } else {
+            window->restored_outer = window->outer;
+            window->iconified = 0;
+        }
         _aes_compute_work(window);
         if (window->open != 0) {
             _aes_redraw_window_change(&window->previous_outer, &window->outer);
@@ -2081,12 +2371,15 @@ WORD rsrc_gaddr(WORD type, WORD index, void **addr)
         return 1;
     case R_TEDINFO:
         *addr = base + header->rsh_tedinfo + index * sizeof(TEDINFO);
+        _aes_resource_fix_tedinfo((TEDINFO *) *addr);
         return 1;
     case R_ICONBLK:
         *addr = base + header->rsh_iconblk + index * sizeof(ICONBLK);
+        _aes_resource_fix_iconblk((ICONBLK *) *addr);
         return 1;
     case R_BITBLK:
         *addr = base + header->rsh_bitblk + index * sizeof(BITBLK);
+        _aes_resource_fix_bitblk((BITBLK *) *addr);
         return 1;
     case R_STRING: {
         LONG *strings = (LONG *) (base + header->rsh_string);
@@ -2112,12 +2405,43 @@ WORD rsrc_saddr(WORD type, WORD index, void *addr)
 }
 
 /*
- * Accepts an object-fix request without modifying hosted coordinates.
+ * Fixes one loaded resource object by relocating any file-relative
+ * pointer fields into host pointers.
  */
 WORD rsrc_obfix(OBJECT *tree, WORD object)
 {
-    (void) tree;
-    (void) object;
+    LONG spec;
+
+    if (tree == NULL || object < 0) {
+        return 0;
+    }
+    if (!_aes_resource_contains_ptr(tree)) {
+        return 1;
+    }
+
+    spec = tree[object].ob_spec;
+    switch (tree[object].ob_type) {
+    case G_STRING:
+    case G_TITLE:
+    case G_BUTTON:
+        tree[object].ob_spec = _aes_resource_fix_offset(spec);
+        break;
+    case G_TEXT:
+    case G_BOXTEXT:
+    case G_FTEXT:
+    case G_FBOXTEXT:
+        spec = _aes_resource_fix_offset(spec);
+        tree[object].ob_spec = spec;
+        _aes_resource_fix_tedinfo((TEDINFO *) (intptr_t) spec);
+        break;
+    case G_ICON:
+        spec = _aes_resource_fix_offset(spec);
+        tree[object].ob_spec = spec;
+        _aes_resource_fix_iconblk((ICONBLK *) (intptr_t) spec);
+        break;
+    default:
+        break;
+    }
     return 1;
 }
 

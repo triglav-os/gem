@@ -45,11 +45,13 @@ typedef struct aes_window {
     WORD handle;
     WORD owner;
     WORD open;
+    WORD iconified;
     uint32_t z_order;
     UWORD kind;
     GRECT outer;
     GRECT work;
     GRECT previous_outer;
+    GRECT restored_outer;
     char name[128];
     char info[128];
 } aes_window_t;
@@ -71,6 +73,9 @@ typedef struct aes_state {
     OBJECT *menu_tree;
     WORD menu_visible;
     WORD menu_popup_root_direct;
+    OBJECT *edit_tree;
+    WORD edit_object;
+    WORD edit_index;
     WORD menu_saved_count;
     GRECT menu_saved_rects[AES_MAX_MENU_SAVED_REGIONS];
     uint8_t *menu_saved_pixels[AES_MAX_MENU_SAVED_REGIONS];
@@ -129,6 +134,18 @@ void _vdi_present_screen(void);
 void _vdi_set_mouse_state(WORD x, WORD y, WORD status);
 
 /*
+ * Returns the shared hosted AES chrome height used by menu bars,
+ * window titles, and standard dialog buttons.
+ */
+WORD _aes_chrome_height(void);
+
+/*
+ * Returns the hosted top menu-bar height, including the white top row
+ * and the bottom separator rule used by classic monochrome GEM.
+ */
+WORD _aes_menu_chrome_height(void);
+
+/*
  * Returns the pixel width of one C string in the active VDI font.
  */
 WORD _vdi_string_width(const char *string);
@@ -163,6 +180,7 @@ int gem_builtin_rsrc_gaddr(WORD type, WORD index, void **addr);
 void gem_builtin_rsrc_free(void);
 
 void _aes_trace(const char *fmt, ...);
+WORD _aes_menu_bar_height(void);
 void _aes_store_mouse_state(const gem_hid_event_t *evt);
 void _aes_menu_prepare_tree(OBJECT *tree);
 void _aes_menu_hide_popups(OBJECT *tree);
@@ -184,6 +202,7 @@ WORD _aes_wind_set_text(WORD handle, WORD field, const char *text);
 void _aes_draw_window_frame(const aes_window_t *window);
 void _aes_clear_window_frame(const aes_window_t *window);
 void _aes_redraw_open_windows(void);
+void _aes_redraw_region(const GRECT *dirty);
 void _aes_redraw_window_change(const GRECT *before, const GRECT *after);
 void _aes_redraw_window_title_states(const aes_window_t *previous_top,
                                      const aes_window_t *new_top);

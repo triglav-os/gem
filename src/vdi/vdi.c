@@ -88,8 +88,9 @@ VOID v_opnvwk(WORD work_in[11], VDI_HANDLE *handle, WORD work_out[57])
         _vdi.line_color = _vdi_color_to_pixel(1);
         _vdi.fill_color = _vdi_color_to_pixel(1);
         _vdi.text_color = _vdi_color_to_pixel(1);
+        _vdi.cursor_hidden = 1;
         _vdi.open = 1;
-
+        (void) _vdi_load_standard_mouse_forms();
         gem_raster_set_palette(0u, 0u, 0u, 0u);
         gem_raster_set_palette(1u, 255u, 255u, 255u);
         _vdi_clear_screen(0);
@@ -386,7 +387,7 @@ VOID vrq_string(VDI_HANDLE handle,
         }
 
         {
-            char ch = _vdi_scancode_to_ascii(evt.key);
+            char ch = (char) (evt.key & 0xffu);
 
             if (ch == '\0') {
                 continue;
@@ -435,11 +436,11 @@ static uint8_t _vdi_sample_bitmap_direct(const MFDB *mfdb, WORD x, WORD y)
     }
 
     {
-        const uint8_t *row = (const uint8_t *) mfdb->fd_addr +
-            (size_t) y * (size_t) mfdb->fd_wdwidth * 2u;
-        uint8_t mask = (uint8_t) (1u << (7u - ((unsigned int) x & 7u)));
+        const UWORD *row = (const UWORD *) mfdb->fd_addr +
+            (size_t) y * (size_t) mfdb->fd_wdwidth;
+        UWORD mask = (UWORD) (0x8000u >> ((unsigned int) x & 15u));
 
-        return (row[(size_t) x / 8u] & mask) != 0u ? 1u : 0u;
+        return (row[(size_t) x / 16u] & mask) != 0u ? 1u : 0u;
     }
 }
 
@@ -479,29 +480,81 @@ static void _vdi_store_pixel_raw(MFDB *dst, WORD x, WORD y, WORD color)
     }
 
     {
-        uint8_t *row = (uint8_t *) dst->fd_addr +
-            (size_t) y * (size_t) dst->fd_wdwidth * 2u;
-        uint8_t mask = (uint8_t) (1u << (7u - ((unsigned int) x & 7u)));
+        UWORD *row = (UWORD *) dst->fd_addr +
+            (size_t) y * (size_t) dst->fd_wdwidth;
+        UWORD mask = (UWORD) (0x8000u >> ((unsigned int) x & 15u));
 
         if (color != 0) {
-            row[(size_t) x / 8u] |= mask;
+            row[(size_t) x / 16u] |= mask;
         } else {
-            row[(size_t) x / 8u] &= (uint8_t) ~mask;
+            row[(size_t) x / 16u] &= (UWORD) ~mask;
         }
     }
 }
 
-static void _vdi_draw_hline_raw(MFDB *dst, WORD y, WORD x0, WORD x1, WORD color)
+static void _vdi_blit_1to1_transparent(MFDB *src,
+                                        const vdi_rect_t *dst_rect,
+                                        WORD src_x0,
+                                        WORD src_y0,
+                                        WORD dst_x0,
+                                        WORD dst_y0,
+                                        WORD foreground)
 {
-    if (x0 > x1) {
-        WORD tmp = x0;
+    size_t src_pitch = (size_t) src->fd_wdwidth * 2u;
+    size_t dst_pitch = _vdi.surface->pitch;
+    WORD dx_clipped = (WORD) (dst_rect->x0 - dst_x0);
+    size_t src_byte0 = (size_t) (src_x0 + dx_clipped) / 8u;
+    size_t dst_byte0 = (size_t) dst_rect->x0 / 8u;
+    size_t dst_byte1 = (size_t) dst_rect->x1 / 8u;
+    size_t row_bytes = dst_byte1 - dst_byte0 + 1u;
+    uint8_t left_mask = (uint8_t) (0xffu >> ((unsigned int) dst_rect->x0 & 7u));
+    uint8_t right_mask = (uint8_t) (0xffu << (7u - ((unsigned int) dst_rect->x1 & 7u)));
+    WORD rel_y;
 
-        x0 = x1;
-        x1 = tmp;
-    }
+    for (rel_y = 0; rel_y <= dst_rect->y1 - dst_rect->y0; ++rel_y) {
+        WORD sy = (WORD) (src_y0 + (dst_rect->y0 - dst_y0) + rel_y);
+        WORD dy = (WORD) (dst_rect->y0 + rel_y);
+        const uint8_t *sr = (const uint8_t *) src->fd_addr +
+            (size_t) sy * src_pitch + src_byte0;
+        uint8_t *dr = (uint8_t *) _vdi.surface->pixels +
+            (size_t) dy * dst_pitch + dst_byte0;
+        size_t i;
 
-    for (; x0 <= x1; ++x0) {
-        _vdi_store_pixel_raw(dst, x0, y, color);
+        if (row_bytes == 1u) {
+            uint8_t mask = left_mask & right_mask;
+
+            if (foreground != 0) {
+                *dr |= (*sr & mask);
+            } else {
+                *dr &= (uint8_t) ~(*sr & mask);
+            }
+            continue;
+        }
+
+        /* Left edge */
+        if (foreground != 0) {
+            *dr |= (*sr & left_mask);
+        } else {
+            *dr &= (uint8_t) ~(*sr & left_mask);
+        }
+        ++sr;
+        ++dr;
+
+        /* Middle full bytes */
+        for (i = 1u; i < row_bytes - 1u; ++i, ++sr, ++dr) {
+            if (foreground != 0) {
+                *dr |= *sr;
+            } else {
+                *dr &= (uint8_t) ~(*sr);
+            }
+        }
+
+        /* Right edge */
+        if (foreground != 0) {
+            *dr |= (*sr & right_mask);
+        } else {
+            *dr &= (uint8_t) ~(*sr & right_mask);
+        }
     }
 }
 
@@ -530,6 +583,31 @@ static void _vdi_blit_bitmap(MFDB *src,
     dst_rect.y1 = (WORD) (dst_y0 + dst_h - 1);
     _vdi_get_destination_bounds(dst, &dst_bounds);
     if (!_vdi_intersect_rects(&dst_rect, &dst_bounds, &dst_rect)) {
+        return;
+    }
+
+    /* Fast path: 1:1 scale, non-transparent mode 1, screen-to-screen same alignment */
+    if (src_w == dst_w && src_h == dst_h &&
+        transparent == 0 && mode == 1 && mode != 6 &&
+        _vdi_uses_screen(src) && _vdi_uses_screen(dst) &&
+        ((unsigned int) src_x0 & 7u) == ((unsigned int) dst_x0 & 7u)) {
+        size_t pitch = _vdi.surface->pitch;
+        size_t left_byte = (size_t) dst_rect.x0 / 8u;
+        size_t right_byte = (size_t) dst_rect.x1 / 8u;
+        size_t row_bytes = right_byte - left_byte + 1u;
+        WORD rel_y;
+
+        for (rel_y = 0; rel_y <= dst_rect.y1 - dst_rect.y0; ++rel_y) {
+            WORD sy = (WORD) (src_y0 + (dst_rect.y0 - dst_y0) + rel_y);
+            WORD dy = (WORD) (dst_rect.y0 + rel_y);
+            const uint8_t *sr = (const uint8_t *) _vdi.surface->pixels +
+                (size_t) sy * pitch + left_byte;
+            uint8_t *dr = (uint8_t *) _vdi.surface->pixels +
+                (size_t) dy * pitch + left_byte;
+
+            memmove(dr, sr, row_bytes);
+        }
+        _vdi_present_screen();
         return;
     }
 
@@ -581,7 +659,7 @@ static void _vdi_blit_bitmap(MFDB *src,
                 }
                 ++x;
             }
-            _vdi_draw_hline_raw(dst, y, run_start, (WORD) (x - 1), run_color);
+            _vdi_mfdb_draw_hline(dst, y, run_start, (WORD) (x - 1), run_color);
         }
     }
 }
@@ -648,7 +726,7 @@ VOID vrt_cpyfm(VDI_HANDLE handle,
         return;
     }
     if (colors != NULL) {
-        foreground = (WORD) ((colors[1] != 0) ? 1 : 0);
+        foreground = _vdi_color_to_pixel(colors[1]);
     }
 
     _vdi_blit_bitmap(src, dst, pxy, mode, 1, foreground);
@@ -699,7 +777,6 @@ typedef struct vdi_compat_state {
     WORD cursor_column;
     WORD reverse_video;
     WORD palette[VDI_COMPAT_COLORS][3];
-    MFORM mouse_form;
     VOID (*timv)(void);
     VOID (*butv)(void);
     VOID (*motv)(void);
@@ -818,18 +895,17 @@ static void _vdi_outline_box(WORD x0, WORD y0, WORD x1, WORD y1, WORD color)
 
 static double _vdi_deci_degrees_to_radians(WORD angle)
 {
-    return ((double) angle / 10.0) * (VDI_PI / 180.0);
+    return (double) angle * (VDI_PI / 1800.0);
 }
 
 static WORD _vdi_normalize_angle(WORD angle)
 {
-    while (angle < 0) {
-        angle = (WORD) (angle + 3600);
+    int a = (int) angle % 3600;
+
+    if (a < 0) {
+        a += 3600;
     }
-    while (angle >= 3600) {
-        angle = (WORD) (angle - 3600);
-    }
-    return angle;
+    return (WORD) a;
 }
 
 static int _vdi_angle_in_sweep(WORD angle, WORD start, WORD end)
@@ -901,7 +977,7 @@ static void _vdi_fill_polygon_points(const WORD *points,
         WORD i;
 
         for (i = 0; i < count; ++i) {
-            WORD next = (WORD) ((i + 1) % count);
+            WORD next = (WORD) ((i + 1 < count) ? i + 1 : 0);
             WORD x0 = points[i * 2];
             WORD y0 = points[i * 2 + 1];
             WORD x1 = points[next * 2];
@@ -925,25 +1001,29 @@ static void _vdi_fill_polygon_points(const WORD *points,
             continue;
         }
 
-        for (i = 0; i < (WORD) (intersections_count - 1); ++i) {
-            WORD j;
+        for (i = 1; i < intersections_count; ++i) {
+            double key = intersections[i];
+            int j = (int) i - 1;
 
-            for (j = (WORD) (i + 1); j < intersections_count; ++j) {
-                if (intersections[j] < intersections[i]) {
-                    double tmp = intersections[i];
-
-                    intersections[i] = intersections[j];
-                    intersections[j] = tmp;
-                }
+            while (j >= 0 && intersections[j] > key) {
+                intersections[j + 1] = intersections[j];
+                --j;
             }
+            intersections[j + 1] = key;
         }
 
         for (i = 0; i + 1 < intersections_count; i += 2) {
             WORD left = (WORD) ceil(intersections[i]);
             WORD right = (WORD) floor(intersections[i + 1]);
 
+            if (left < clip.x0) {
+                left = clip.x0;
+            }
+            if (right > clip.x1) {
+                right = clip.x1;
+            }
             if (left <= right) {
-                _vdi_draw_screen_hline(y, left, right, color);
+                _vdi_draw_screen_hline_direct(y, left, right, color);
             }
         }
     }
@@ -1838,61 +1918,79 @@ VOID v_contourfill(WORD handle, WORD x, WORD y, WORD index)
         return;
     }
 
-    stack[stack_size].x = x;
-    stack[stack_size].y = y;
-    ++stack_size;
-    while (stack_size > 0u) {
-        WORD left;
-        WORD right;
-        WORD scan_y;
-        vdi_seed_t seed = stack[--stack_size];
+    {
+        size_t pitch = _vdi.surface->pitch;
+        const uint8_t *pixels = (const uint8_t *) _vdi.surface->pixels;
 
-        if (seed.x < clip.x0 || seed.x > clip.x1 ||
-            seed.y < clip.y0 || seed.y > clip.y1 ||
-            _vdi_get_screen_pixel(seed.x, seed.y) != target) {
-            continue;
-        }
+#define _CF_ROW(yy) (pixels + (size_t)(yy) * pitch)
+#define _CF_PIX(row, xx) \
+    (((row)[(size_t)(xx) / 8u] & (uint8_t)(0x80u >> ((unsigned int)(xx) & 7u))) != 0u)
 
-        left = seed.x;
-        right = seed.x;
-        while (left > clip.x0 &&
-            _vdi_get_screen_pixel((WORD) (left - 1), seed.y) == target) {
-            --left;
-        }
-        while (right < clip.x1 &&
-            _vdi_get_screen_pixel((WORD) (right + 1), seed.y) == target) {
-            ++right;
-        }
+        stack[stack_size].x = x;
+        stack[stack_size].y = y;
+        ++stack_size;
+        while (stack_size > 0u) {
+            WORD left;
+            WORD right;
+            WORD scan_y;
+            vdi_seed_t seed = stack[--stack_size];
+            const uint8_t *seed_row;
 
-        _vdi_draw_screen_hline(seed.y, left, right, fill_color);
-
-        for (scan_y = (WORD) (seed.y - 1); scan_y <= (WORD) (seed.y + 1);
-            scan_y += 2) {
-            WORD scan_x = left;
-
-            if (scan_y < clip.y0 || scan_y > clip.y1) {
+            if (seed.x < clip.x0 || seed.x > clip.x1 ||
+                seed.y < clip.y0 || seed.y > clip.y1) {
+                continue;
+            }
+            seed_row = _CF_ROW(seed.y);
+            if ((WORD) _CF_PIX(seed_row, seed.x) != target) {
                 continue;
             }
 
-            while (scan_x <= right) {
-                while (scan_x <= right &&
-                    _vdi_get_screen_pixel(scan_x, scan_y) != target) {
-                    ++scan_x;
+            left = seed.x;
+            right = seed.x;
+            while (left > clip.x0 &&
+                (WORD) _CF_PIX(seed_row, left - 1) == target) {
+                --left;
+            }
+            while (right < clip.x1 &&
+                (WORD) _CF_PIX(seed_row, right + 1) == target) {
+                ++right;
+            }
+
+            _vdi_draw_screen_hline_direct(seed.y, left, right, fill_color);
+
+            for (scan_y = (WORD) (seed.y - 1); scan_y <= (WORD) (seed.y + 1);
+                scan_y += 2) {
+                const uint8_t *scan_row;
+                WORD scan_x = left;
+
+                if (scan_y < clip.y0 || scan_y > clip.y1) {
+                    continue;
                 }
-                if (scan_x > right) {
-                    break;
-                }
-                if (stack_size < capacity) {
-                    stack[stack_size].x = scan_x;
-                    stack[stack_size].y = scan_y;
-                    ++stack_size;
-                }
-                while (scan_x <= right &&
-                    _vdi_get_screen_pixel(scan_x, scan_y) == target) {
-                    ++scan_x;
+                scan_row = _CF_ROW(scan_y);
+
+                while (scan_x <= right) {
+                    while (scan_x <= right &&
+                        (WORD) _CF_PIX(scan_row, scan_x) != target) {
+                        ++scan_x;
+                    }
+                    if (scan_x > right) {
+                        break;
+                    }
+                    if (stack_size < capacity) {
+                        stack[stack_size].x = scan_x;
+                        stack[stack_size].y = scan_y;
+                        ++stack_size;
+                    }
+                    while (scan_x <= right &&
+                        (WORD) _CF_PIX(scan_row, scan_x) == target) {
+                        ++scan_x;
+                    }
                 }
             }
         }
+
+#undef _CF_ROW
+#undef _CF_PIX
     }
 
     gem_os_free(stack);
@@ -1981,8 +2079,7 @@ WORD vsc_form(WORD handle, MFORM *cur_form)
         return 0;
     }
 
-    memcpy(&_vdi_compat.mouse_form, cur_form, sizeof(MFORM));
-    return 1;
+    return _vdi_set_mouse_form(cur_form);
 }
 
 WORD vsf_udpat(WORD handle, WORD *fill_pat, WORD planes)

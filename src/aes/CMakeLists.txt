@@ -1,4 +1,4 @@
-add_library(aes STATIC
+add_library(aes SHARED
     _aes.c
     aes.c
 )
@@ -25,7 +25,3 @@ target_compile_options(aes
         $<$<CONFIG:Debug>:-fsanitize=address,undefined>
 )
 
-target_link_options(aes
-    PRIVATE
-        $<$<CONFIG:Debug>:-fsanitize=address,undefined>
-)

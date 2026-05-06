@@ -30,6 +30,11 @@ typedef struct packed_mfdb {
     WORD row_bytes;
 } packed_mfdb_t;
 
+static uint8_t test_vdi_color_to_pixel(WORD color_index)
+{
+    return (uint8_t) ((color_index == 0) ? 1u : 0u);
+}
+
 static VDI_HANDLE open_handle(void)
 {
     WORD work_in[11] = { 0 };
@@ -134,33 +139,37 @@ static void packed_mfdb_free(packed_mfdb_t *packed)
 static void packed_mfdb_set_pixel(packed_mfdb_t *packed, WORD x, WORD y, WORD value)
 {
     size_t offset;
-    uint8_t mask;
+    UWORD *row;
+    UWORD mask;
 
     if (x < 0 || y < 0 || x >= packed->mfdb.fd_w || y >= packed->mfdb.fd_h) {
         return;
     }
 
-    offset = (size_t) y * (size_t) packed->row_bytes + (size_t) x / 8u;
-    mask = (uint8_t) (1u << (7 - ((unsigned int) x & 7u)));
+    offset = (size_t) y * (size_t) packed->mfdb.fd_wdwidth + (size_t) x / 16u;
+    row = (UWORD *) packed->bytes;
+    mask = (UWORD) (0x8000u >> ((unsigned int) x & 15u));
     if (value != 0) {
-        packed->bytes[offset] |= mask;
+        row[offset] |= mask;
     } else {
-        packed->bytes[offset] &= (uint8_t) ~mask;
+        row[offset] &= (UWORD) ~mask;
     }
 }
 
 static uint8_t packed_mfdb_get_pixel(const packed_mfdb_t *packed, WORD x, WORD y)
 {
     size_t offset;
-    uint8_t mask;
+    const UWORD *row;
+    UWORD mask;
 
     if (x < 0 || y < 0 || x >= packed->mfdb.fd_w || y >= packed->mfdb.fd_h) {
         return 0;
     }
 
-    offset = (size_t) y * (size_t) packed->row_bytes + (size_t) x / 8u;
-    mask = (uint8_t) (1u << (7 - ((unsigned int) x & 7u)));
-    return (packed->bytes[offset] & mask) != 0u ? 1u : 0u;
+    offset = (size_t) y * (size_t) packed->mfdb.fd_wdwidth + (size_t) x / 16u;
+    row = (const UWORD *) packed->bytes;
+    mask = (UWORD) (0x8000u >> ((unsigned int) x & 15u));
+    return (row[offset] & mask) != 0u ? 1u : 0u;
 }
 
 static void packed_mfdb_to_bitmap(const packed_mfdb_t *packed, test_bitmap_t *bitmap)
@@ -433,13 +442,33 @@ static int test_contourfill_and_blits(void)
     packed_mfdb_set_pixel(&source, 8, 8, 1);
     packed_mfdb_to_bitmap(&source, &source_bitmap);
     packed_mfdb_to_bitmap(&target, &target_bitmap);
-    test_reference_vrt_cpyfm(&target_bitmap, &source_bitmap, transparent_xy, 1);
+    test_reference_vrt_cpyfm(&target_bitmap, &source_bitmap, transparent_xy,
+        test_vdi_color_to_pixel(colors[1]));
     vrt_cpyfm(handle, 1, transparent_xy, &source.mfdb, &target.mfdb, colors);
     {
         test_bitmap_t actual_target;
+        WORD y;
 
         packed_mfdb_to_bitmap(&target, &actual_target);
-        ASSERT_TRUE(test_bitmap_equal(&target_bitmap, &actual_target));
+        if (!test_bitmap_equal(&target_bitmap, &actual_target)) {
+            for (y = 0; y < target_bitmap.height; ++y) {
+                WORD x;
+
+                for (x = 0; x < target_bitmap.width; ++x) {
+                    uint8_t expected = test_bitmap_get_pixel(&target_bitmap, x, y);
+                    uint8_t actual = test_bitmap_get_pixel(&actual_target, x, y);
+
+                    if (expected != actual) {
+                        fprintf(stderr,
+                            "mfdb transparent mismatch at %d,%d expected=%u actual=%u\n",
+                            x, y, (unsigned int) expected,
+                            (unsigned int) actual);
+                        break;
+                    }
+                }
+            }
+            ASSERT_TRUE(0);
+        }
         test_bitmap_free(&actual_target);
     }
     packed_mfdb_free(&source);
@@ -448,6 +477,74 @@ static int test_contourfill_and_blits(void)
     test_bitmap_free(&reference);
     test_bitmap_free(&source_bitmap);
     test_bitmap_free(&target_bitmap);
+    v_clsvwk(handle);
+    return 1;
+}
+
+static int test_vrt_cpyfm_glyph_bitmap(void)
+{
+    VDI_HANDLE handle = open_handle();
+    packed_mfdb_t source;
+    packed_mfdb_t target;
+    test_bitmap_t source_bitmap;
+    test_bitmap_t expected_target;
+    WORD pxy[] = { 0, 0, 12, 15, 20, 10, 32, 25 };
+    WORD colors[2] = { 0, 1 };
+    WORD y;
+    static const char *rows[] = {
+        "....####.....",
+        "....####.....",
+        "....####.....",
+        "....####.....",
+        "....####.....",
+        "....####.....",
+        "....####.....",
+        "....####.....",
+        "....####.....",
+        "....####.....",
+        "....####.....",
+        "....####.....",
+        "....####.....",
+        "....####.....",
+        "....####.....",
+        "....####....."
+    };
+
+    ASSERT_TRUE(handle == 1);
+    packed_mfdb_init(&source, 13, 16);
+    packed_mfdb_init(&target, TEST_VDI_WIDTH, TEST_VDI_HEIGHT);
+    for (y = 0; y < 16; ++y) {
+        WORD x;
+
+        for (x = 0; x < 13; ++x) {
+            if (rows[y][x] == '#') {
+                packed_mfdb_set_pixel(&source, x, y, 1);
+            }
+        }
+    }
+
+    packed_mfdb_to_bitmap(&source, &source_bitmap);
+    test_bitmap_init(&expected_target, TEST_VDI_WIDTH, TEST_VDI_HEIGHT);
+    test_reference_vrt_cpyfm(&expected_target, &source_bitmap, pxy,
+        test_vdi_color_to_pixel(colors[1]));
+
+    clear_screen_and_counter(handle);
+    vrt_cpyfm(handle, 1, pxy, &source.mfdb, NULL, colors);
+    ASSERT_TRUE(assert_surface_matches(&expected_target));
+
+    vrt_cpyfm(handle, 1, pxy, &source.mfdb, &target.mfdb, colors);
+    {
+        test_bitmap_t actual_target;
+
+        packed_mfdb_to_bitmap(&target, &actual_target);
+        ASSERT_TRUE(test_bitmap_equal(&expected_target, &actual_target));
+        test_bitmap_free(&actual_target);
+    }
+
+    packed_mfdb_free(&source);
+    packed_mfdb_free(&target);
+    test_bitmap_free(&source_bitmap);
+    test_bitmap_free(&expected_target);
     v_clsvwk(handle);
     return 1;
 }
@@ -705,6 +802,9 @@ int main(void)
         return 1;
     }
     if (!test_cursor_and_text_helpers()) {
+        return 1;
+    }
+    if (!test_vrt_cpyfm_glyph_bitmap()) {
         return 1;
     }
 

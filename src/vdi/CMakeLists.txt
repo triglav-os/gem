@@ -1,8 +1,8 @@
 file(GLOB vdi_sources CONFIGURE_DEPENDS *.c)
 
-add_library(vdi STATIC ${vdi_sources})
+add_library(vdi SHARED ${vdi_sources})
 
-add_dependencies(vdi gem_runtime_fonts)
+add_dependencies(vdi gem_runtime_fonts gem_runtime_cursors)
 
 target_include_directories(vdi
     PUBLIC
@@ -23,15 +23,11 @@ target_compile_options(vdi
 target_compile_definitions(vdi
     PRIVATE
         GEM_FONT_DIR="${PROJECT_SOURCE_DIR}/bin/fonts"
+        GEM_CURSOR_RSC="${PROJECT_SOURCE_DIR}/bin/cursors.rsc"
 )
 
 target_compile_options(vdi
     PRIVATE
         $<$<CONFIG:Debug>:-g>
-        $<$<CONFIG:Debug>:-fsanitize=address,undefined>
-)
-
-target_link_options(vdi
-    PRIVATE
         $<$<CONFIG:Debug>:-fsanitize=address,undefined>
 )

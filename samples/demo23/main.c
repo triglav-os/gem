@@ -25,24 +25,24 @@ OBJECT menu_tree[] = {
     /* Root */
     {-1,1,3, G_IBOX, NONE, NORMAL, 0L, 0,0,0,0},
     /* Menu bar */
-    {0,2,2, G_BOX, NONE, NORMAL, 0x1100L, 0,0,80,1},  /* Adjust width */
+    {0,2,2, G_BOX, NONE, NORMAL, 0x1100L, 0,0,80,1},
     /* Titles */
     {1, -1,-1, G_TITLE, NONE, NORMAL, (long)" Desk ", 0,0,6,1},
     {1, -1,-1, G_TITLE, NONE, NORMAL, (long)" File ", 6,0,6,1},
     {1, -1,-1, G_TITLE, NONE, NORMAL, (long)" Help ",12,0,6,1},
     /* Desk menu */
-    {0,5,8, G_BOX, NONE, NORMAL, 0x1100L, 0,0,20,4},
-    {4, -1,-1, G_STRING, NONE, NORMAL, (long)"  About... ", 0,0,20,1},
-    {4, -1,-1, G_STRING, NONE, NORMAL, (long)"  ------------ ", 0,1,20,1},
-    {4, -1,-1, G_STRING, NONE, NORMAL, (long)"  Quit     ", 0,2,20,1},
+    {0,6,8, G_BOX, NONE, NORMAL, 0x1100L, 0,0,20,4},
+    {5, 7,7, G_STRING, NONE, NORMAL, (long)"  About... ", 0,0,20,1},
+    {5, 8,8, G_STRING, NONE, NORMAL, (long)"  ------------ ", 0,1,20,1},
+    {5, -1,-1, G_STRING, NONE, NORMAL, (long)"  Quit     ", 0,2,20,1},
     /* File menu */
-    {0,9,11, G_BOX, NONE, NORMAL, 0x1100L, 0,0,20,3},
-    {8, -1,-1, G_STRING, NONE, NORMAL, (long)"  Open     ", 0,0,20,1},
-    {8, -1,-1, G_STRING, NONE, NORMAL, (long)"  Save     ", 0,1,20,1},
-    {8, -1,-1, G_STRING, NONE, NORMAL, (long)"  Exit     ", 0,2,20,1},
+    {0,10,12, G_BOX, NONE, NORMAL, 0x1100L, 0,0,20,3},
+    {9, 11,11, G_STRING, NONE, NORMAL, (long)"  Open     ", 0,0,20,1},
+    {9, 12,12, G_STRING, NONE, NORMAL, (long)"  Save     ", 0,1,20,1},
+    {9, -1,-1, G_STRING, NONE, NORMAL, (long)"  Exit     ", 0,2,20,1},
     /* Help menu */
-    {0,12,12, G_BOX, NONE, NORMAL, 0x1100L, 0,0,20,1},
-    {11,-1,-1, G_STRING, LASTOB, NORMAL, (long)"  About GEM Demo ", 0,0,20,1},
+    {0,14,14, G_BOX, NONE, NORMAL, 0x1100L, 0,0,20,1},
+    {13,-1,-1, G_STRING, LASTOB, NORMAL, (long)"  About GEM Demo ", 0,0,20,1},
 };
 
 /* Forward declarations */
@@ -94,6 +94,36 @@ int main(void)
             case WM_SIZED:
                 wind_set(win_handle, WF_CURRXYWH, msg[4], msg[5], msg[6], msg[7]);
                 break;
+
+            case WM_TOPPED:
+                wind_set(win_handle, WF_TOP, 0, 0, 0, 0);
+                break;
+
+            case WM_FULLED:
+            {
+                GRECT current;
+                GRECT previous;
+                GRECT full_work;
+
+                wind_get(win_handle, WF_CURRXYWH, &current.g_x, &current.g_y,
+                    &current.g_w, &current.g_h);
+                wind_get(win_handle, WF_PXYWH, &previous.g_x, &previous.g_y,
+                    &previous.g_w, &previous.g_h);
+                wind_get(win_handle, WF_FXYWH, &full_work.g_x, &full_work.g_y,
+                    &full_work.g_w, &full_work.g_h);
+
+                if (current.g_x == full_work.g_x &&
+                    current.g_y == full_work.g_y &&
+                    current.g_w == full_work.g_w &&
+                    current.g_h == full_work.g_h) {
+                    wind_set(win_handle, WF_CURRXYWH, previous.g_x,
+                        previous.g_y, previous.g_w, previous.g_h);
+                } else {
+                    wind_set(win_handle, WF_CURRXYWH, full_work.g_x,
+                        full_work.g_y, full_work.g_w, full_work.g_h);
+                }
+                break;
+            }
 
             case MN_SELECTED:
                 handle_menu(msg[3], msg[4]);

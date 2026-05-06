@@ -1,6 +1,6 @@
 file(GLOB rasta_sources CONFIGURE_DEPENDS *.c)
 
-add_library(rasta STATIC ${rasta_sources})
+add_library(rasta SHARED ${rasta_sources})
 
 target_include_directories(rasta
     PUBLIC
@@ -22,7 +22,3 @@ target_compile_options(rasta
         $<$<CONFIG:Debug>:-fsanitize=address,undefined>
 )
 
-target_link_options(rasta
-    PRIVATE
-        $<$<CONFIG:Debug>:-fsanitize=address,undefined>
-)

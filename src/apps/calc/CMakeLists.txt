@@ -1,4 +1,4 @@
-add_executable(calc main.c)
+add_executable(calc calc.c _calc.c)
 
 target_include_directories(calc
     PRIVATE

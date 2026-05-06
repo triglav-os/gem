@@ -46,6 +46,63 @@ static int16_t g_mouse_x;
 static int16_t g_mouse_y;
 static uint16_t g_button_flags;
 
+static uint16_t rasta_key_to_gem(uint16_t key)
+{
+    uint8_t ascii = 0u;
+
+    if (key >= 4u && key <= 29u) {
+        ascii = (uint8_t) ('a' + (char) (key - 4u));
+    } else if (key >= 30u && key <= 38u) {
+        ascii = (uint8_t) ('1' + (char) (key - 30u));
+    } else {
+        switch (key) {
+        case 39u:
+            ascii = '0';
+            break;
+        case 40u:
+            ascii = '\n';
+            break;
+        case 41u:
+            ascii = 27u;
+            break;
+        case 42u:
+            ascii = '\b';
+            break;
+        case 44u:
+            ascii = ' ';
+            break;
+        case 45u:
+            ascii = '-';
+            break;
+        case 47u:
+            ascii = '[';
+            break;
+        case 48u:
+            ascii = ']';
+            break;
+        case 51u:
+            ascii = ';';
+            break;
+        case 52u:
+            ascii = '\'';
+            break;
+        case 54u:
+            ascii = ',';
+            break;
+        case 55u:
+            ascii = '.';
+            break;
+        case 56u:
+            ascii = '/';
+            break;
+        default:
+            break;
+        }
+    }
+
+    return (uint16_t) (((key & 0xffu) << 8) | ascii);
+}
+
 static const char *rasta_framebuffer_path(void)
 {
     const char *value = getenv("GEM_RASTA_FRAMEBUFFER");
@@ -320,7 +377,7 @@ static void fill_key_event(gem_hid_event_t *evt,
     evt->dx = 0;
     evt->dy = 0;
     evt->button = 0u;
-    evt->key = (uint16_t) message->par1;
+    evt->key = rasta_key_to_gem((uint16_t) message->par1);
     evt->mod = 0u;
 }
 

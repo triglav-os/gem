@@ -1,4 +1,4 @@
-add_library(platform_linux STATIC os.c)
+add_library(platform_linux SHARED os.c)
 
 target_include_directories(platform_linux
     PUBLIC
@@ -20,7 +20,3 @@ target_compile_options(platform_linux
         $<$<CONFIG:Debug>:-fsanitize=address,undefined>
 )
 
-target_link_options(platform_linux
-    PRIVATE
-        $<$<CONFIG:Debug>:-fsanitize=address,undefined>
-)

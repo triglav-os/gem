@@ -106,13 +106,7 @@ static int desktop_point_in_panel_close(WORD x, WORD y);
 
 static WORD desktop_key_to_ascii(uint16_t key)
 {
-    if (key >= 4u && key <= 29u) {
-        return (WORD) ('a' + (WORD) (key - 4u));
-    }
-    if (key == 41u) {
-        return 27;
-    }
-    return 0;
+    return (WORD) (key & 0xffu);
 }
 
 static void desktop_init_object(OBJECT *object,

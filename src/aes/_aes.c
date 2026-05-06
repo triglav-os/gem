@@ -20,6 +20,7 @@
 #include <string.h>
 
 aes_state_t _aes;
+static int _aes_menu_redraw_in_progress;
 
 static WORD _aes_find_parent(OBJECT *tree, WORD object);
 static WORD _aes_window_left_border(const aes_window_t *window);
@@ -28,6 +29,10 @@ static WORD _aes_window_bottom_border(const aes_window_t *window);
 static WORD _aes_window_title_height(const aes_window_t *window);
 static WORD _aes_light_color(void);
 static WORD _aes_dark_color(void);
+static int _aes_is_dialog_root_tree(const OBJECT *tree);
+static int _aes_is_menu_bar_object(const OBJECT *tree, WORD object);
+static int _aes_is_dialog_frame_object(const OBJECT *tree, WORD object,
+    WORD parent);
 static int _aes_window_title_rect(const aes_window_t *window, GRECT *rect);
 static int _aes_window_closer_rect(const aes_window_t *window, GRECT *rect);
 static int _aes_window_fuller_rect(const aes_window_t *window, GRECT *rect);
@@ -35,7 +40,15 @@ static int _aes_window_sizer_rect(const aes_window_t *window, GRECT *rect);
 static LONG _aes_resolve_spec(const OBJECT *obj);
 static void _aes_draw_text(WORD x, WORD y, WORD color, const char *text);
 static void _aes_fill_rect(WORD x0, WORD y0, WORD x1, WORD y1, WORD color);
+static void _aes_invert_rect(WORD x0, WORD y0, WORD x1, WORD y1);
+static void _aes_fill_pattern_rect(WORD x0, WORD y0, WORD x1, WORD y1,
+    const uint8_t *rows, size_t row_count);
 static void _aes_fill_checker_rect(WORD x0, WORD y0, WORD x1, WORD y1);
+static void _aes_draw_hline(WORD x0, WORD x1, WORD y, WORD color);
+static void _aes_draw_vline(WORD x, WORD y0, WORD y1, WORD color);
+static void _aes_draw_dialog_frame(const WORD rect[4]);
+static void _aes_draw_button_frame(const WORD rect[4], WORD dark_color,
+    WORD light_color, int default_button);
 static void _aes_draw_window_icon(WORD x0, WORD y0, WORD x1, WORD y1,
     char glyph);
 static void _aes_draw_window_icon_offset(WORD x0, WORD y0, WORD x1, WORD y1,
@@ -52,10 +65,16 @@ static int _aes_intersect_rects(const GRECT *left, const GRECT *right,
 static WORD _aes_subtract_rect(const GRECT *source, const GRECT *cover,
     GRECT out[4]);
 static void _aes_expand_window_damage_rect(const GRECT *src, GRECT *out);
-static void _aes_redraw_region(const GRECT *dirty);
+void _aes_redraw_region(const GRECT *dirty);
 static void _aes_desktop_rect_local(GRECT *rect);
 static int _aes_menu_subtree_rect(OBJECT *tree, WORD object, GRECT *rect);
+static void _aes_menu_expand_saved_rect(OBJECT *tree, WORD object, GRECT *rect);
 static int _aes_menu_is_separator_text(const char *text);
+static int _aes_menu_split_shortcut(const char *text,
+    char *label,
+    size_t label_size,
+    char *shortcut,
+    size_t shortcut_size);
 static int _aes_menu_item_selectable(OBJECT *tree, WORD item);
 static void _aes_menu_free_saved_pixels(void);
 static void _aes_menu_restore_saved_region(void);
@@ -156,6 +175,37 @@ void _aes_store_mouse_state(const gem_hid_event_t *evt)
     }
 
     _vdi_set_mouse_state((WORD) evt->x, (WORD) evt->y, (WORD) evt->flags);
+}
+
+WORD _aes_chrome_height(void)
+{
+    WORD text_height;
+
+    text_height = _aes.vdi_ready ? _vdi_font_text_height() : AES_CHAR_HEIGHT;
+    return (WORD) (text_height + 4);
+}
+
+WORD _aes_menu_chrome_height(void)
+{
+    WORD text_height;
+
+    text_height = _aes.vdi_ready ? _vdi_font_text_height() : AES_CHAR_HEIGHT;
+    return (WORD) (text_height + 6);
+}
+
+WORD _aes_menu_bar_height(void)
+{
+    WORD box_height = 0;
+
+    if (_aes.menu_visible == 0 || _aes.menu_tree == NULL) {
+        return 0;
+    }
+
+    (void) graf_handle(NULL, NULL, NULL, &box_height);
+    if (box_height <= 0) {
+        box_height = _aes_menu_chrome_height();
+    }
+    return box_height;
 }
 
 /*
@@ -411,6 +461,37 @@ static void _aes_menu_set_title_selected(OBJECT *tree,
 }
 
 /*
+ * Clears the selected state from every title in the current menu bar.
+ */
+static void _aes_menu_clear_title_selection(OBJECT *tree)
+{
+    WORD parent;
+    WORD child;
+
+    if (tree == NULL) {
+        return;
+    }
+
+    parent = _aes_menu_title_container(tree);
+    if (parent == NIL) {
+        return;
+    }
+
+    child = tree[parent].ob_head;
+    while (child != NIL) {
+        WORD next = tree[child].ob_next;
+
+        if (tree[child].ob_type == G_TITLE) {
+            tree[child].ob_state &= (UWORD) ~SELECTED;
+        }
+        if (child == tree[parent].ob_tail || next == parent || next == NIL) {
+            break;
+        }
+        child = next;
+    }
+}
+
+/*
  * Redraws the full menu tree after a title or popup state change.
  */
 void _aes_menu_redraw_tree(OBJECT *tree)
@@ -418,11 +499,18 @@ void _aes_menu_redraw_tree(OBJECT *tree)
     WORD bar;
     WORD popup_parent;
     WORD popup;
+    WORD visible_popup_count = 0;
     GRECT redraw_rect;
 
     if (tree == NULL || _aes_ensure_vdi() == 0) {
         return;
     }
+
+    if (_aes_menu_redraw_in_progress != 0) {
+        return;
+    }
+
+    _aes_menu_redraw_in_progress = 1;
 
     _vdi_begin_update();
     v_hide_c(_aes.vdi_handle);
@@ -435,6 +523,7 @@ void _aes_menu_redraw_tree(OBJECT *tree)
     _aes_menu_free_saved_pixels();
 
     if (bar != NIL && _aes_menu_subtree_rect(tree, bar, &redraw_rect) != 0) {
+        _aes_menu_expand_saved_rect(tree, bar, &redraw_rect);
         (void) _aes_menu_save_region(&redraw_rect);
     }
 
@@ -443,6 +532,8 @@ void _aes_menu_redraw_tree(OBJECT *tree)
 
         if ((tree[popup].ob_flags & HIDETREE) == 0u &&
             _aes_menu_subtree_rect(tree, popup, &redraw_rect) != 0) {
+            ++visible_popup_count;
+            _aes_menu_expand_saved_rect(tree, popup, &redraw_rect);
             (void) _aes_menu_save_region(&redraw_rect);
         }
 
@@ -455,6 +546,7 @@ void _aes_menu_redraw_tree(OBJECT *tree)
 
     if (bar != NIL && _aes_menu_subtree_rect(tree, bar, &redraw_rect) != 0) {
         WORD fill[4];
+        GRECT seam;
 
         fill[0] = redraw_rect.g_x;
         fill[1] = redraw_rect.g_y;
@@ -464,6 +556,16 @@ void _aes_menu_redraw_tree(OBJECT *tree)
         v_bar(_aes.vdi_handle, fill);
         objc_draw(tree, bar, MAX_DEPTH, redraw_rect.g_x, redraw_rect.g_y,
             redraw_rect.g_w, redraw_rect.g_h);
+
+        /*
+         * Repaint the first row below the menu bar from the underlying
+         * desktop/windows before popups are drawn. This clears any stale
+         * seam pixels left from previous popup geometry changes while
+         * still allowing the active popup to paint over its own span.
+         */
+        _aes_set_rect(&seam, redraw_rect.g_x,
+            (WORD) (redraw_rect.g_y + redraw_rect.g_h), redraw_rect.g_w, 1);
+        _aes_redraw_region(&seam);
     }
 
     popup = _aes_menu_first_popup_child(tree, popup_parent);
@@ -491,8 +593,30 @@ void _aes_menu_redraw_tree(OBJECT *tree)
         popup = next;
     }
 
+    if (visible_popup_count == 0 && bar != NIL &&
+        _aes_menu_subtree_rect(tree, bar, &redraw_rect) != 0) {
+        GRECT repair;
+
+        repair.g_x = 0;
+        repair.g_y = (WORD) (redraw_rect.g_y + redraw_rect.g_h - 1);
+        repair.g_w = (WORD) (_aes.work_out[0] + 1);
+        repair.g_h = 2;
+        if (repair.g_y < 0) {
+            repair.g_y = 0;
+        }
+        if (repair.g_y <= _aes.work_out[1]) {
+            if (repair.g_y + repair.g_h - 1 > _aes.work_out[1]) {
+                repair.g_h = (WORD) (_aes.work_out[1] - repair.g_y + 1);
+            }
+            if (repair.g_h > 0) {
+                _aes_redraw_region(&repair);
+            }
+        }
+    }
+
     v_show_c(_aes.vdi_handle, 1);
     _vdi_end_update();
+    _aes_menu_redraw_in_progress = 0;
 }
 
 void _aes_menu_clear_saved_region(void)
@@ -513,7 +637,7 @@ void _aes_menu_prepare_tree(OBJECT *tree)
     WORD wchar = AES_CHAR_WIDTH;
     WORD hchar = AES_CHAR_HEIGHT;
     WORD boxw = AES_DECOR;
-    WORD boxh = (WORD) (AES_CHAR_HEIGHT + AES_DECOR);
+    WORD boxh = _aes_menu_chrome_height();
     WORD menu_bar_height;
     WORD menu_item_height;
     WORD menu_separator_height;
@@ -593,7 +717,9 @@ void _aes_menu_prepare_tree(OBJECT *tree)
         if ((WORD) (last_title + 1) <= last_object &&
             (tree[last_title + 1].ob_type == G_BOX ||
              tree[last_title + 1].ob_type == G_IBOX) &&
-            tree[last_title + 1].ob_head != NIL) {
+            tree[last_title + 1].ob_head != NIL &&
+            (tree[tree[last_title + 1].ob_head].ob_type == G_BOX ||
+             tree[tree[last_title + 1].ob_head].ob_type == G_IBOX)) {
             WORD popup_container = (WORD) (last_title + 1);
             WORD popup_child;
 
@@ -665,7 +791,7 @@ void _aes_menu_prepare_tree(OBJECT *tree)
 
     (void) graf_handle(&wchar, &hchar, &boxw, &boxh);
     menu_bar_height = boxh;
-    menu_item_height = boxh;
+    menu_item_height = _aes_chrome_height();
     menu_separator_height = (WORD) _aes_max_word((WORD) 8,
         (WORD) (boxh - 4));
     if (bar != NIL && tree[bar].ob_height > 0 && tree[bar].ob_height <= 4) {
@@ -704,7 +830,7 @@ void _aes_menu_prepare_tree(OBJECT *tree)
                 WORD rendered_width = (WORD) _vdi_string_width(text);
 
                 if (rendered_width > 0) {
-                    title_width = rendered_width;
+                    title_width = (WORD) (rendered_width + 4);
                 }
             }
 
@@ -762,7 +888,8 @@ void _aes_menu_prepare_tree(OBJECT *tree)
 
             _aes_object_extent(tree, title, &title_x, &title_y);
             tree[popup].ob_x = title_x;
-            tree[popup].ob_y = tree[bar].ob_height;
+            tree[popup].ob_y = (WORD) _aes_max_word((WORD) 0,
+                (WORD) (tree[bar].ob_height - 1));
 
             if (popup == tree[ROOT].ob_tail || tree[popup].ob_next == ROOT ||
                 tree[popup].ob_next == NIL) {
@@ -784,7 +911,7 @@ void _aes_menu_prepare_tree(OBJECT *tree)
             WORD child = tree[popup].ob_head;
             WORD popup_width = tree[popup].ob_width;
             WORD popup_height = 0;
-            WORD row_y = 0;
+            WORD row_y = 1;
 
             while (child != NIL) {
                 LONG child_spec = _aes_resolve_spec(&tree[child]);
@@ -792,6 +919,7 @@ void _aes_menu_prepare_tree(OBJECT *tree)
                 WORD row_height = _aes_menu_is_separator_text(text) ?
                     menu_separator_height : menu_item_height;
 
+                tree[child].ob_x = 1;
                 tree[child].ob_y = row_y;
                 tree[child].ob_height = row_height;
                 row_y = (WORD) (row_y + row_height);
@@ -800,9 +928,23 @@ void _aes_menu_prepare_tree(OBJECT *tree)
                 }
 
                 if (tree[child].ob_type == G_STRING && child_spec != 0) {
-                    WORD rendered_width = (WORD) _vdi_string_width(text);
-                    WORD needed_width = (WORD) (tree[child].ob_x +
+                    char shortcut_label[128];
+                    char shortcut_text[64];
+                    WORD rendered_width;
+                    WORD needed_width;
+                    int has_shortcut = _aes_menu_split_shortcut(text,
+                        shortcut_label, sizeof(shortcut_label),
+                        shortcut_text, sizeof(shortcut_text));
+
+                    rendered_width = (WORD) _vdi_string_width(
+                        has_shortcut != 0 ? shortcut_label : text);
+                    needed_width = (WORD) (tree[child].ob_x +
                         rendered_width + 4);
+
+                    if (has_shortcut != 0 && shortcut_text[0] != '\0') {
+                        needed_width = (WORD) (needed_width +
+                            _vdi_string_width(shortcut_text) + 12);
+                    }
 
                     if (rendered_width > 0) {
                         tree[child].ob_width = (WORD) (rendered_width + 2);
@@ -821,7 +963,8 @@ void _aes_menu_prepare_tree(OBJECT *tree)
 
             child = tree[popup].ob_head;
             while (child != NIL) {
-                tree[child].ob_width = popup_width;
+                tree[child].ob_width = (WORD) _aes_max_word((WORD) 1,
+                    (WORD) (popup_width - 2));
                 if (child == tree[popup].ob_tail || tree[child].ob_next == popup ||
                     tree[child].ob_next == NIL) {
                     break;
@@ -830,7 +973,8 @@ void _aes_menu_prepare_tree(OBJECT *tree)
             }
 
             tree[popup].ob_width = popup_width;
-            tree[popup].ob_height = popup_height;
+            tree[popup].ob_height = (WORD) _aes_max_word((WORD) 2,
+                (WORD) (popup_height + 1));
 
             if (popup == tree[ROOT].ob_tail || tree[popup].ob_next == ROOT ||
                 tree[popup].ob_next == NIL) {
@@ -896,6 +1040,8 @@ WORD _aes_menu_event(OBJECT *tree,
         (first_evt->flags & GEM_HID_BUTTON_LEFT) == 0u) {
         return 0;
     }
+
+    memset(mepbuff, 0, sizeof(WORD) * 8u);
 
     title = _aes_menu_hit_title(tree, (WORD) first_evt->x, (WORD) first_evt->y);
     if (title == NIL) {
@@ -1016,14 +1162,13 @@ WORD _aes_menu_event(OBJECT *tree,
                 highlighted_item = NIL;
             }
             _aes_menu_hide_popups(tree);
-            _aes_menu_set_title_selected(tree, title, 0);
+            _aes_menu_clear_title_selection(tree);
             _aes_menu_redraw_tree(tree);
 
             if (item == NIL) {
                 return 0;
             }
 
-            memset(mepbuff, 0, sizeof(WORD) * 8u);
             mepbuff[0] = MN_SELECTED;
             mepbuff[1] = _aes.current_app_id;
             mepbuff[3] = title;
@@ -1111,6 +1256,12 @@ int _aes_ensure_vdi(void)
         return 0;
     }
 
+    /*
+     * AES applications expect the default arrow cursor to be visible
+     * once the hosted workstation exists. Demos that only use basic
+     * window messages never call graf_mouse(M_ON) themselves.
+     */
+    v_show_c(_aes.vdi_handle, 1);
     _aes.vdi_ready = 1;
     _aes_trace("ensure_vdi opened handle=%d size=%dx%d",
         _aes.vdi_handle, _aes.work_out[0] + 1, _aes.work_out[1] + 1);
@@ -1170,17 +1321,54 @@ static WORD _aes_window_bottom_border(const aes_window_t *window)
 
 static WORD _aes_window_title_height(const aes_window_t *window)
 {
-    WORD text_height;
-
     if (window == NULL || window->kind == 0u) {
         return 0;
     }
     if ((window->kind & (NAME | CLOSER | FULLER | MOVER)) == 0u) {
         return 2;
     }
+    return _aes_menu_chrome_height();
+}
 
-    text_height = _aes.vdi_ready ? _vdi_font_text_height() : AES_CHAR_HEIGHT;
-    return (WORD) (text_height + 6);
+static int _aes_is_dialog_root_tree(const OBJECT *tree)
+{
+    if (tree == NULL || tree == _aes.menu_tree) {
+        return 0;
+    }
+
+    if (tree[ROOT].ob_head == NIL) {
+        return 0;
+    }
+
+    return (tree[ROOT].ob_type == G_IBOX || tree[ROOT].ob_type == G_BOX) ?
+        1 : 0;
+}
+
+static int _aes_is_menu_bar_object(const OBJECT *tree, WORD object)
+{
+    WORD bar;
+
+    if (tree == NULL || tree != _aes.menu_tree || object < 0) {
+        return 0;
+    }
+
+    bar = tree[ROOT].ob_head;
+    return (bar != NIL && object == bar) ? 1 : 0;
+}
+
+static int _aes_is_dialog_frame_object(const OBJECT *tree, WORD object,
+                                       WORD parent)
+{
+    if (tree == NULL || object <= ROOT || parent != ROOT) {
+        return 0;
+    }
+
+    if (_aes_is_dialog_root_tree(tree) == 0) {
+        return 0;
+    }
+
+    return (tree[object].ob_type == G_BOX || tree[object].ob_type == G_IBOX) ?
+        1 : 0;
 }
 
 static int _aes_window_closer_rect(const aes_window_t *window, GRECT *rect)
@@ -1216,7 +1404,7 @@ static int _aes_window_fuller_rect(const aes_window_t *window, GRECT *rect)
     _aes_set_rect(rect,
         (WORD) (window->outer.g_x + window->outer.g_w - side - 2),
         (WORD) (window->outer.g_y + 1),
-        side,
+        (WORD) (side + 1),
         side);
     return 1;
 }
@@ -1348,6 +1536,8 @@ static void _aes_present_after_window_draw(void)
 
 static void _aes_desktop_rect_local(GRECT *rect)
 {
+    WORD menu_height;
+
     if (rect == NULL) {
         return;
     }
@@ -1357,8 +1547,10 @@ static void _aes_desktop_rect_local(GRECT *rect)
         return;
     }
 
-    _aes_set_rect(rect, 0, 0, (WORD) (_aes.work_out[0] + 1),
-        (WORD) (_aes.work_out[1] + 1));
+    menu_height = _aes_menu_bar_height();
+    _aes_set_rect(rect, 0, menu_height, (WORD) (_aes.work_out[0] + 1),
+        (WORD) (_aes_max_word((WORD) 0,
+            (WORD) (_aes.work_out[1] + 1 - menu_height))));
 }
 
 static int _aes_rects_intersect(const GRECT *left, const GRECT *right)
@@ -1479,19 +1671,34 @@ static void _aes_expand_window_damage_rect(const GRECT *src, GRECT *out)
     out->g_h = (WORD) (src->g_h + 1);
 }
 
-static void _aes_redraw_region(const GRECT *dirty)
+void _aes_redraw_region(const GRECT *dirty)
 {
     uint32_t target_z;
     WORD clip[4];
     GRECT desktop;
+    GRECT menu_rect;
+    WORD bar;
+    int redraw_menu = 0;
 
     if (dirty == NULL || dirty->g_w <= 0 || dirty->g_h <= 0 ||
         _aes.vdi_ready == 0) {
         return;
     }
 
+    if (_aes.menu_visible != 0 && _aes.menu_tree != NULL) {
+        bar = _aes.menu_tree[ROOT].ob_head;
+        if (bar != NIL &&
+            _aes_menu_subtree_rect(_aes.menu_tree, bar, &menu_rect) != 0 &&
+            _aes_rects_intersect(&menu_rect, dirty) != 0) {
+            redraw_menu = 1;
+        }
+    }
+
     _aes_desktop_rect_local(&desktop);
     if (_aes_rects_intersect(&desktop, dirty) == 0) {
+        if (redraw_menu != 0) {
+            _aes_menu_redraw_tree(_aes.menu_tree);
+        }
         return;
     }
 
@@ -1521,6 +1728,10 @@ static void _aes_redraw_region(const GRECT *dirty)
     vs_clip(_aes.vdi_handle, 0, clip);
     --_aes.update_depth;
     _vdi_end_update();
+
+    if (redraw_menu != 0) {
+        _aes_menu_redraw_tree(_aes.menu_tree);
+    }
 }
 
 static void _aes_queue_window_redraw(const aes_window_t *window,
@@ -1646,23 +1857,59 @@ static void _aes_fill_rect(WORD x0, WORD y0, WORD x1, WORD y1, WORD color)
     v_bar(_aes.vdi_handle, rect);
 }
 
-static void _aes_fill_checker_rect(WORD x0, WORD y0, WORD x1, WORD y1)
+static void _aes_invert_rect(WORD x0, WORD y0, WORD x1, WORD y1)
 {
     WORD x;
     WORD y;
-    WORD dark_pixel = (_aes_dark_color() == WHITE) ? 1 : 0;
 
     if (x0 > x1 || y0 > y1) {
         return;
     }
 
-    _aes_fill_rect(x0, y0, x1, y1, _aes_light_color());
+    _vdi_prepare_screen_write();
     for (y = y0; y <= y1; ++y) {
-        for (x = (WORD) (x0 + ((x0 + y) & 1)); x <= x1;
-             x = (WORD) (x + 2)) {
-            _vdi_plot_pixel(x, y, dark_pixel);
+        for (x = x0; x <= x1; ++x) {
+            _vdi_set_screen_pixel(x, y,
+                (WORD) (_vdi_get_screen_pixel(x, y) == 0 ? 1 : 0));
         }
     }
+}
+
+static void _aes_fill_pattern_rect(WORD x0, WORD y0, WORD x1, WORD y1,
+                                   const uint8_t *rows, size_t row_count)
+{
+    WORD x;
+    WORD y;
+    WORD dark_pixel = (_aes_dark_color() == WHITE) ? 1 : 0;
+    uint8_t row_bits;
+
+    if (x0 > x1 || y0 > y1 || rows == NULL || row_count == 0u) {
+        return;
+    }
+
+    _aes_fill_rect(x0, y0, x1, y1, _aes_light_color());
+    for (y = y0; y <= y1; ++y) {
+        row_bits = rows[(size_t) (y % (WORD) row_count)];
+        for (x = x0; x <= x1; ++x) {
+            if ((row_bits & (uint8_t) (0x80u >> (x & 7))) != 0u) {
+                _vdi_plot_pixel(x, y, dark_pixel);
+            }
+        }
+    }
+}
+
+static void _aes_fill_checker_rect(WORD x0, WORD y0, WORD x1, WORD y1)
+{
+    static const uint8_t desktop_rows[] = {
+        0xaa, 0x55, 0xaa
+    };
+
+    if (x0 > x1 || y0 > y1) {
+        return;
+    }
+
+    _aes_fill_pattern_rect(x0, y0, x1, y1, desktop_rows,
+        sizeof(desktop_rows) / sizeof(desktop_rows[0]));
 }
 
 static int _aes_menu_subtree_rect(OBJECT *tree, WORD object, GRECT *rect)
@@ -1717,6 +1964,17 @@ static int _aes_menu_subtree_rect(OBJECT *tree, WORD object, GRECT *rect)
     return 1;
 }
 
+static void _aes_menu_expand_saved_rect(OBJECT *tree, WORD object, GRECT *rect)
+{
+    if (tree == NULL || rect == NULL || rect->g_w <= 0 || rect->g_h <= 0) {
+        return;
+    }
+
+    if (object == tree[ROOT].ob_head) {
+        rect->g_h = (WORD) (rect->g_h + 1);
+    }
+}
+
 static int _aes_menu_is_separator_text(const char *text)
 {
     int saw_dash = 0;
@@ -1736,6 +1994,51 @@ static int _aes_menu_is_separator_text(const char *text)
     }
 
     return saw_dash;
+}
+
+static int _aes_menu_split_shortcut(const char *text,
+                                    char *label,
+                                    size_t label_size,
+                                    char *shortcut,
+                                    size_t shortcut_size)
+{
+    const char *tab;
+    size_t left_len;
+    size_t right_len;
+
+    if (label != NULL && label_size > 0u) {
+        label[0] = '\0';
+    }
+    if (shortcut != NULL && shortcut_size > 0u) {
+        shortcut[0] = '\0';
+    }
+    if (text == NULL || label == NULL || shortcut == NULL ||
+        label_size == 0u || shortcut_size == 0u) {
+        return 0;
+    }
+
+    tab = strchr(text, '\t');
+    if (tab == NULL) {
+        strncpy(label, text, label_size - 1u);
+        label[label_size - 1u] = '\0';
+        return 0;
+    }
+
+    left_len = (size_t) (tab - text);
+    if (left_len >= label_size) {
+        left_len = label_size - 1u;
+    }
+    memcpy(label, text, left_len);
+    label[left_len] = '\0';
+
+    ++tab;
+    right_len = strlen(tab);
+    if (right_len >= shortcut_size) {
+        right_len = shortcut_size - 1u;
+    }
+    memcpy(shortcut, tab, right_len);
+    shortcut[right_len] = '\0';
+    return 1;
 }
 
 static int _aes_menu_item_selectable(OBJECT *tree, WORD item)
@@ -1965,6 +2268,9 @@ static void _aes_draw_window_title(const aes_window_t *window,
                                    const WORD outer_box[4],
                                    WORD title_height)
 {
+    static const uint8_t title_rows[] = {
+        0x00, 0x55, 0x00, 0x55
+    };
     GRECT closer_rect;
     GRECT fuller_rect;
     WORD text_attrib[6];
@@ -2032,15 +2338,16 @@ static void _aes_draw_window_title(const aes_window_t *window,
         _aes_draw_window_icon(closer_rect.g_x, closer_rect.g_y,
             close_right,
             (WORD) (closer_rect.g_y + closer_rect.g_h - 1), 5);
-        title_left = (WORD) (close_sep[0] + 2);
+        title_left = (WORD) (close_sep[0] + 1);
     }
 
     if (has_fuller != 0) {
         WORD fuller_sep[4];
         WORD fuller_left = (WORD) (fuller_rect.g_x + 1);
+        WORD fuller_right = (WORD) (fuller_rect.g_x + fuller_rect.g_w - 1);
 
         _aes_fill_rect(fuller_left, fuller_rect.g_y,
-            (WORD) (fuller_rect.g_x + fuller_rect.g_w - 1),
+            fuller_right,
             (WORD) (fuller_rect.g_y + fuller_rect.g_h - 1),
             _aes_light_color());
         fuller_sep[0] = fuller_left;
@@ -2050,9 +2357,9 @@ static void _aes_draw_window_title(const aes_window_t *window,
         vsl_color(_aes.vdi_handle, _aes_dark_color());
         v_pline(_aes.vdi_handle, 2, fuller_sep);
         _aes_draw_window_icon_offset(fuller_left, fuller_rect.g_y,
-            (WORD) (fuller_rect.g_x + fuller_rect.g_w - 1),
-            (WORD) (fuller_rect.g_y + fuller_rect.g_h - 1), 7, 1, 0);
-        title_right = (WORD) (fuller_sep[0] - 2);
+            fuller_right,
+            (WORD) (fuller_rect.g_y + fuller_rect.g_h - 1), 7, 2, 0);
+        title_right = (WORD) (fuller_sep[0] - 1);
     }
 
     if ((window->kind & NAME) != 0u && window->name[0] != '\0') {
@@ -2080,20 +2387,23 @@ static void _aes_draw_window_title(const aes_window_t *window,
     if (title_left <= title_right && title_top <= title_bottom) {
         if (active_title != 0) {
             if (title_box_left <= title_box_right) {
-                WORD left_fill_right = (WORD) (title_box_left - 2);
-                WORD right_fill_left = (WORD) (title_box_right + 2);
+                WORD left_fill_right = (WORD) (title_box_left - 1);
+                WORD right_fill_left = (WORD) (title_box_right + 1);
 
                 if (title_left <= left_fill_right) {
-                    _aes_fill_checker_rect(title_left, title_top,
-                        left_fill_right, title_bottom);
+                    _aes_fill_pattern_rect(title_left, title_top,
+                        left_fill_right, title_bottom, title_rows,
+                        sizeof(title_rows) / sizeof(title_rows[0]));
                 }
                 if (right_fill_left <= title_right) {
-                    _aes_fill_checker_rect(right_fill_left, title_top,
-                        title_right, title_bottom);
+                    _aes_fill_pattern_rect(right_fill_left, title_top,
+                        title_right, title_bottom, title_rows,
+                        sizeof(title_rows) / sizeof(title_rows[0]));
                 }
             } else {
-                _aes_fill_checker_rect(title_left, title_top, title_right,
-                    title_bottom);
+                _aes_fill_pattern_rect(title_left, title_top, title_right,
+                    title_bottom, title_rows,
+                    sizeof(title_rows) / sizeof(title_rows[0]));
             }
         } else {
             _aes_fill_rect(title_left, title_top, title_right, title_bottom,
@@ -2106,7 +2416,7 @@ static void _aes_draw_window_title(const aes_window_t *window,
             title_bottom, _aes_light_color());
         title_y = (WORD) (title_top +
             (title_bottom - title_top - text_height) / 2 +
-            _vdi_font_ascent());
+            _vdi_font_ascent() + 1);
         _aes_draw_text(title_x, title_y, _aes_dark_color(), window->name);
     }
 
@@ -2118,6 +2428,9 @@ static void _aes_draw_window_title(const aes_window_t *window,
 void _aes_draw_window_frame(const aes_window_t *window)
 {
     WORD outer_box[10];
+    WORD left_fill[4];
+    WORD right_fill[4];
+    WORD bottom_fill[4];
     WORD gutter_x = 0;
     WORD gutter_y = 0;
     WORD gutter_right = 0;
@@ -2167,6 +2480,33 @@ void _aes_draw_window_frame(const aes_window_t *window)
     shadow_right[3] = (WORD) (window->outer.g_y + window->outer.g_h);
     v_pline(_aes.vdi_handle, 2, shadow_bottom);
     v_pline(_aes.vdi_handle, 2, shadow_right);
+
+    left_fill[0] = (WORD) (window->outer.g_x + 1);
+    left_fill[1] = window->work.g_y;
+    left_fill[2] = (WORD) (window->work.g_x - 1);
+    left_fill[3] = (WORD) (window->outer.g_y + window->outer.g_h - 2);
+    if (left_fill[0] <= left_fill[2] && left_fill[1] <= left_fill[3]) {
+        _aes_fill_rect(left_fill[0], left_fill[1], left_fill[2], left_fill[3],
+            _aes_light_color());
+    }
+
+    right_fill[0] = (WORD) (window->work.g_x + window->work.g_w);
+    right_fill[1] = window->work.g_y;
+    right_fill[2] = (WORD) (window->outer.g_x + window->outer.g_w - 2);
+    right_fill[3] = (WORD) (window->outer.g_y + window->outer.g_h - 2);
+    if (right_fill[0] <= right_fill[2] && right_fill[1] <= right_fill[3]) {
+        _aes_fill_rect(right_fill[0], right_fill[1], right_fill[2],
+            right_fill[3], _aes_light_color());
+    }
+
+    bottom_fill[0] = (WORD) (window->outer.g_x + 1);
+    bottom_fill[1] = (WORD) (window->work.g_y + window->work.g_h);
+    bottom_fill[2] = (WORD) (window->outer.g_x + window->outer.g_w - 2);
+    bottom_fill[3] = (WORD) (window->outer.g_y + window->outer.g_h - 2);
+    if (bottom_fill[0] <= bottom_fill[2] && bottom_fill[1] <= bottom_fill[3]) {
+        _aes_fill_rect(bottom_fill[0], bottom_fill[1], bottom_fill[2],
+            bottom_fill[3], _aes_light_color());
+    }
 
     if ((window->kind & SIZER) != 0u) {
         gutter_x = (WORD) (window->outer.g_x + window->outer.g_w -
@@ -2389,16 +2729,19 @@ static void _aes_draw_text(WORD x, WORD y, WORD color, const char *text)
 /*
  * Draws one `TEDINFO`-backed text object.
  */
-static void _aes_draw_ted_object(const OBJECT *obj,
+static void _aes_draw_ted_object(const OBJECT *tree,
+                                 WORD object,
+                                 const OBJECT *obj,
                                  const TEDINFO *ted,
                                  const WORD rect[4])
 {
     const char *text;
-    WORD box[4];
     WORD text_x;
     WORD text_y;
-    WORD fill_color;
-    WORD border_color;
+    WORD text_width;
+    WORD caret_width;
+    WORD underline_y;
+    WORD caret_x;
     WORD text_color;
 
     if (obj == NULL || ted == NULL) {
@@ -2407,22 +2750,168 @@ static void _aes_draw_ted_object(const OBJECT *obj,
 
     text = (const char *) (intptr_t) ted->te_ptext;
     text_x = (WORD) (rect[0] + 2);
-    text_y = (WORD) (rect[1] + AES_CHAR_HEIGHT);
-    text_color = ((obj->ob_state & SELECTED) != 0u) ?
-        _aes_light_color() : _aes_dark_color();
-    fill_color = ((obj->ob_state & SELECTED) != 0u) ?
-        _aes_dark_color() : _aes_light_color();
-    border_color = _aes_dark_color();
+    text_color = _aes_dark_color();
+    text_width = (WORD) _vdi_string_width(text != NULL ? text : "");
+    caret_width = text_width;
 
-    if (obj->ob_type == G_BOXTEXT || obj->ob_type == G_FBOXTEXT) {
-        memcpy(box, rect, sizeof(box));
-        vsf_color(_aes.vdi_handle, fill_color);
-        v_bar(_aes.vdi_handle, box);
-        vsl_color(_aes.vdi_handle, border_color);
-        v_rbox(_aes.vdi_handle, box);
+    if (obj->ob_type == G_FTEXT || obj->ob_type == G_FBOXTEXT) {
+        text_y = (WORD) (rect[1] + _vdi_font_ascent());
+        underline_y = (WORD) (rect[1] + _vdi_font_text_height() + 1);
+        if (underline_y > rect[3]) {
+            underline_y = rect[3];
+        }
+        if (tree == _aes.edit_tree && object == _aes.edit_object &&
+            text != NULL) {
+            WORD edit_index = _aes.edit_index;
+            WORD text_length = (WORD) strlen(text);
+            char prefix[256];
+
+            if (edit_index < 0) {
+                edit_index = 0;
+            }
+            if (edit_index > text_length) {
+                edit_index = text_length;
+            }
+            if ((size_t) edit_index >= sizeof(prefix)) {
+                edit_index = (WORD) (sizeof(prefix) - 1u);
+            }
+            memcpy(prefix, text, (size_t) edit_index);
+            prefix[edit_index] = '\0';
+            caret_width = (WORD) _vdi_string_width(prefix);
+        }
+        _aes_fill_rect(rect[0], rect[1], rect[2], rect[3], _aes_light_color());
+        _aes_draw_hline((WORD) (rect[0] + 1), (WORD) (rect[2] - 1),
+            underline_y, _aes_dark_color());
+        if ((obj->ob_state & SELECTED) != 0u) {
+            caret_x = (WORD) (text_x + caret_width + 1);
+            if (caret_x < rect[0] + 1) {
+                caret_x = (WORD) (rect[0] + 1);
+            }
+            if (caret_x > rect[2] - 1) {
+                caret_x = (WORD) (rect[2] - 1);
+            }
+            _aes_draw_vline(caret_x, (WORD) (text_y - _vdi_font_ascent() + 1),
+                (WORD) (underline_y - 1), _aes_dark_color());
+        }
+    } else if (obj->ob_type == G_BOXTEXT) {
+        text_y = (WORD) (rect[1] +
+            ((rect[3] - rect[1] + 1 - _vdi_font_text_height()) > 0 ?
+            (rect[3] - rect[1] + 1 - _vdi_font_text_height()) / 2 : 0) +
+            _vdi_font_ascent());
+        _aes_fill_rect(rect[0], rect[1], rect[2], rect[3], _aes_light_color());
+        _aes_draw_hline(rect[0], rect[2], rect[1], _aes_dark_color());
+        _aes_draw_hline(rect[0], rect[2], rect[3], _aes_dark_color());
+        _aes_draw_vline(rect[0], rect[1], rect[3], _aes_dark_color());
+        _aes_draw_vline(rect[2], rect[1], rect[3], _aes_dark_color());
+    } else {
+        text_y = (WORD) (rect[1] +
+            ((rect[3] - rect[1] + 1 - _vdi_font_text_height()) > 0 ?
+            (rect[3] - rect[1] + 1 - _vdi_font_text_height()) / 2 : 0) +
+            _vdi_font_ascent());
+    }
+
+    if (ted->te_just == TE_RIGHT) {
+        text_x = (WORD) (rect[2] - text_width - 1);
+        if (text_x < rect[0] + 2) {
+            text_x = (WORD) (rect[0] + 2);
+        }
+    } else if (ted->te_just == TE_CNTR) {
+        text_x = (WORD) (rect[0] + ((rect[2] - rect[0] + 1) - text_width) / 2);
+        if (text_x < rect[0] + 2) {
+            text_x = (WORD) (rect[0] + 2);
+        }
     }
 
     _aes_draw_text(text_x, text_y, text_color, text);
+}
+
+static void _aes_draw_hline(WORD x0, WORD x1, WORD y, WORD color)
+{
+    WORD pts[4];
+
+    if (x0 > x1) {
+        return;
+    }
+
+    pts[0] = x0;
+    pts[1] = y;
+    pts[2] = x1;
+    pts[3] = y;
+    vsl_color(_aes.vdi_handle, color);
+    v_pline(_aes.vdi_handle, 2, pts);
+}
+
+static void _aes_draw_vline(WORD x, WORD y0, WORD y1, WORD color)
+{
+    WORD pts[4];
+
+    if (y0 > y1) {
+        return;
+    }
+
+    pts[0] = x;
+    pts[1] = y0;
+    pts[2] = x;
+    pts[3] = y1;
+    vsl_color(_aes.vdi_handle, color);
+    v_pline(_aes.vdi_handle, 2, pts);
+}
+
+static void _aes_draw_dialog_frame(const WORD rect[4])
+{
+    WORD inset;
+    WORD left;
+    WORD top;
+    WORD right;
+    WORD bottom;
+
+    for (inset = 0; inset < 5; ++inset) {
+        left = (WORD) (rect[0] + inset);
+        top = (WORD) (rect[1] + inset);
+        right = (WORD) (rect[2] - inset);
+        bottom = (WORD) (rect[3] - inset);
+        if (left > right || top > bottom) {
+            break;
+        }
+
+        _aes_draw_hline(left, right, top,
+            (inset == 0 || inset >= 3) ? _aes_dark_color() :
+            _aes_light_color());
+        _aes_draw_hline(left, right, bottom,
+            (inset == 0 || inset >= 3) ? _aes_dark_color() :
+            _aes_light_color());
+        _aes_draw_vline(left, top, bottom,
+            (inset == 0 || inset >= 3) ? _aes_dark_color() :
+            _aes_light_color());
+        _aes_draw_vline(right, top, bottom,
+            (inset == 0 || inset >= 3) ? _aes_dark_color() :
+            _aes_light_color());
+    }
+}
+
+static void _aes_draw_button_frame(const WORD rect[4], WORD dark_color,
+                                   WORD light_color, int default_button)
+{
+    WORD inset;
+    WORD border_thickness = default_button != 0 ? 2 : 1;
+
+    (void) light_color;
+
+    for (inset = 0; inset < border_thickness; ++inset) {
+        WORD left = (WORD) (rect[0] + inset);
+        WORD top = (WORD) (rect[1] + inset);
+        WORD right = (WORD) (rect[2] - inset);
+        WORD bottom = (WORD) (rect[3] - inset);
+
+        if (left > right || top > bottom) {
+            break;
+        }
+
+        _aes_draw_hline(left, right, top, dark_color);
+        _aes_draw_hline(left, right, bottom, dark_color);
+        _aes_draw_vline(left, top, bottom, dark_color);
+        _aes_draw_vline(right, top, bottom, dark_color);
+    }
 }
 
 /*
@@ -2517,9 +3006,12 @@ static void _aes_draw_object(const OBJECT *tree,
                              WORD abs_y,
                              WORD clip[4])
 {
+    char shortcut_label[128];
+    char shortcut_text[64];
     const OBJECT *obj;
     LONG spec;
     WORD rect[4];
+    WORD parent;
     WORD active;
     WORD fill_color;
     WORD border_color;
@@ -2537,6 +3029,7 @@ static void _aes_draw_object(const OBJECT *tree,
     }
 
     obj = &tree[object];
+    parent = _aes_find_parent((OBJECT *) tree, object);
     spec = _aes_resolve_spec(obj);
     checked_menu_item = (obj->ob_type == G_STRING &&
         (obj->ob_state & CHECKED) != 0u) ? 1 : 0;
@@ -2557,7 +3050,16 @@ static void _aes_draw_object(const OBJECT *tree,
     switch (obj->ob_type) {
     case G_BOX:
     case G_BOXCHAR:
-        if (object == ROOT && rect[0] == 0 && rect[2] >= _aes.work_out[0] &&
+        if (object == ROOT && _aes_is_dialog_root_tree(tree) != 0) {
+            vsf_color(_aes.vdi_handle, _aes_light_color());
+            v_bar(_aes.vdi_handle, rect);
+            _aes_draw_dialog_frame(rect);
+        } else if (_aes_is_menu_bar_object(tree, object) != 0) {
+            vsf_color(_aes.vdi_handle, _aes_light_color());
+            v_bar(_aes.vdi_handle, rect);
+            _aes_draw_hline(rect[0], rect[2], rect[3], border_color);
+        } else if (object == ROOT && rect[0] == 0 &&
+            rect[2] >= _aes.work_out[0] &&
             rect[3] >= (WORD) (_aes.work_out[1] / 2)) {
             _aes_fill_checker_rect(rect[0], rect[1], rect[2], rect[3]);
         } else {
@@ -2565,35 +3067,37 @@ static void _aes_draw_object(const OBJECT *tree,
             v_bar(_aes.vdi_handle, rect);
         }
         if (object != ROOT) {
-            vsl_color(_aes.vdi_handle, border_color);
-            v_rbox(_aes.vdi_handle, rect);
+            if (_aes_is_menu_bar_object(tree, object) == 0) {
+                if (_aes_is_dialog_frame_object(tree, object, parent) != 0) {
+                    _aes_draw_dialog_frame(rect);
+                } else {
+                    _aes_draw_hline(rect[0], rect[2], rect[1], border_color);
+                    _aes_draw_hline(rect[0], rect[2], rect[3], border_color);
+                    _aes_draw_vline(rect[0], rect[1], rect[3], border_color);
+                    _aes_draw_vline(rect[2], rect[1], rect[3], border_color);
+                }
+            }
         }
         break;
     case G_IBOX:
+        if (_aes_is_dialog_frame_object(tree, object, parent) != 0) {
+            vsf_color(_aes.vdi_handle, _aes_light_color());
+            v_bar(_aes.vdi_handle, rect);
+            _aes_draw_dialog_frame(rect);
+        }
         break;
     case G_BUTTON:
         vsf_color(_aes.vdi_handle, fill_color);
         v_bar(_aes.vdi_handle, rect);
-        vsl_color(_aes.vdi_handle, border_color);
-        v_rbox(_aes.vdi_handle, rect);
-        if ((obj->ob_flags & DEFAULT) != 0u &&
-            rect[0] + 2 <= rect[2] - 2 &&
-            rect[1] + 2 <= rect[3] - 2) {
-            WORD inner_rect[4];
-
-            inner_rect[0] = (WORD) (rect[0] + 1);
-            inner_rect[1] = (WORD) (rect[1] + 1);
-            inner_rect[2] = (WORD) (rect[2] - 1);
-            inner_rect[3] = (WORD) (rect[3] - 1);
-            vsl_color(_aes.vdi_handle, inner_border_color);
-            v_rbox(_aes.vdi_handle, inner_rect);
-        }
+        _aes_draw_button_frame(rect, border_color, inner_border_color,
+            (obj->ob_flags & DEFAULT) != 0u ? 1 : 0);
         break;
     case G_TEXT:
     case G_BOXTEXT:
     case G_FTEXT:
     case G_FBOXTEXT:
-        _aes_draw_ted_object(obj, (const TEDINFO *) (intptr_t) spec, rect);
+        _aes_draw_ted_object(tree, object, obj,
+            (const TEDINFO *) (intptr_t) spec, rect);
         return;
     case G_ICON:
         _aes_draw_icon_object(obj, (const ICONBLK *) (intptr_t) spec,
@@ -2610,7 +3114,23 @@ static void _aes_draw_object(const OBJECT *tree,
         obj->ob_type, rect[0], rect[1], rect[2], rect[3],
         (const void *) (intptr_t) spec, obj->ob_flags, obj->ob_state);
 
-    if ((obj->ob_type == G_STRING || obj->ob_type == G_TITLE) &&
+    if (obj->ob_type == G_TITLE) {
+        if (rect[1] + 1 <= rect[3] - 1) {
+            _aes_fill_rect(rect[0], (WORD) (rect[1] + 1), rect[2],
+                (WORD) (rect[3] - 1), _aes_light_color());
+        }
+    } else if (obj->ob_type == G_STRING && tree == _aes.menu_tree &&
+        parent != NIL &&
+        (tree[parent].ob_type == G_BOX || tree[parent].ob_type == G_IBOX) &&
+        _aes_is_menu_bar_object(tree, parent) == 0) {
+        WORD fill_right = (WORD) (rect[2] - 1);
+
+        if (fill_right < rect[0]) {
+            fill_right = rect[0];
+        }
+        _aes_fill_rect(rect[0], rect[1], fill_right, rect[3],
+            (active != 0) ? _aes_dark_color() : _aes_light_color());
+    } else if ((obj->ob_type == G_STRING || obj->ob_type == G_TITLE) &&
         active != 0) {
         vsf_color(_aes.vdi_handle, fill_color);
         v_bar(_aes.vdi_handle, rect);
@@ -2619,18 +3139,67 @@ static void _aes_draw_object(const OBJECT *tree,
     text_width = 0;
     text_height = _vdi_font_text_height();
     text_ascent = _vdi_font_ascent();
-    text_x = (obj->ob_type == G_TITLE) ? rect[0] : (WORD) (rect[0] + 2);
+    text_x = (obj->ob_type == G_TITLE) ? (WORD) (rect[0] + 2) :
+        (WORD) (rect[0] + 2);
     if (checked_menu_item != 0) {
-        text_x = (WORD) (text_x + 8);
+        /* Keep the menu label aligned and overlay the checkmark instead. */
     }
-    text_y = (WORD) (rect[1] +
-        ((obj->ob_height - text_height) > 0 ?
-        (obj->ob_height - text_height) / 2 : 0) + text_ascent);
-    text_color = (active != 0) ?
-        _aes_light_color() : _aes_dark_color();
+    if (obj->ob_type == G_TITLE) {
+        text_y = (WORD) (rect[1] + 3 + text_ascent);
+    } else {
+        text_y = (WORD) (rect[1] +
+            ((obj->ob_height - text_height) > 0 ?
+            (obj->ob_height - text_height) / 2 : 0) + text_ascent);
+    }
+    if (obj->ob_type == G_TITLE) {
+        text_color = _aes_dark_color();
+    } else {
+        text_color = (active != 0) ?
+            _aes_light_color() : _aes_dark_color();
+    }
     if ((obj->ob_type == G_STRING || obj->ob_type == G_TITLE ||
          obj->ob_type == G_BUTTON) && spec != 0) {
-        text_width = (WORD) _vdi_string_width((const char *) (intptr_t) spec);
+        const char *text = (const char *) (intptr_t) spec;
+        int has_shortcut = 0;
+
+        if (obj->ob_type == G_STRING && _aes_menu_is_separator_text(text)) {
+            WORD dash_x = (WORD) (rect[0] + 2);
+            WORD dash_y = text_y;
+            WORD dash_width = _vdi_char_cell_width('-');
+            WORD dash_count;
+            char dash_buf[128];
+            WORD i;
+
+            if (dash_width <= 0) {
+                dash_width = AES_CHAR_WIDTH;
+            }
+            dash_count = (WORD) ((rect[2] - rect[0] - 3) / dash_width);
+            if (dash_count < 1) {
+                dash_count = 1;
+            }
+            if ((size_t) dash_count >= sizeof(dash_buf)) {
+                dash_count = (WORD) (sizeof(dash_buf) - 1u);
+            }
+            for (i = 0; i < dash_count; ++i) {
+                dash_buf[i] = '-';
+            }
+            dash_buf[dash_count] = '\0';
+            _aes_draw_text((WORD) (dash_x + 1), (WORD) (dash_y + 1),
+                _aes_light_color(), dash_buf);
+            _aes_draw_text(dash_x, dash_y, _aes_dark_color(), dash_buf);
+            return;
+        }
+
+        if (obj->ob_type == G_STRING) {
+            has_shortcut = _aes_menu_split_shortcut(text, shortcut_label,
+                sizeof(shortcut_label), shortcut_text,
+                sizeof(shortcut_text));
+            if (has_shortcut != 0) {
+                text = shortcut_label;
+            }
+        }
+
+        text_width = (WORD) _vdi_string_width(text);
         if ((obj->ob_type == G_BUTTON || obj->ob_type == G_TITLE) &&
             text_width <= obj->ob_width) {
             text_x = (WORD) (rect[0] + (obj->ob_width - text_width) / 2);
@@ -2638,8 +3207,21 @@ static void _aes_draw_object(const OBJECT *tree,
         if (checked_menu_item != 0) {
             _aes_draw_text((WORD) (rect[0] + 2), text_y, text_color, "\010");
         }
-        _aes_draw_text(text_x, text_y, text_color,
-            (const char *) (intptr_t) spec);
+        _aes_draw_text(text_x, text_y, text_color, text);
+        if (has_shortcut != 0 && shortcut_text[0] != '\0') {
+            WORD shortcut_width = (WORD) _vdi_string_width(shortcut_text);
+            WORD shortcut_x = (WORD) (rect[2] - shortcut_width - 2);
+
+            if (shortcut_x > text_x) {
+                _aes_draw_text(shortcut_x, text_y, text_color,
+                    shortcut_text);
+            }
+        }
+        if (obj->ob_type == G_TITLE && active != 0 &&
+            rect[1] + 1 <= rect[3] - 1) {
+            _aes_invert_rect(rect[0], (WORD) (rect[1] + 1), rect[2],
+                (WORD) (rect[3] - 1));
+        }
     }
 }
 
@@ -2655,6 +3237,8 @@ void _aes_draw_tree_recursive(const OBJECT *tree,
 {
     WORD abs_x;
     WORD abs_y;
+    WORD child_clip[4];
+    WORD clip_on = 0;
 
     if (tree == NULL || object < 0) {
         return;
@@ -2665,7 +3249,14 @@ void _aes_draw_tree_recursive(const OBJECT *tree,
 
     abs_x = (WORD) (parent_x + tree[object].ob_x);
     abs_y = (WORD) (parent_y + tree[object].ob_y);
+    if (clip != NULL) {
+        vs_clip(_aes.vdi_handle, 1, clip);
+        clip_on = 1;
+    }
     _aes_draw_object(tree, object, abs_x, abs_y, clip);
+    if (clip_on != 0) {
+        vs_clip(_aes.vdi_handle, 0, clip);
+    }
 
     if (depth == 0 || tree[object].ob_head == NIL) {
         return;
@@ -2674,11 +3265,34 @@ void _aes_draw_tree_recursive(const OBJECT *tree,
     {
         WORD child = tree[object].ob_head;
 
+        memcpy(child_clip, clip, sizeof(child_clip));
+        if (object == ROOT && _aes_is_dialog_root_tree(tree) != 0) {
+            WORD inner_clip[4];
+
+            inner_clip[0] = (WORD) (abs_x + 5);
+            inner_clip[1] = (WORD) (abs_y + 5);
+            inner_clip[2] = (WORD) (abs_x + tree[object].ob_width - 7);
+            inner_clip[3] = (WORD) (abs_y + tree[object].ob_height - 7);
+            if (inner_clip[0] <= inner_clip[2] &&
+                inner_clip[1] <= inner_clip[3]) {
+                child_clip[0] = _aes_max_word(child_clip[0], inner_clip[0]);
+                child_clip[1] = _aes_max_word(child_clip[1], inner_clip[1]);
+                child_clip[2] = _aes_min_word(child_clip[2], inner_clip[2]);
+                child_clip[3] = _aes_min_word(child_clip[3], inner_clip[3]);
+            }
+        }
+
         while (child != NIL) {
             WORD next = tree[child].ob_next;
+            WORD *next_clip = child_clip;
+
+            if (object == ROOT && _aes_is_dialog_frame_object(tree, child,
+                    object) != 0) {
+                next_clip = clip;
+            }
 
             _aes_draw_tree_recursive(tree, child, abs_x, abs_y,
-                (depth > 0) ? (WORD) (depth - 1) : depth, clip);
+                (depth > 0) ? (WORD) (depth - 1) : depth, next_clip);
             if (child == tree[object].ob_tail || next == object ||
                 next == NIL) {
                 break;

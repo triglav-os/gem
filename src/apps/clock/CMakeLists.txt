@@ -1,11 +1,13 @@
-add_executable(clock main.c)
+add_executable(clock clock.c _clock.c)
+
+add_dependencies(clock gem_runtime_clock_numbers)
 
 target_include_directories(clock
     PRIVATE
         ${PROJECT_SOURCE_DIR}/include
 )
 
-target_link_libraries(clock PRIVATE aes vdi)
+target_link_libraries(clock PRIVATE aes vdi m)
 
 set_target_properties(clock PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/bin

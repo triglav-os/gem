@@ -13,6 +13,8 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)
+set(CMAKE_BUILD_RPATH "$ORIGIN")
 
 file(GLOB gem_runtime_font_files CONFIGURE_DEPENDS
     ${PROJECT_SOURCE_DIR}/src/resources/fonts/*.fnt)
@@ -30,9 +32,12 @@ add_custom_target(gem_runtime_fonts ALL
 
 add_subdirectory(lib/platform/rasta)
 add_subdirectory(lib/platform/linux)
+add_subdirectory(tools/resgen)
 add_subdirectory(src/vdi)
 add_subdirectory(src/aes)
-add_subdirectory(src/rcs)
+if(EXISTS ${PROJECT_SOURCE_DIR}/src/rcs/CMakeLists.txt)
+    add_subdirectory(src/rcs)
+endif()
 add_subdirectory(src/desktop)
 add_subdirectory(src/apps)
 add_subdirectory(samples)
