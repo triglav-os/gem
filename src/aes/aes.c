@@ -28,6 +28,9 @@ static void _aes_queue_window_message(const aes_window_t *window,
     WORD message, WORD w4, WORD w5, WORD w6, WORD w7);
 static WORD _aes_dequeue_message(WORD msg[8]);
 static void _aes_draw_drag_outline(const GRECT *rect);
+static void _aes_union_rects(const GRECT *left, const GRECT *right, GRECT *out);
+static void _aes_redraw_scrollbar_delta(const aes_window_t *before,
+    const aes_window_t *after, WORD field);
 static void _aes_clamp_dragged_window_position(const aes_window_t *window,
     const GRECT *desktop, WORD *x, WORD *y);
 static void _aes_toggle_window_iconified(aes_window_t *window);
@@ -131,6 +134,70 @@ static void _aes_draw_drag_outline(const GRECT *rect)
     vsl_color(_aes.vdi_handle, WHITE);
     v_pline(_aes.vdi_handle, 5, box);
     (void) vswr_mode(_aes.vdi_handle, previous_mode);
+}
+
+static void _aes_union_rects(const GRECT *left, const GRECT *right, GRECT *out)
+{
+    WORD x0;
+    WORD y0;
+    WORD x1;
+    WORD y1;
+
+    if (left == NULL || right == NULL || out == NULL) {
+        return;
+    }
+
+    x0 = _aes_min_word(left->g_x, right->g_x);
+    y0 = _aes_min_word(left->g_y, right->g_y);
+    x1 = _aes_max_word((WORD) (left->g_x + left->g_w - 1),
+        (WORD) (right->g_x + right->g_w - 1));
+    y1 = _aes_max_word((WORD) (left->g_y + left->g_h - 1),
+        (WORD) (right->g_y + right->g_h - 1));
+    _aes_set_rect(out, x0, y0, (WORD) (x1 - x0 + 1), (WORD) (y1 - y0 + 1));
+}
+
+static void _aes_redraw_scrollbar_delta(const aes_window_t *before,
+    const aes_window_t *after, WORD field)
+{
+    GRECT old_rect;
+    GRECT new_rect;
+    GRECT dirty;
+    int have_old = 0;
+    int have_new = 0;
+
+    if (before == NULL || after == NULL || after->open == 0) {
+        return;
+    }
+
+    switch (field) {
+    case WF_VSLIDE:
+    case WF_VSLSIZ:
+        have_old = _aes_window_vthumb_rect(before, &old_rect);
+        have_new = _aes_window_vthumb_rect(after, &new_rect);
+        break;
+    case WF_HSLIDE:
+    case WF_HSLSIZ:
+        have_old = _aes_window_hthumb_rect(before, &old_rect);
+        have_new = _aes_window_hthumb_rect(after, &new_rect);
+        break;
+    default:
+        break;
+    }
+
+    if (have_old != 0 && have_new != 0) {
+        if (old_rect.g_x == new_rect.g_x &&
+            old_rect.g_y == new_rect.g_y &&
+            old_rect.g_w == new_rect.g_w &&
+            old_rect.g_h == new_rect.g_h) {
+            return;
+        }
+        _aes_union_rects(&old_rect, &new_rect, &dirty);
+        _aes_redraw_region(&dirty);
+    } else if (have_old != 0) {
+        _aes_redraw_region(&old_rect);
+    } else if (have_new != 0) {
+        _aes_redraw_region(&new_rect);
+    }
 }
 
 static void _aes_clamp_dragged_window_position(const aes_window_t *window,
@@ -360,6 +427,175 @@ static WORD _aes_track_window_interaction(const gem_hid_event_t *first_evt,
             return 0;
         }
         _aes_queue_window_message(window, WM_FULLED, 0, 0, 0, 0);
+        if ((flags & MU_MESAG) != 0u && mepbuff != NULL &&
+            _aes_dequeue_message(mepbuff) != 0) {
+            return MU_MESAG;
+        }
+        return 0;
+    }
+
+    if (part == AES_WINDOW_PART_VUP || part == AES_WINDOW_PART_VDOWN ||
+        part == AES_WINDOW_PART_HLEFT || part == AES_WINDOW_PART_HRIGHT ||
+        part == AES_WINDOW_PART_VPAGE_UP ||
+        part == AES_WINDOW_PART_VPAGE_DOWN ||
+        part == AES_WINDOW_PART_HPAGE_LEFT ||
+        part == AES_WINDOW_PART_HPAGE_RIGHT) {
+        WORD arrow_code = WA_UPLINE;
+
+        switch (part) {
+        case AES_WINDOW_PART_VUP:
+            arrow_code = WA_UPLINE;
+            break;
+        case AES_WINDOW_PART_VDOWN:
+            arrow_code = WA_DNLINE;
+            break;
+        case AES_WINDOW_PART_HLEFT:
+            arrow_code = WA_LFLINE;
+            break;
+        case AES_WINDOW_PART_HRIGHT:
+            arrow_code = WA_RTLINE;
+            break;
+        case AES_WINDOW_PART_VPAGE_UP:
+            arrow_code = WA_UPPAGE;
+            break;
+        case AES_WINDOW_PART_VPAGE_DOWN:
+            arrow_code = WA_DNPAGE;
+            break;
+        case AES_WINDOW_PART_HPAGE_LEFT:
+            arrow_code = WA_LFPAGE;
+            break;
+        case AES_WINDOW_PART_HPAGE_RIGHT:
+            arrow_code = WA_RTPAGE;
+            break;
+        default:
+            break;
+        }
+
+        _aes_queue_window_message(window, WM_ARROWED, arrow_code, 0, 0, 0);
+        if ((flags & MU_MESAG) != 0u && mepbuff != NULL &&
+            _aes_dequeue_message(mepbuff) != 0) {
+            return MU_MESAG;
+        }
+        return 0;
+    }
+
+    if (part == AES_WINDOW_PART_VSLIDE || part == AES_WINDOW_PART_HSLIDE) {
+        gem_hid_event_t evt;
+        GRECT slot;
+        GRECT thumb;
+        GRECT drag_rect;
+        GRECT last_rect;
+        WORD press_offset;
+        int drag_drawn = 0;
+
+        if (part == AES_WINDOW_PART_VSLIDE) {
+            if (_aes_window_vslot_rect(window, &slot) == 0 ||
+                _aes_window_vthumb_rect(window, &thumb) == 0) {
+                return 0;
+            }
+            press_offset = (WORD) (start_y - thumb.g_y);
+        } else {
+            if (_aes_window_hslot_rect(window, &slot) == 0 ||
+                _aes_window_hthumb_rect(window, &thumb) == 0) {
+                return 0;
+            }
+            press_offset = (WORD) (start_x - thumb.g_x);
+        }
+
+        drag_rect = thumb;
+        last_rect = thumb;
+        _vdi_begin_update();
+        v_hide_c(_aes.vdi_handle);
+        _aes_draw_drag_outline(&drag_rect);
+        v_show_c(_aes.vdi_handle, 1);
+        _vdi_end_update();
+        drag_drawn = 1;
+
+        FOREVER {
+            if (gem_hid_poll(&evt) == 0) {
+                gem_os_sleep_ms(1u);
+                continue;
+            }
+            if (evt.type == GEM_HID_MOUSE_MOVE ||
+                evt.type == GEM_HID_MOUSE_BUTTON) {
+                _vdi_begin_update();
+                v_hide_c(_aes.vdi_handle);
+                _aes_store_mouse_state(&evt);
+                if (evt.type == GEM_HID_MOUSE_MOVE) {
+                    if (part == AES_WINDOW_PART_VSLIDE) {
+                        WORD limit = (WORD) (slot.g_h - thumb.g_h);
+                        WORD pos = (WORD) (evt.y - slot.g_y - press_offset);
+
+                        if (limit > 0) {
+                            pos = _aes_max_word(0, _aes_min_word(pos, limit));
+                        } else {
+                            pos = 0;
+                        }
+                        if (drag_drawn != 0) {
+                            _aes_draw_drag_outline(&last_rect);
+                        }
+                        _aes_set_rect(&drag_rect, thumb.g_x,
+                            (WORD) (slot.g_y + pos), thumb.g_w, thumb.g_h);
+                    } else {
+                        WORD limit = (WORD) (slot.g_w - thumb.g_w);
+                        WORD pos = (WORD) (evt.x - slot.g_x - press_offset);
+
+                        if (limit > 0) {
+                            pos = _aes_max_word(0, _aes_min_word(pos, limit));
+                        } else {
+                            pos = 0;
+                        }
+                        if (drag_drawn != 0) {
+                            _aes_draw_drag_outline(&last_rect);
+                        }
+                        _aes_set_rect(&drag_rect, (WORD) (slot.g_x + pos),
+                            thumb.g_y, thumb.g_w, thumb.g_h);
+                    }
+                    _aes_draw_drag_outline(&drag_rect);
+                    last_rect = drag_rect;
+                    drag_drawn = 1;
+                }
+                v_show_c(_aes.vdi_handle, 1);
+                _vdi_end_update();
+                graf_mkstate(pmx, pmy, pmb, pks);
+            }
+            if (evt.type == GEM_HID_MOUSE_BUTTON &&
+                evt.button == GEM_HID_BUTTON_LEFT &&
+                (evt.flags & GEM_HID_BUTTON_LEFT) == 0u) {
+                _vdi_begin_update();
+                v_hide_c(_aes.vdi_handle);
+                _aes_store_mouse_state(&evt);
+                if (drag_drawn != 0) {
+                    _aes_draw_drag_outline(&last_rect);
+                }
+                v_show_c(_aes.vdi_handle, 1);
+                _vdi_end_update();
+                break;
+            }
+        }
+
+        if (part == AES_WINDOW_PART_VSLIDE) {
+            WORD limit = (WORD) (slot.g_h - thumb.g_h);
+            WORD pos = (WORD) (drag_rect.g_y - slot.g_y);
+            WORD slider = 0;
+
+            if (limit > 0) {
+                pos = _aes_max_word(0, _aes_min_word(pos, limit));
+                slider = (WORD) ((1000L * pos) / limit);
+            }
+            _aes_queue_window_message(window, WM_VSLID, slider, 0, 0, 0);
+        } else {
+            WORD limit = (WORD) (slot.g_w - thumb.g_w);
+            WORD pos = (WORD) (drag_rect.g_x - slot.g_x);
+            WORD slider = 0;
+
+            if (limit > 0) {
+                pos = _aes_max_word(0, _aes_min_word(pos, limit));
+                slider = (WORD) ((1000L * pos) / limit);
+            }
+            _aes_queue_window_message(window, WM_HSLID, slider, 0, 0, 0);
+        }
+
         if ((flags & MU_MESAG) != 0u && mepbuff != NULL &&
             _aes_dequeue_message(mepbuff) != 0) {
             return MU_MESAG;
@@ -1772,6 +2008,10 @@ WORD wind_create(UWORD kind, WORD x, WORD y, WORD w, WORD h)
             _aes_set_rect(&_aes.windows[i].outer, x, y, w, h);
             _aes.windows[i].previous_outer = _aes.windows[i].outer;
             _aes.windows[i].restored_outer = _aes.windows[i].outer;
+            _aes.windows[i].hslide = 0;
+            _aes.windows[i].vslide = 0;
+            _aes.windows[i].hslsize = 1000;
+            _aes.windows[i].vslsize = 1000;
             _aes_compute_work(&_aes.windows[i]);
             return _aes.windows[i].handle;
         }
@@ -1983,6 +2223,30 @@ WORD wind_get(WORD handle, WORD field, WORD *w1, WORD *w2, WORD *w3, WORD *w4)
         rect_value.g_h = (WORD) _aes_max_word((WORD) 0,
             (WORD) (_aes.work_out[1] + 1 - rect_value.g_y));
         rect = &rect_value;
+    } else if (field == WF_HSLIDE) {
+        rect_value.g_x = window->hslide;
+        rect_value.g_y = 0;
+        rect_value.g_w = 0;
+        rect_value.g_h = 0;
+        rect = &rect_value;
+    } else if (field == WF_VSLIDE) {
+        rect_value.g_x = window->vslide;
+        rect_value.g_y = 0;
+        rect_value.g_w = 0;
+        rect_value.g_h = 0;
+        rect = &rect_value;
+    } else if (field == WF_HSLSIZ) {
+        rect_value.g_x = window->hslsize;
+        rect_value.g_y = 0;
+        rect_value.g_w = 0;
+        rect_value.g_h = 0;
+        rect = &rect_value;
+    } else if (field == WF_VSLSIZ) {
+        rect_value.g_x = window->vslsize;
+        rect_value.g_y = 0;
+        rect_value.g_w = 0;
+        rect_value.g_h = 0;
+        rect = &rect_value;
     } else {
         rect = &window->work;
     }
@@ -2008,10 +2272,13 @@ WORD wind_get(WORD handle, WORD field, WORD *w1, WORD *w2, WORD *w3, WORD *w4)
 WORD wind_set(WORD handle, WORD field, WORD w1, WORD w2, WORD w3, WORD w4)
 {
     aes_window_t *window = _aes_find_window(handle);
+    aes_window_t before;
 
     if (window == NULL) {
         return 0;
     }
+
+    before = *window;
 
     switch (field) {
     case WF_NAME:
@@ -2045,6 +2312,54 @@ WORD wind_set(WORD handle, WORD field, WORD w1, WORD w2, WORD w3, WORD w4)
             _aes_redraw_window_change(&window->previous_outer, &window->outer);
         }
         break;
+    case WF_HSLIDE:
+    {
+        WORD value = _aes_max_word(0, _aes_min_word(w1, 1000));
+        if (window->hslide == value) {
+            break;
+        }
+        window->hslide = value;
+        if (window->open != 0) {
+            _aes_redraw_scrollbar_delta(&before, window, field);
+        }
+        break;
+    }
+    case WF_VSLIDE:
+    {
+        WORD value = _aes_max_word(0, _aes_min_word(w1, 1000));
+        if (window->vslide == value) {
+            break;
+        }
+        window->vslide = value;
+        if (window->open != 0) {
+            _aes_redraw_scrollbar_delta(&before, window, field);
+        }
+        break;
+    }
+    case WF_HSLSIZ:
+    {
+        WORD value = _aes_max_word(0, _aes_min_word(w1, 1000));
+        if (window->hslsize == value) {
+            break;
+        }
+        window->hslsize = value;
+        if (window->open != 0) {
+            _aes_redraw_scrollbar_delta(&before, window, field);
+        }
+        break;
+    }
+    case WF_VSLSIZ:
+    {
+        WORD value = _aes_max_word(0, _aes_min_word(w1, 1000));
+        if (window->vslsize == value) {
+            break;
+        }
+        window->vslsize = value;
+        if (window->open != 0) {
+            _aes_redraw_scrollbar_delta(&before, window, field);
+        }
+        break;
+    }
     default:
         break;
     }

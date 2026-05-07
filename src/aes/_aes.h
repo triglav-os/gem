@@ -52,6 +52,10 @@ typedef struct aes_window {
     GRECT work;
     GRECT previous_outer;
     GRECT restored_outer;
+    WORD hslide;
+    WORD vslide;
+    WORD hslsize;
+    WORD vslsize;
     char name[128];
     char info[128];
 } aes_window_t;
@@ -109,7 +113,17 @@ enum {
     AES_WINDOW_PART_TITLE = 2,
     AES_WINDOW_PART_CLOSER = 3,
     AES_WINDOW_PART_FULLER = 4,
-    AES_WINDOW_PART_SIZER = 5
+    AES_WINDOW_PART_SIZER = 5,
+    AES_WINDOW_PART_VUP = 6,
+    AES_WINDOW_PART_VDOWN = 7,
+    AES_WINDOW_PART_VSLIDE = 8,
+    AES_WINDOW_PART_VPAGE_UP = 9,
+    AES_WINDOW_PART_VPAGE_DOWN = 10,
+    AES_WINDOW_PART_HLEFT = 11,
+    AES_WINDOW_PART_HRIGHT = 12,
+    AES_WINDOW_PART_HSLIDE = 13,
+    AES_WINDOW_PART_HPAGE_LEFT = 14,
+    AES_WINDOW_PART_HPAGE_RIGHT = 15
 };
 
 /*
@@ -212,6 +226,12 @@ void _aes_redraw_window_title_states(const aes_window_t *previous_top,
                                      const aes_window_t *new_top);
 void _aes_raise_window(aes_window_t *window);
 WORD _aes_window_hit_part(const aes_window_t *window, WORD x, WORD y);
+int _aes_window_vtrack_rect(const aes_window_t *window, GRECT *rect);
+int _aes_window_htrack_rect(const aes_window_t *window, GRECT *rect);
+int _aes_window_vslot_rect(const aes_window_t *window, GRECT *rect);
+int _aes_window_hslot_rect(const aes_window_t *window, GRECT *rect);
+int _aes_window_vthumb_rect(const aes_window_t *window, GRECT *rect);
+int _aes_window_hthumb_rect(const aes_window_t *window, GRECT *rect);
 void _aes_object_extent(OBJECT *tree, WORD object, WORD *x, WORD *y);
 void _aes_draw_tree_recursive(const OBJECT *tree,
                               WORD object,

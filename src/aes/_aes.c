@@ -37,6 +37,14 @@ static int _aes_window_title_rect(const aes_window_t *window, GRECT *rect);
 static int _aes_window_closer_rect(const aes_window_t *window, GRECT *rect);
 static int _aes_window_fuller_rect(const aes_window_t *window, GRECT *rect);
 static int _aes_window_sizer_rect(const aes_window_t *window, GRECT *rect);
+int _aes_window_vtrack_rect(const aes_window_t *window, GRECT *rect);
+int _aes_window_htrack_rect(const aes_window_t *window, GRECT *rect);
+static int _aes_window_vup_rect(const aes_window_t *window, GRECT *rect);
+static int _aes_window_vdown_rect(const aes_window_t *window, GRECT *rect);
+static int _aes_window_hleft_rect(const aes_window_t *window, GRECT *rect);
+static int _aes_window_hright_rect(const aes_window_t *window, GRECT *rect);
+int _aes_window_vthumb_rect(const aes_window_t *window, GRECT *rect);
+int _aes_window_hthumb_rect(const aes_window_t *window, GRECT *rect);
 static LONG _aes_resolve_spec(const OBJECT *obj);
 static void _aes_draw_text(WORD x, WORD y, WORD color, const char *text);
 static void _aes_fill_rect(WORD x0, WORD y0, WORD x1, WORD y1, WORD color);
@@ -1279,21 +1287,59 @@ aes_window_t *_aes_find_window(WORD handle)
 
 static WORD _aes_window_left_border(const aes_window_t *window)
 {
-    return (window != NULL && window->kind != 0u) ? 2 : 0;
+    return (window != NULL && window->kind != 0u) ? 1 : 0;
+}
+
+static int _aes_window_has_vscroll(const aes_window_t *window)
+{
+    return window != NULL &&
+        (window->kind & (UPARROW | DNARROW | VSLIDE)) != 0u;
+}
+
+static int _aes_window_has_hscroll(const aes_window_t *window)
+{
+    return window != NULL &&
+        (window->kind & (LFARROW | RTARROW | HSLIDE)) != 0u;
+}
+
+static WORD _aes_window_scroll_span(const aes_window_t *window)
+{
+    WORD span;
+
+    if (window == NULL) {
+        return 0;
+    }
+
+    span = (WORD) (_aes_window_title_height(window) - 1);
+    return _aes_max_word(span, 12);
+}
+
+static WORD _aes_window_scroll_button_side(const aes_window_t *window)
+{
+    WORD side;
+
+    if (window == NULL) {
+        return 0;
+    }
+
+    side = (WORD) (_aes_window_title_height(window) - 2);
+    return _aes_max_word(side, 10);
 }
 
 static WORD _aes_window_right_border(const aes_window_t *window)
 {
-    if (window != NULL && (window->kind & SIZER) != 0u) {
-        return (WORD) (_aes_window_title_height(window) - 1);
+    if (window != NULL &&
+        ((window->kind & SIZER) != 0u || _aes_window_has_vscroll(window) != 0)) {
+        return _aes_window_scroll_span(window);
     }
     return _aes_window_left_border(window);
 }
 
 static WORD _aes_window_bottom_border(const aes_window_t *window)
 {
-    if (window != NULL && (window->kind & SIZER) != 0u) {
-        return (WORD) (_aes_window_title_height(window) - 1);
+    if (window != NULL &&
+        ((window->kind & SIZER) != 0u || _aes_window_has_hscroll(window) != 0)) {
+        return _aes_window_scroll_span(window);
     }
     return (window != NULL && window->kind != 0u) ? 2 : 0;
 }
@@ -1440,6 +1486,229 @@ static int _aes_window_sizer_rect(const aes_window_t *window, GRECT *rect)
     return 1;
 }
 
+int _aes_window_vtrack_rect(const aes_window_t *window, GRECT *rect)
+{
+    WORD left;
+    WORD right;
+    WORD top;
+    WORD bottom;
+
+    if (window == NULL || rect == NULL || _aes_window_has_vscroll(window) == 0) {
+        return 0;
+    }
+
+    left = (WORD) (window->work.g_x + window->work.g_w);
+    right = (WORD) (window->outer.g_x + window->outer.g_w - 2);
+    top = window->work.g_y;
+    bottom = (WORD) (window->work.g_y + window->work.g_h - 1);
+    if (right < left || bottom < top) {
+        return 0;
+    }
+
+    _aes_set_rect(rect, left, top, (WORD) (right - left + 1),
+        (WORD) (bottom - top + 1));
+    return 1;
+}
+
+int _aes_window_htrack_rect(const aes_window_t *window, GRECT *rect)
+{
+    WORD left;
+    WORD right;
+    WORD top;
+    WORD bottom;
+
+    if (window == NULL || rect == NULL || _aes_window_has_hscroll(window) == 0) {
+        return 0;
+    }
+
+    left = (WORD) (window->outer.g_x + 1);
+    right = (WORD) (window->work.g_x + window->work.g_w - 1);
+    top = (WORD) (window->work.g_y + window->work.g_h);
+    bottom = (WORD) (window->outer.g_y + window->outer.g_h - 2);
+    if (right < left || bottom < top) {
+        return 0;
+    }
+
+    _aes_set_rect(rect, left, top, (WORD) (right - left + 1),
+        (WORD) (bottom - top + 1));
+    return 1;
+}
+
+int _aes_window_vslot_rect(const aes_window_t *window, GRECT *rect)
+{
+    GRECT track;
+    GRECT up_rect;
+    GRECT down_rect;
+    WORD top;
+    WORD bottom;
+
+    if (window == NULL || rect == NULL ||
+        _aes_window_vtrack_rect(window, &track) == 0) {
+        return 0;
+    }
+
+    top = track.g_y;
+    bottom = (WORD) (track.g_y + track.g_h - 1);
+    if (_aes_window_vup_rect(window, &up_rect) != 0) {
+        top = (WORD) (up_rect.g_y + up_rect.g_h);
+    }
+    if (_aes_window_vdown_rect(window, &down_rect) != 0) {
+        bottom = (WORD) (down_rect.g_y - 1);
+    }
+    if (bottom < top) {
+        return 0;
+    }
+
+    _aes_set_rect(rect, track.g_x, top, track.g_w,
+        (WORD) (bottom - top + 1));
+    return 1;
+}
+
+int _aes_window_hslot_rect(const aes_window_t *window, GRECT *rect)
+{
+    GRECT track;
+    GRECT left_rect;
+    GRECT right_rect;
+    WORD left;
+    WORD right;
+
+    if (window == NULL || rect == NULL ||
+        _aes_window_htrack_rect(window, &track) == 0) {
+        return 0;
+    }
+
+    left = track.g_x;
+    right = (WORD) (track.g_x + track.g_w - 1);
+    if (_aes_window_hleft_rect(window, &left_rect) != 0) {
+        left = (WORD) (left_rect.g_x + left_rect.g_w);
+    }
+    if (_aes_window_hright_rect(window, &right_rect) != 0) {
+        right = (WORD) (right_rect.g_x - 1);
+    }
+    if (right < left) {
+        return 0;
+    }
+
+    _aes_set_rect(rect, left, track.g_y, (WORD) (right - left + 1), track.g_h);
+    return 1;
+}
+
+static int _aes_window_vup_rect(const aes_window_t *window, GRECT *rect)
+{
+    GRECT track;
+    WORD side;
+
+    if (window == NULL || rect == NULL || (window->kind & UPARROW) == 0u ||
+        _aes_window_vtrack_rect(window, &track) == 0) {
+        return 0;
+    }
+
+    side = _aes_min_word(_aes_window_scroll_button_side(window), track.g_h);
+    _aes_set_rect(rect, track.g_x, track.g_y, track.g_w, side);
+    return 1;
+}
+
+static int _aes_window_vdown_rect(const aes_window_t *window, GRECT *rect)
+{
+    GRECT track;
+    WORD side;
+
+    if (window == NULL || rect == NULL || (window->kind & DNARROW) == 0u ||
+        _aes_window_vtrack_rect(window, &track) == 0) {
+        return 0;
+    }
+
+    side = _aes_min_word(_aes_window_scroll_button_side(window), track.g_h);
+    _aes_set_rect(rect, track.g_x, (WORD) (track.g_y + track.g_h - side),
+        track.g_w, side);
+    return 1;
+}
+
+static int _aes_window_hleft_rect(const aes_window_t *window, GRECT *rect)
+{
+    GRECT track;
+    WORD side;
+
+    if (window == NULL || rect == NULL || (window->kind & LFARROW) == 0u ||
+        _aes_window_htrack_rect(window, &track) == 0) {
+        return 0;
+    }
+
+    side = _aes_min_word(_aes_window_scroll_button_side(window), track.g_w);
+    _aes_set_rect(rect, track.g_x, track.g_y, side, track.g_h);
+    return 1;
+}
+
+static int _aes_window_hright_rect(const aes_window_t *window, GRECT *rect)
+{
+    GRECT track;
+    WORD side;
+
+    if (window == NULL || rect == NULL || (window->kind & RTARROW) == 0u ||
+        _aes_window_htrack_rect(window, &track) == 0) {
+        return 0;
+    }
+
+    side = _aes_min_word(_aes_window_scroll_button_side(window), track.g_w);
+    _aes_set_rect(rect, (WORD) (track.g_x + track.g_w - side), track.g_y,
+        side, track.g_h);
+    return 1;
+}
+
+int _aes_window_vthumb_rect(const aes_window_t *window, GRECT *rect)
+{
+    GRECT slot;
+    WORD span;
+    WORD size;
+    WORD pos;
+
+    if (window == NULL || rect == NULL || (window->kind & VSLIDE) == 0u ||
+        _aes_window_vslot_rect(window, &slot) == 0) {
+        return 0;
+    }
+
+    span = slot.g_h;
+    size = (WORD) ((span * _aes_max_word(0, _aes_min_word(window->vslsize, 1000)))
+        / 1000L);
+    size = _aes_max_word(size, _aes_min_word(slot.g_w, span));
+    size = _aes_min_word(size, span);
+    pos = slot.g_y;
+    if (span > size) {
+        pos = (WORD) (slot.g_y + ((span - size) *
+            _aes_max_word(0, _aes_min_word(window->vslide, 1000))) / 1000L);
+    }
+
+    _aes_set_rect(rect, slot.g_x, pos, slot.g_w, size);
+    return 1;
+}
+
+int _aes_window_hthumb_rect(const aes_window_t *window, GRECT *rect)
+{
+    GRECT slot;
+    WORD span;
+    WORD size;
+    WORD pos;
+
+    if (window == NULL || rect == NULL || (window->kind & HSLIDE) == 0u ||
+        _aes_window_hslot_rect(window, &slot) == 0) {
+        return 0;
+    }
+
+    span = slot.g_w;
+    size = (WORD) ((span * _aes_max_word(0, _aes_min_word(window->hslsize, 1000)))
+        / 1000L);
+    size = _aes_max_word(size, _aes_min_word(slot.g_h, span));
+    size = _aes_min_word(size, span);
+    pos = slot.g_x;
+    if (span > size) {
+        pos = (WORD) (slot.g_x + ((span - size) *
+            _aes_max_word(0, _aes_min_word(window->hslide, 1000))) / 1000L);
+    }
+
+    _aes_set_rect(rect, pos, slot.g_y, size, slot.g_h);
+    return 1;
+}
+
 /*
  * Derives the work-area rectangle from a window's outer rectangle.
  */
@@ -1492,6 +1761,10 @@ WORD _aes_wind_set_text(WORD handle, WORD field, const char *text)
         size = sizeof(window->info);
     } else {
         return 0;
+    }
+
+    if (strncmp(target, text, size) == 0) {
+        return 1;
     }
 
     strncpy(target, text, size - 1u);
@@ -1832,6 +2105,48 @@ static void _aes_fill_rect(WORD x0, WORD y0, WORD x1, WORD y1, WORD color)
     rect[3] = y1;
     vsf_color(_aes.vdi_handle, color);
     v_bar(_aes.vdi_handle, rect);
+}
+
+static void _aes_draw_rect_edges(WORD x0, WORD y0, WORD x1, WORD y1,
+                                 int draw_top,
+                                 int draw_right,
+                                 int draw_bottom,
+                                 int draw_left)
+{
+    WORD line[4];
+
+    if (x0 > x1 || y0 > y1) {
+        return;
+    }
+
+    if (draw_top != 0) {
+        line[0] = x0;
+        line[1] = y0;
+        line[2] = x1;
+        line[3] = y0;
+        v_pline(_aes.vdi_handle, 2, line);
+    }
+    if (draw_right != 0) {
+        line[0] = x1;
+        line[1] = y0;
+        line[2] = x1;
+        line[3] = y1;
+        v_pline(_aes.vdi_handle, 2, line);
+    }
+    if (draw_bottom != 0) {
+        line[0] = x0;
+        line[1] = y1;
+        line[2] = x1;
+        line[3] = y1;
+        v_pline(_aes.vdi_handle, 2, line);
+    }
+    if (draw_left != 0) {
+        line[0] = x0;
+        line[1] = y0;
+        line[2] = x0;
+        line[3] = y1;
+        v_pline(_aes.vdi_handle, 2, line);
+    }
 }
 
 static void _aes_invert_rect(WORD x0, WORD y0, WORD x1, WORD y1)
@@ -2372,6 +2687,9 @@ static void _aes_draw_window_title(const aes_window_t *window,
 
 void _aes_draw_window_frame(const aes_window_t *window)
 {
+    static const uint8_t scrollbar_rows[] = {
+        0x88, 0x22
+    };
     WORD outer_box[10];
     WORD left_fill[4];
     WORD right_fill[4];
@@ -2494,6 +2812,125 @@ void _aes_draw_window_frame(const aes_window_t *window)
     }
     _aes_draw_window_title(window, outer_box,
         _aes_window_title_height(window));
+    if (_aes_window_has_vscroll(window) != 0) {
+        GRECT track;
+        GRECT slot;
+        GRECT thumb;
+        GRECT button;
+        WORD right;
+        WORD bottom;
+
+        if (_aes_window_vtrack_rect(window, &track) != 0) {
+            right = (WORD) (track.g_x + track.g_w - 1);
+            bottom = (WORD) (track.g_y + track.g_h - 1);
+            _aes_fill_pattern_rect(track.g_x, track.g_y, right, bottom,
+                scrollbar_rows, sizeof(scrollbar_rows));
+            vsl_color(_aes.vdi_handle, _aes_dark_color());
+            _aes_draw_rect_edges(track.g_x, track.g_y, right, bottom,
+                1, 0, 1, 1);
+        }
+        if (_aes_window_vup_rect(window, &button) != 0) {
+            right = (WORD) (button.g_x + button.g_w - 1);
+            bottom = (WORD) (button.g_y + button.g_h - 1);
+            _aes_fill_rect(button.g_x, button.g_y, right, bottom,
+                _aes_light_color());
+            vsl_color(_aes.vdi_handle, _aes_dark_color());
+            _aes_draw_rect_edges(button.g_x, button.g_y, right, bottom,
+                0, 0, 1, 1);
+            _aes_draw_window_icon_offset(button.g_x, button.g_y, right,
+                bottom, 1, 0, -1);
+        }
+        if (_aes_window_vdown_rect(window, &button) != 0) {
+            right = (WORD) (button.g_x + button.g_w - 1);
+            bottom = (WORD) (button.g_y + button.g_h - 1);
+            _aes_fill_rect(button.g_x, button.g_y, right, bottom,
+                _aes_light_color());
+            vsl_color(_aes.vdi_handle, _aes_dark_color());
+            _aes_draw_rect_edges(button.g_x, button.g_y, right, bottom,
+                1, 0, 0, 1);
+            _aes_draw_window_icon(button.g_x, button.g_y, right, bottom, 2);
+        }
+        if (_aes_window_vthumb_rect(window, &thumb) != 0) {
+            int draw_top = 1;
+            int draw_bottom = 1;
+
+            right = (WORD) (thumb.g_x + thumb.g_w - 1);
+            bottom = (WORD) (thumb.g_y + thumb.g_h - 1);
+            if (_aes_window_vslot_rect(window, &slot) != 0) {
+                if (thumb.g_y <= slot.g_y) {
+                    draw_top = 0;
+                }
+                if (bottom >= slot.g_y + slot.g_h - 1) {
+                    draw_bottom = 0;
+                }
+            }
+            _aes_fill_rect(thumb.g_x, thumb.g_y, right, bottom,
+                _aes_light_color());
+            vsl_color(_aes.vdi_handle, _aes_dark_color());
+            _aes_draw_rect_edges(thumb.g_x, thumb.g_y, right, bottom,
+                draw_top, 0, draw_bottom, 1);
+        }
+    }
+    if (_aes_window_has_hscroll(window) != 0) {
+        GRECT track;
+        GRECT slot;
+        GRECT thumb;
+        GRECT button;
+        WORD right;
+        WORD bottom;
+
+        if (_aes_window_htrack_rect(window, &track) != 0) {
+            right = (WORD) (track.g_x + track.g_w - 1);
+            bottom = (WORD) (track.g_y + track.g_h - 1);
+            _aes_fill_pattern_rect(track.g_x, track.g_y, right, bottom,
+                scrollbar_rows, sizeof(scrollbar_rows));
+            vsl_color(_aes.vdi_handle, _aes_dark_color());
+            _aes_draw_rect_edges(track.g_x, track.g_y, right, bottom,
+                1, 1, 0, 1);
+        }
+        if (_aes_window_hleft_rect(window, &button) != 0) {
+            right = (WORD) (button.g_x + button.g_w - 1);
+            bottom = (WORD) (button.g_y + button.g_h - 1);
+            _aes_fill_rect(button.g_x, button.g_y, right, bottom,
+                _aes_light_color());
+            vsl_color(_aes.vdi_handle, _aes_dark_color());
+            _aes_draw_rect_edges(button.g_x, button.g_y, right, bottom,
+                1, 1, 0, 0);
+            _aes_draw_window_icon_offset(button.g_x, button.g_y, right,
+                bottom, 4, 0, 2);
+        }
+        if (_aes_window_hright_rect(window, &button) != 0) {
+            right = (WORD) (button.g_x + button.g_w - 1);
+            bottom = (WORD) (button.g_y + button.g_h - 1);
+            _aes_fill_rect(button.g_x, button.g_y, right, bottom,
+                _aes_light_color());
+            vsl_color(_aes.vdi_handle, _aes_dark_color());
+            _aes_draw_rect_edges(button.g_x, button.g_y, right, bottom,
+                1, 0, 0, 1);
+            _aes_draw_window_icon_offset(button.g_x, button.g_y, right,
+                bottom, 3, 0, 2);
+        }
+        if (_aes_window_hthumb_rect(window, &thumb) != 0) {
+            int draw_left = 1;
+            int draw_right = 1;
+
+            right = (WORD) (thumb.g_x + thumb.g_w - 1);
+            bottom = (WORD) (thumb.g_y + thumb.g_h - 1);
+            if (_aes_window_hslot_rect(window, &slot) != 0) {
+                if (thumb.g_x <= slot.g_x) {
+                    draw_left = 0;
+                }
+                if (right >= slot.g_x + slot.g_w - 1) {
+                    draw_right = 0;
+                }
+            }
+            _aes_fill_rect(thumb.g_x, thumb.g_y, right, bottom,
+                _aes_light_color());
+            vsl_color(_aes.vdi_handle, _aes_dark_color());
+            _aes_draw_rect_edges(thumb.g_x, thumb.g_y, right, bottom,
+                1, draw_right, 0, draw_left);
+        }
+    }
     _aes_draw_sizer_glyph(window);
     _aes_present_after_window_draw();
 }
@@ -2535,6 +2972,7 @@ void _aes_raise_window(aes_window_t *window)
 WORD _aes_window_hit_part(const aes_window_t *window, WORD x, WORD y)
 {
     GRECT rect;
+    GRECT thumb;
 
     if (window == NULL || window->open == 0 ||
         !_aes_point_in_rect(x, y, &window->outer)) {
@@ -2552,6 +2990,44 @@ WORD _aes_window_hit_part(const aes_window_t *window, WORD x, WORD y)
     if (_aes_window_sizer_rect(window, &rect) != 0 &&
         _aes_point_in_rect(x, y, &rect)) {
         return AES_WINDOW_PART_SIZER;
+    }
+    if (_aes_window_vup_rect(window, &rect) != 0 &&
+        _aes_point_in_rect(x, y, &rect)) {
+        return AES_WINDOW_PART_VUP;
+    }
+    if (_aes_window_vdown_rect(window, &rect) != 0 &&
+        _aes_point_in_rect(x, y, &rect)) {
+        return AES_WINDOW_PART_VDOWN;
+    }
+    if (_aes_window_hleft_rect(window, &rect) != 0 &&
+        _aes_point_in_rect(x, y, &rect)) {
+        return AES_WINDOW_PART_HLEFT;
+    }
+    if (_aes_window_hright_rect(window, &rect) != 0 &&
+        _aes_point_in_rect(x, y, &rect)) {
+        return AES_WINDOW_PART_HRIGHT;
+    }
+    if (_aes_window_vthumb_rect(window, &thumb) != 0 &&
+        _aes_point_in_rect(x, y, &thumb)) {
+        return AES_WINDOW_PART_VSLIDE;
+    }
+    if (_aes_window_hthumb_rect(window, &thumb) != 0 &&
+        _aes_point_in_rect(x, y, &thumb)) {
+        return AES_WINDOW_PART_HSLIDE;
+    }
+    if (_aes_window_vtrack_rect(window, &rect) != 0 &&
+        _aes_point_in_rect(x, y, &rect)) {
+        if (_aes_window_vthumb_rect(window, &thumb) != 0 && y < thumb.g_y) {
+            return AES_WINDOW_PART_VPAGE_UP;
+        }
+        return AES_WINDOW_PART_VPAGE_DOWN;
+    }
+    if (_aes_window_htrack_rect(window, &rect) != 0 &&
+        _aes_point_in_rect(x, y, &rect)) {
+        if (_aes_window_hthumb_rect(window, &thumb) != 0 && x < thumb.g_x) {
+            return AES_WINDOW_PART_HPAGE_LEFT;
+        }
+        return AES_WINDOW_PART_HPAGE_RIGHT;
     }
     if (_aes_window_title_rect(window, &rect) != 0 &&
         _aes_point_in_rect(x, y, &rect)) {

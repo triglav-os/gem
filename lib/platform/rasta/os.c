@@ -7,6 +7,7 @@
  * Copyright (C) 2026 tomaz stih
  */
 
+#define _GNU_SOURCE
 #define _POSIX_C_SOURCE 200809L
 
 #include "platform/os.h"
@@ -20,9 +21,13 @@
 #include <stdlib.h>
 #include <string.h>
 #include <mntent.h>
+#include <signal.h>
 #include <sys/stat.h>
 #include <sys/statvfs.h>
+#include <sys/ioctl.h>
 #include <sys/types.h>
+#include <sys/wait.h>
+#include <termios.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -491,4 +496,191 @@ void gem_os_volume_iter_close(gem_os_volume_iter_t *iter)
 
     (void) endmntent((FILE *) iter->handle);
     iter->handle = NULL;
+}
+
+static int gem_os_pty_apply_size(int fd, uint16_t columns, uint16_t rows)
+{
+    struct winsize ws;
+
+    if (fd < 0) {
+        errno = EINVAL;
+        return 0;
+    }
+
+    memset(&ws, 0, sizeof(ws));
+    ws.ws_col = (unsigned short) ((columns > 0u) ? columns : 80u);
+    ws.ws_row = (unsigned short) ((rows > 0u) ? rows : 25u);
+    return (ioctl(fd, TIOCSWINSZ, &ws) == 0) ? 1 : 0;
+}
+
+int gem_os_pty_spawn_shell(gem_os_pty_t *pty,
+                           const char *shell_path,
+                           const char *cwd,
+                           uint16_t columns,
+                           uint16_t rows)
+{
+    int master_fd;
+    int slave_fd = -1;
+    char *slave_name;
+    pid_t pid;
+    const char *shell;
+
+    if (pty == NULL) {
+        errno = EINVAL;
+        return 0;
+    }
+
+    pty->master_fd = -1;
+    pty->child_pid = -1;
+    master_fd = posix_openpt(O_RDWR | O_NOCTTY | O_NONBLOCK);
+    if (master_fd < 0) {
+        return 0;
+    }
+    if (grantpt(master_fd) != 0 || unlockpt(master_fd) != 0) {
+        (void) close(master_fd);
+        return 0;
+    }
+
+    slave_name = ptsname(master_fd);
+    if (slave_name == NULL) {
+        (void) close(master_fd);
+        return 0;
+    }
+
+    pid = fork();
+    if (pid < 0) {
+        (void) close(master_fd);
+        return 0;
+    }
+
+    if (pid == 0) {
+        shell = shell_path;
+        if (shell == NULL || shell[0] == '\0') {
+            shell = getenv("SHELL");
+        }
+        if (shell == NULL || shell[0] == '\0') {
+            shell = "/bin/sh";
+        }
+
+        (void) signal(SIGINT, SIG_DFL);
+        (void) signal(SIGTERM, SIG_DFL);
+        (void) signal(SIGHUP, SIG_DFL);
+        (void) signal(SIGCHLD, SIG_DFL);
+
+        (void) close(master_fd);
+        if (setsid() < 0) {
+            _exit(127);
+        }
+
+        slave_fd = open(slave_name, O_RDWR);
+        if (slave_fd < 0) {
+            _exit(127);
+        }
+        (void) gem_os_pty_apply_size(slave_fd, columns, rows);
+        (void) ioctl(slave_fd, TIOCSCTTY, 0);
+        (void) dup2(slave_fd, STDIN_FILENO);
+        (void) dup2(slave_fd, STDOUT_FILENO);
+        (void) dup2(slave_fd, STDERR_FILENO);
+        if (slave_fd > STDERR_FILENO) {
+            (void) close(slave_fd);
+        }
+
+        if (cwd != NULL && cwd[0] != '\0') {
+            (void) chdir(cwd);
+        }
+        (void) setenv("TERM", "dumb", 1);
+        (void) setenv("LINES", "25", 1);
+        (void) setenv("COLUMNS", "80", 1);
+        execl(shell, shell, "-i", (char *) NULL);
+        _exit(127);
+    }
+
+    pty->master_fd = master_fd;
+    pty->child_pid = (int) pid;
+    (void) gem_os_pty_apply_size(master_fd, columns, rows);
+    return 1;
+}
+
+int gem_os_pty_resize(gem_os_pty_t *pty, uint16_t columns, uint16_t rows)
+{
+    if (pty == NULL || pty->master_fd < 0) {
+        errno = EINVAL;
+        return 0;
+    }
+    return gem_os_pty_apply_size(pty->master_fd, columns, rows);
+}
+
+int32_t gem_os_pty_read(gem_os_pty_t *pty, void *buf, uint32_t size)
+{
+    ssize_t rc;
+
+    if (pty == NULL || pty->master_fd < 0 || (buf == NULL && size != 0u)) {
+        errno = EINVAL;
+        return -1;
+    }
+
+    rc = read(pty->master_fd, buf, (size_t) size);
+    if (rc < 0) {
+        if (errno == EAGAIN || errno == EWOULDBLOCK) {
+            return 0;
+        }
+        return -1;
+    }
+    return (int32_t) rc;
+}
+
+int32_t gem_os_pty_write(gem_os_pty_t *pty, const void *buf, uint32_t size)
+{
+    ssize_t rc;
+
+    if (pty == NULL || pty->master_fd < 0 || (buf == NULL && size != 0u)) {
+        errno = EINVAL;
+        return -1;
+    }
+
+    rc = write(pty->master_fd, buf, (size_t) size);
+    if (rc < 0) {
+        if (errno == EAGAIN || errno == EWOULDBLOCK) {
+            return 0;
+        }
+        return -1;
+    }
+    return (int32_t) rc;
+}
+
+int gem_os_pty_is_alive(gem_os_pty_t *pty)
+{
+    pid_t rc;
+    int status;
+
+    if (pty == NULL || pty->child_pid <= 0) {
+        return 0;
+    }
+
+    rc = waitpid((pid_t) pty->child_pid, &status, WNOHANG);
+    if (rc == 0) {
+        return 1;
+    }
+    if (rc == (pid_t) pty->child_pid) {
+        pty->child_pid = -1;
+        return 0;
+    }
+    return 0;
+}
+
+void gem_os_pty_close(gem_os_pty_t *pty)
+{
+    if (pty == NULL) {
+        return;
+    }
+
+    if (pty->child_pid > 0) {
+        (void) kill((pid_t) pty->child_pid, SIGHUP);
+        (void) waitpid((pid_t) pty->child_pid, NULL, 0);
+        pty->child_pid = -1;
+    }
+    if (pty->master_fd >= 0) {
+        (void) close(pty->master_fd);
+        pty->master_fd = -1;
+    }
 }

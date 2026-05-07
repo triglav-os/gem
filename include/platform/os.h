@@ -46,6 +46,11 @@ typedef struct gem_os_volume_iter {
     void *handle;
 } gem_os_volume_iter_t;
 
+typedef struct gem_os_pty {
+    int master_fd;
+    int child_pid;
+} gem_os_pty_t;
+
 /*
  * Initializes operating system services required by the GEM runtime.
  * Returns non-zero on success and zero on failure.
@@ -206,6 +211,17 @@ int      gem_os_volume_iter_read(gem_os_volume_iter_t *iter,
  * `gem_os_volume_iter_open()`.
  */
 void     gem_os_volume_iter_close(gem_os_volume_iter_t *iter);
+
+int      gem_os_pty_spawn_shell(gem_os_pty_t *pty,
+                                const char *shell_path,
+                                const char *cwd,
+                                uint16_t columns,
+                                uint16_t rows);
+int      gem_os_pty_resize(gem_os_pty_t *pty, uint16_t columns, uint16_t rows);
+int32_t  gem_os_pty_read(gem_os_pty_t *pty, void *buf, uint32_t size);
+int32_t  gem_os_pty_write(gem_os_pty_t *pty, const void *buf, uint32_t size);
+int      gem_os_pty_is_alive(gem_os_pty_t *pty);
+void     gem_os_pty_close(gem_os_pty_t *pty);
 
 #ifdef __cplusplus
 }
