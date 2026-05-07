@@ -1,113 +1,131 @@
 /*
- * Launches the hosted GEM desktop session used by the current Linux
- * port. The launcher now describes its user interface through AES
- * object trees and window state so the session exercises GEM-style
- * structures instead of painting the full scene directly with ad hoc
- * VDI calls.
+ * Implements a fresh portable GEM desktop that relies only on the
+ * hosted AES, VDI, and operating-system wrappers. The desktop keeps the
+ * original menu structure, draws Atari ST disk and trash icons from
+ * monochrome masked resources, and avoids any hosted window manager
+ * dependencies by rendering directly into the desktop work area.
  *
  * MIT License (see: LICENSE)
  * Copyright (C) 2026 tomaz stih
  */
 
-#include <gem/aes.h>
-#include <gem/portab.h>
-#include <gem/vdi.h>
+#define _POSIX_C_SOURCE 200809L
 
-#include "platform/hid.h"
+#include <gem.h>
+
 #include "platform/os.h"
 
+#include "desktop_assets.h"
+
+#include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 
 enum {
-    desktop_menu_root = 0,
-    desktop_menu_desktop = 1,
-    desktop_menu_file = 2,
-    desktop_menu_view = 3,
-    desktop_menu_help = 4
+    DESKTOP_ROOT = 0,
+    DESKTOP_ICON_BASE
 };
 
 enum {
-    desktop_root = 0,
-    desktop_icon_trash = 1,
-    desktop_icon_files = 2,
-    desktop_icon_tools = 3,
-    desktop_status_box = 4,
-    desktop_status_text = 5
+    MENU_ROOT = 0,
+    MENU_BAR_BOX,
+    MENU_TITLES,
+    MENU_TITLE_DESK,
+    MENU_TITLE_FILE,
+    MENU_TITLE_OPTIONS,
+    MENU_TITLE_ARRANGE,
+    MENU_POPUPS,
+    MENU_DESK_BOX,
+    MENU_DESK_ABOUT,
+    MENU_DESK_SEPARATOR,
+    MENU_DESK_1,
+    MENU_DESK_2,
+    MENU_DESK_3,
+    MENU_DESK_4,
+    MENU_DESK_5,
+    MENU_DESK_6,
+    MENU_FILE_BOX,
+    MENU_FILE_OPEN,
+    MENU_FILE_INFO,
+    MENU_FILE_SEPARATOR_1,
+    MENU_FILE_DELETE,
+    MENU_FILE_FORMAT,
+    MENU_FILE_SEPARATOR_2,
+    MENU_FILE_OUTPUT,
+    MENU_FILE_EXIT,
+    MENU_OPTIONS_BOX,
+    MENU_OPTIONS_INSTALL_DISK,
+    MENU_OPTIONS_CONFIGURE_APP,
+    MENU_OPTIONS_SEPARATOR,
+    MENU_OPTIONS_PREFS,
+    MENU_OPTIONS_SAVE,
+    MENU_OPTIONS_DOS,
+    MENU_ARRANGE_BOX,
+    MENU_ARRANGE_SHOW_AS_ICONS,
+    MENU_ARRANGE_SEPARATOR,
+    MENU_ARRANGE_SORT_NAME,
+    MENU_ARRANGE_SORT_TYPE,
+    MENU_ARRANGE_SORT_SIZE,
+    MENU_ARRANGE_SORT_DATE,
+    MENU_OBJECT_COUNT
 };
 
 enum {
-    panel_root = 0,
-    panel_text_line1 = 1,
-    panel_text_line2 = 2,
-    panel_text_line3 = 3
+    DESKTOP_MAX_DISKS = 12,
+    DESKTOP_MAX_ICONS = DESKTOP_MAX_DISKS + 1,
+    DESKTOP_OBJECT_COUNT = DESKTOP_ICON_BASE + DESKTOP_MAX_ICONS,
+    DESKTOP_ICON_OBJECT_W = 72,
+    DESKTOP_ICON_OBJECT_H = 58,
+    DESKTOP_ICON_TEXT_Y = 40,
+    DESKTOP_ICON_STEP_X = 78,
+    DESKTOP_ICON_STEP_Y = 66,
+    DESKTOP_ICON_MARGIN_X = 16,
+    DESKTOP_ICON_MARGIN_Y = 16
 };
 
-enum {
-    desktop_menu_height = 18,
-    desktop_status_height = 18,
-    desktop_icon_width = 56,
-    desktop_icon_height = 48,
-    panel_width = 240,
-    panel_height = 110
-};
+typedef struct desktop_icon_draw {
+    const desktop_icon_asset_t *asset;
+    const char *label;
+} desktop_icon_draw_t;
 
-static OBJECT g_menu_tree[5];
-static OBJECT g_desktop_tree[6];
-static OBJECT g_panel_tree[4];
-static char g_status_text[64];
-static char g_status_message[64];
-static char g_panel_title[32];
-static char g_panel_line1[64];
-static char g_panel_line2[64];
-static char g_panel_line3[64];
-static WORD g_panel_handle;
-static WORD g_panel_open;
-static WORD g_menu_popup_open;
-static WORD g_menu_popup_title;
-static WORD g_dragging_panel;
-static WORD g_drag_offset_x;
-static WORD g_drag_offset_y;
+typedef struct desktop_icon_entry {
+    char label[24];
+    char path[GEM_OS_PATH_MAX];
+    uint64_t total_bytes;
+    uint64_t avail_bytes;
+    const desktop_icon_asset_t *asset;
+    USERBLK userblk;
+    desktop_icon_draw_t draw_info;
+    WORD object_id;
+    WORD is_trash;
+} desktop_icon_entry_t;
 
-static const char *g_desktop_menu_items[] = {
-    "ABOUT DESKTOP",
-    "RESET DESKTOP",
-    "CLOSE WINDOW"
-};
+typedef struct desktop_state {
+    OBJECT desktop_tree[DESKTOP_OBJECT_COUNT];
+    OBJECT menu_tree[MENU_OBJECT_COUNT];
+    desktop_icon_entry_t icons[DESKTOP_MAX_ICONS];
+    WORD icon_count;
+    WORD selected_icon;
+    WORD app_id;
+    VDI_HANDLE vdi_handle;
+    WORD screen_width;
+    WORD screen_height;
+    GRECT work;
+    char status_text[96];
+} desktop_state_t;
 
-static const char *g_file_menu_items[] = {
-    "OPEN FILES",
-    "OPEN TOOLS",
-    "OPEN TRASH"
-};
+static desktop_state_t g_desktop;
 
-static const char *g_view_menu_items[] = {
-    "REFRESH",
-    "CLEAR STATUS",
-    "CLOSE MENU"
-};
-
-static const char *g_help_menu_items[] = {
-    "ABOUT GEM",
-    "KEYS",
-    "ABOUT RASTA"
-};
-
-static int desktop_rects_intersect(WORD ax,
-                                   WORD ay,
-                                   WORD aw,
-                                   WORD ah,
-                                   WORD bx,
-                                   WORD by,
-                                   WORD bw,
-                                   WORD bh);
-static int desktop_point_in_panel_close(WORD x, WORD y);
-
-static WORD desktop_key_to_ascii(uint16_t key)
-{
-    return (WORD) (key & 0xffu);
-}
+static WORD desktop_user_draw(LONG parm_block);
+static void desktop_set_status(const char *text);
+static void desktop_redraw(const GRECT *dirty);
+static void desktop_layout_icons(void);
+static void desktop_handle_menu_item(WORD item);
+static void desktop_handle_icon_click(WORD object_id);
+static void desktop_refresh_icon_bindings(void);
+static void desktop_draw_background_pattern(const GRECT *dirty);
+static void desktop_object_rect(WORD object_id, GRECT *rect);
 
 static void desktop_init_object(OBJECT *object,
                                 WORD next,
@@ -135,890 +153,980 @@ static void desktop_init_object(OBJECT *object,
     object->ob_height = h;
 }
 
-static void desktop_init_menu_tree(WORD screen_width)
+static size_t desktop_word_width(const desktop_icon_asset_t *asset)
 {
-    desktop_init_object(&g_menu_tree[desktop_menu_root],
-        NIL, desktop_menu_desktop, desktop_menu_help,
-        G_BOX, SELECTED, SELECTED, 0L,
-        0, 0, screen_width, desktop_menu_height);
-    desktop_init_object(&g_menu_tree[desktop_menu_desktop],
-        desktop_menu_file, NIL, NIL,
-        G_TITLE, NONE, NORMAL, (LONG) (intptr_t) "DESKTOP",
-        10, 2, 64, 12);
-    desktop_init_object(&g_menu_tree[desktop_menu_file],
-        desktop_menu_view, NIL, NIL,
-        G_TITLE, NONE, NORMAL, (LONG) (intptr_t) "FILE",
-        86, 2, 36, 12);
-    desktop_init_object(&g_menu_tree[desktop_menu_view],
-        desktop_menu_help, NIL, NIL,
-        G_TITLE, NONE, NORMAL, (LONG) (intptr_t) "VIEW",
-        126, 2, 36, 12);
-    desktop_init_object(&g_menu_tree[desktop_menu_help],
-        desktop_menu_root, NIL, NIL,
-        G_TITLE, LASTOB, NORMAL, (LONG) (intptr_t) "HELP",
-        168, 2, 36, 12);
+    return (size_t) ((asset->width + 15) / 16);
 }
 
-static void desktop_init_desktop_tree(WORD x, WORD y, WORD w, WORD h)
+static int desktop_icon_bit(const UWORD *bits,
+                            const desktop_icon_asset_t *asset,
+                            WORD x,
+                            WORD y)
 {
-    WORD status_y = (WORD) (h - desktop_status_height);
+    size_t row_words;
+    size_t index;
+    UWORD word;
 
-    desktop_init_object(&g_desktop_tree[desktop_root],
-        NIL, desktop_icon_trash, desktop_status_text,
-        G_BOX, NONE, NORMAL, 0L,
-        x, y, w, h);
-    desktop_init_object(&g_desktop_tree[desktop_icon_trash],
-        desktop_icon_files, NIL, NIL,
-        G_BUTTON, SELECTABLE, NORMAL, (LONG) (intptr_t) "TRASH",
-        28, 22, desktop_icon_width, desktop_icon_height);
-    desktop_init_object(&g_desktop_tree[desktop_icon_files],
-        desktop_icon_tools, NIL, NIL,
-        G_BUTTON, SELECTABLE, NORMAL, (LONG) (intptr_t) "FILES",
-        104, 22, desktop_icon_width, desktop_icon_height);
-    desktop_init_object(&g_desktop_tree[desktop_icon_tools],
-        desktop_status_box, NIL, NIL,
-        G_BUTTON, SELECTABLE, NORMAL, (LONG) (intptr_t) "TOOLS",
-        180, 22, desktop_icon_width, desktop_icon_height);
-    desktop_init_object(&g_desktop_tree[desktop_status_box],
-        desktop_status_text, NIL, NIL,
-        G_BOX, NONE, NORMAL, 0L,
-        0, status_y, w, desktop_status_height);
-    desktop_init_object(&g_desktop_tree[desktop_status_text],
-        desktop_root, NIL, NIL,
-        G_STRING, LASTOB, NORMAL, (LONG) (intptr_t) g_status_text,
-        10, (WORD) (status_y + 3), w - 20, 12);
-}
-
-static void desktop_set_status_message(const char *message)
-{
-    if (message != NULL) {
-        strncpy(g_status_message, message, sizeof(g_status_message) - 1u);
-        g_status_message[sizeof(g_status_message) - 1u] = '\0';
-    } else {
-        g_status_message[0] = '\0';
-    }
-}
-
-static void desktop_update_status_text(WORD mouse_x, WORD mouse_y)
-{
-    if (g_status_message[0] != '\0') {
-        int prefix_max = (int) sizeof(g_status_text) - 24;
-
-        (void) snprintf(g_status_text, sizeof(g_status_text),
-            "%.*s  Mouse %d,%d", prefix_max, g_status_message,
-            (int) mouse_x, (int) mouse_y);
-    } else {
-        (void) snprintf(g_status_text, sizeof(g_status_text),
-            "Esc/q quits  Mouse %d,%d", (int) mouse_x, (int) mouse_y);
-    }
-}
-
-static void desktop_select_icon(WORD object)
-{
-    g_desktop_tree[desktop_icon_trash].ob_state = NORMAL;
-    g_desktop_tree[desktop_icon_files].ob_state = NORMAL;
-    g_desktop_tree[desktop_icon_tools].ob_state = NORMAL;
-
-    if (object == desktop_icon_trash || object == desktop_icon_files ||
-        object == desktop_icon_tools) {
-        g_desktop_tree[object].ob_state = SELECTED;
-    }
-}
-
-static const char *desktop_icon_message(WORD object)
-{
-    switch (object) {
-    case desktop_icon_trash:
-        return "Selected Trash";
-    case desktop_icon_files:
-        return "Selected Files";
-    case desktop_icon_tools:
-        return "Selected Tools";
-    default:
-        return "";
-    }
-}
-
-static void desktop_init_panel_tree(WORD work_x, WORD work_y, WORD work_w, WORD work_h)
-{
-    desktop_init_object(&g_panel_tree[panel_root],
-        NIL, panel_text_line1, panel_text_line3,
-        G_BOX, NONE, NORMAL, 0L,
-        work_x, work_y, work_w, work_h);
-    desktop_init_object(&g_panel_tree[panel_text_line1],
-        panel_text_line2, NIL, NIL,
-        G_STRING, NONE, NORMAL, (LONG) (intptr_t) g_panel_line1,
-        12, 12, (WORD) (work_w - 24), 12);
-    desktop_init_object(&g_panel_tree[panel_text_line2],
-        panel_text_line3, NIL, NIL,
-        G_STRING, NONE, NORMAL, (LONG) (intptr_t) g_panel_line2,
-        12, 30, (WORD) (work_w - 24), 12);
-    desktop_init_object(&g_panel_tree[panel_text_line3],
-        panel_root, NIL, NIL,
-        G_STRING, LASTOB, NORMAL, (LONG) (intptr_t) g_panel_line3,
-        12, 48, (WORD) (work_w - 24), 12);
-}
-
-static void desktop_get_panel_outer_rect(WORD *x, WORD *y, WORD *w, WORD *h)
-{
-    WORD outer_x = 0;
-    WORD outer_y = 0;
-    WORD outer_w = 0;
-    WORD outer_h = 0;
-
-    if (g_panel_open != 0) {
-        (void) wind_get(g_panel_handle, WF_WXYWH,
-            &outer_x, &outer_y, &outer_w, &outer_h);
-    }
-    if (x != NULL) {
-        *x = outer_x;
-    }
-    if (y != NULL) {
-        *y = outer_y;
-    }
-    if (w != NULL) {
-        *w = outer_w;
-    }
-    if (h != NULL) {
-        *h = outer_h;
-    }
-}
-
-static void desktop_get_menu_popup_items(WORD title,
-                                         const char ***items,
-                                         WORD *count)
-{
-    switch (title) {
-    case desktop_menu_desktop:
-        *items = g_desktop_menu_items;
-        *count = 3;
-        break;
-    case desktop_menu_file:
-        *items = g_file_menu_items;
-        *count = 3;
-        break;
-    case desktop_menu_view:
-        *items = g_view_menu_items;
-        *count = 3;
-        break;
-    case desktop_menu_help:
-        *items = g_help_menu_items;
-        *count = 3;
-        break;
-    default:
-        *items = NULL;
-        *count = 0;
-        break;
-    }
-}
-
-static void desktop_get_menu_popup_rect(WORD *x, WORD *y, WORD *w, WORD *h)
-{
-    WORD title_x = 0;
-    WORD title_y = 0;
-    WORD title_h = 0;
-    const char **items = NULL;
-    WORD count = 0;
-    WORD popup_w = 112;
-
-    if (g_menu_popup_open == 0) {
-        if (x != NULL) {
-            *x = 0;
-        }
-        if (y != NULL) {
-            *y = 0;
-        }
-        if (w != NULL) {
-            *w = 0;
-        }
-        if (h != NULL) {
-            *h = 0;
-        }
-        return;
-    }
-
-    desktop_get_menu_popup_items(g_menu_popup_title, &items, &count);
-    objc_offset(g_menu_tree, g_menu_popup_title, &title_x, &title_y);
-    title_h = g_menu_tree[g_menu_popup_title].ob_height;
-    if (g_menu_popup_title == desktop_menu_file) {
-        popup_w = 104;
-    } else if (g_menu_popup_title == desktop_menu_view) {
-        popup_w = 100;
-    }
-
-    if (x != NULL) {
-        *x = title_x;
-    }
-    if (y != NULL) {
-        *y = (WORD) (title_y + title_h + 2);
-    }
-    if (w != NULL) {
-        *w = popup_w;
-    }
-    if (h != NULL) {
-        *h = (WORD) (count * 16 + 4);
-    }
-}
-
-static void desktop_close_menu_popup(void)
-{
-    if (g_menu_popup_open == 0) {
-        return;
-    }
-
-    g_menu_tree[g_menu_popup_title].ob_state = NORMAL;
-    g_menu_popup_open = 0;
-    g_menu_popup_title = NIL;
-}
-
-static void desktop_open_menu_popup(WORD title)
-{
-    desktop_close_menu_popup();
-    g_menu_popup_open = 1;
-    g_menu_popup_title = title;
-    g_menu_tree[title].ob_state = SELECTED;
-}
-
-static WORD desktop_menu_popup_hit(WORD x, WORD y)
-{
-    WORD popup_x;
-    WORD popup_y;
-    WORD popup_w;
-    WORD popup_h;
-    const char **items = NULL;
-    WORD count = 0;
-    WORD index;
-
-    if (g_menu_popup_open == 0) {
-        return NIL;
-    }
-
-    desktop_get_menu_popup_items(g_menu_popup_title, &items, &count);
-    desktop_get_menu_popup_rect(&popup_x, &popup_y, &popup_w, &popup_h);
-    if (!desktop_rects_intersect(x, y, 1, 1, popup_x, popup_y, popup_w, popup_h)) {
-        return NIL;
-    }
-
-    index = (WORD) ((y - popup_y - 2) / 16);
-    if (index < 0 || index >= count) {
-        return NIL;
-    }
-    return index;
-}
-
-static int desktop_point_in_panel_title(WORD x, WORD y)
-{
-    WORD outer_x;
-    WORD outer_y;
-    WORD outer_w;
-    WORD outer_h;
-
-    if (g_panel_open == 0) {
+    if (bits == NULL || asset == NULL || x < 0 || y < 0 ||
+        x >= asset->width || y >= asset->height) {
         return 0;
     }
 
-    desktop_get_panel_outer_rect(&outer_x, &outer_y, &outer_w, &outer_h);
-    (void) outer_h;
-    return x >= outer_x && x < outer_x + outer_w &&
-        y >= outer_y && y <= outer_y + 17 &&
-        !desktop_point_in_panel_close(x, y);
+    row_words = desktop_word_width(asset);
+    index = (size_t) y * row_words + (size_t) x / 16u;
+    word = bits[index];
+    return (word & (WORD) (0x8000u >> (x % 16))) != 0;
 }
 
-static int desktop_rects_intersect(WORD ax,
-                                   WORD ay,
-                                   WORD aw,
-                                   WORD ah,
-                                   WORD bx,
-                                   WORD by,
-                                   WORD bw,
-                                   WORD bh)
+static void desktop_draw_run(WORD x0, WORD y, WORD x1, WORD color)
 {
-    return ax < bx + bw && bx < ax + aw &&
-        ay < by + bh && by < ay + ah;
-}
-
-static void desktop_draw_panel(WORD clip_x,
-                               WORD clip_y,
-                               WORD clip_w,
-                               WORD clip_h)
-{
-    VDI_HANDLE handle;
-    WORD outer_x;
-    WORD outer_y;
-    WORD outer_w;
-    WORD outer_h;
-    WORD work_x;
-    WORD work_y;
-    WORD work_w;
-    WORD work_h;
-    WORD title_bar[4];
-    WORD close_box[4];
-    WORD clip[4];
-
-    if (g_panel_open == 0) {
-        return;
-    }
-
-    desktop_get_panel_outer_rect(&outer_x, &outer_y, &outer_w, &outer_h);
-    if (!desktop_rects_intersect(outer_x, outer_y, outer_w, outer_h,
-            clip_x, clip_y, clip_w, clip_h)) {
-        return;
-    }
-
-    (void) wind_get(g_panel_handle, WF_CXYWH,
-        &work_x, &work_y, &work_w, &work_h);
-
-    title_bar[0] = outer_x;
-    title_bar[1] = outer_y;
-    title_bar[2] = (WORD) (outer_x + outer_w - 1);
-    title_bar[3] = (WORD) (outer_y + 17);
-    close_box[0] = (WORD) (outer_x + 4);
-    close_box[1] = (WORD) (outer_y + 3);
-    close_box[2] = (WORD) (outer_x + 16);
-    close_box[3] = (WORD) (outer_y + 15);
-    clip[0] = clip_x;
-    clip[1] = clip_y;
-    clip[2] = (WORD) (clip_x + clip_w - 1);
-    clip[3] = (WORD) (clip_y + clip_h - 1);
-
-    desktop_init_panel_tree(work_x, work_y, work_w, work_h);
-    handle = graf_handle(NULL, NULL, NULL, NULL);
-    vs_clip(handle, 1, clip);
-    objc_draw(g_panel_tree, ROOT, MAX_DEPTH,
-        clip_x, clip_y, clip_w, clip_h);
-    vsf_color(handle, 1);
-    v_bar(handle, title_bar);
-    vsl_color(handle, 1);
-    v_rbox(handle, title_bar);
-    vsf_color(handle, 0);
-    v_bar(handle, close_box);
-    vsl_color(handle, 1);
-    v_rbox(handle, close_box);
-    vst_color(handle, 1);
-    v_gtext(handle,
-        (WORD) (outer_x + 24), (WORD) (outer_y + 12),
-        (CONST BYTE *) g_panel_title);
-    v_gtext(handle,
-        (WORD) (outer_x + 8), (WORD) (outer_y + 12),
-        (CONST BYTE *) "X");
-    vs_clip(handle, 0, clip);
-}
-
-static void desktop_draw_menu_popup(WORD clip_x,
-                                    WORD clip_y,
-                                    WORD clip_w,
-                                    WORD clip_h)
-{
-    VDI_HANDLE handle;
-    WORD popup_x;
-    WORD popup_y;
-    WORD popup_w;
-    WORD popup_h;
     WORD rect[4];
-    WORD clip[4];
-    const char **items = NULL;
-    WORD count = 0;
+
+    rect[0] = x0;
+    rect[1] = y;
+    rect[2] = x1;
+    rect[3] = y;
+    vsf_color(g_desktop.vdi_handle, color);
+    v_bar(g_desktop.vdi_handle, rect);
+}
+
+static void desktop_draw_masked_icon(const desktop_icon_asset_t *asset,
+                                     WORD x,
+                                     WORD y)
+{
+    WORD row;
+
+    if (asset == NULL) {
+        return;
+    }
+
+    for (row = 0; row < asset->height; ++row) {
+        WORD col = 0;
+
+        while (col < asset->width) {
+            WORD start = col;
+
+            while (col < asset->width &&
+                   desktop_icon_bit(asset->mask_bits, asset, col, row) == 0) {
+                ++col;
+            }
+            if (col >= asset->width) {
+                break;
+            }
+            start = col;
+            while (col < asset->width &&
+                   desktop_icon_bit(asset->mask_bits, asset, col, row) != 0) {
+                ++col;
+            }
+            desktop_draw_run((WORD) (x + start), (WORD) (y + row),
+                (WORD) (x + col - 1), BLACK);
+        }
+    }
+
+    for (row = 0; row < asset->height; ++row) {
+        WORD col = 0;
+
+        while (col < asset->width) {
+            WORD start;
+
+            while (col < asset->width &&
+                   desktop_icon_bit(asset->data_bits, asset, col, row) == 0) {
+                ++col;
+            }
+            if (col >= asset->width) {
+                break;
+            }
+            start = col;
+            while (col < asset->width &&
+                   desktop_icon_bit(asset->data_bits, asset, col, row) != 0) {
+                ++col;
+            }
+            desktop_draw_run((WORD) (x + start), (WORD) (y + row),
+                (WORD) (x + col - 1), WHITE);
+        }
+    }
+}
+
+static const desktop_icon_entry_t *desktop_find_icon(WORD object_id)
+{
     WORD i;
 
-    if (g_menu_popup_open == 0) {
+    for (i = 0; i < g_desktop.icon_count; ++i) {
+        if (g_desktop.icons[i].object_id == object_id) {
+            return &g_desktop.icons[i];
+        }
+    }
+    return NULL;
+}
+
+static void desktop_label_from_path(const char *path,
+                                    char *label,
+                                    size_t label_size)
+{
+    const char *base;
+    size_t i;
+    int new_word = 1;
+
+    if (label_size == 0u) {
         return;
     }
 
-    desktop_get_menu_popup_items(g_menu_popup_title, &items, &count);
-    desktop_get_menu_popup_rect(&popup_x, &popup_y, &popup_w, &popup_h);
-    if (!desktop_rects_intersect(popup_x, popup_y, popup_w, popup_h,
-            clip_x, clip_y, clip_w, clip_h)) {
+    if (strcmp(path, "/") == 0) {
+        strncpy(label, "ROOT", label_size - 1u);
+        label[label_size - 1u] = '\0';
         return;
     }
 
-    handle = graf_handle(NULL, NULL, NULL, NULL);
-    clip[0] = clip_x;
-    clip[1] = clip_y;
-    clip[2] = (WORD) (clip_x + clip_w - 1);
-    clip[3] = (WORD) (clip_y + clip_h - 1);
-    rect[0] = popup_x;
-    rect[1] = popup_y;
-    rect[2] = (WORD) (popup_x + popup_w - 1);
-    rect[3] = (WORD) (popup_y + popup_h - 1);
-
-    vs_clip(handle, 1, clip);
-    vsf_color(handle, 1);
-    v_bar(handle, rect);
-    vsl_color(handle, 1);
-    v_rbox(handle, rect);
-    vst_color(handle, 0);
-    for (i = 0; i < count; ++i) {
-        v_gtext(handle, (WORD) (popup_x + 8), (WORD) (popup_y + 12 + i * 16),
-            (CONST BYTE *) items[i]);
-    }
-    vs_clip(handle, 0, clip);
-}
-
-static void desktop_open_panel(WORD screen_width,
-                               WORD screen_height,
-                               WORD x,
-                               WORD y,
-                               const char *title,
-                               const char *line1,
-                               const char *line2,
-                               const char *line3)
-{
-    if (x < 12) {
-        x = 12;
-    }
-    if (y < desktop_menu_height + 8) {
-        y = (WORD) (desktop_menu_height + 8);
-    }
-    if (x + panel_width > screen_width - 12) {
-        x = (WORD) (screen_width - panel_width - 12);
-    }
-    if (y + panel_height > screen_height - desktop_status_height - 8) {
-        y = (WORD) (screen_height - desktop_status_height - panel_height - 8);
+    base = strrchr(path, '/');
+    if (base != NULL && base[1] != '\0') {
+        ++base;
+    } else {
+        base = path;
     }
 
-    strncpy(g_panel_title, title, sizeof(g_panel_title) - 1u);
-    g_panel_title[sizeof(g_panel_title) - 1u] = '\0';
-    strncpy(g_panel_line1, line1, sizeof(g_panel_line1) - 1u);
-    g_panel_line1[sizeof(g_panel_line1) - 1u] = '\0';
-    strncpy(g_panel_line2, line2, sizeof(g_panel_line2) - 1u);
-    g_panel_line2[sizeof(g_panel_line2) - 1u] = '\0';
-    strncpy(g_panel_line3, line3, sizeof(g_panel_line3) - 1u);
-    g_panel_line3[sizeof(g_panel_line3) - 1u] = '\0';
-
-    if (g_panel_open == 0) {
-        g_panel_handle = wind_create(NAME | CLOSER, x, y, panel_width, panel_height);
-        g_panel_open = (g_panel_handle != 0);
-    }
-    if (g_panel_open != 0) {
-        (void) wind_open(g_panel_handle, x, y, panel_width, panel_height);
+    strncpy(label, base, label_size - 1u);
+    label[label_size - 1u] = '\0';
+    for (i = 0; label[i] != '\0'; ++i) {
+        if (label[i] == ' ' || label[i] == '_' || label[i] == '-') {
+            new_word = 1;
+            continue;
+        }
+        if (new_word != 0 && label[i] >= 'a' && label[i] <= 'z') {
+            label[i] = (char) (label[i] - ('a' - 'A'));
+        } else if (new_word == 0 && label[i] >= 'A' && label[i] <= 'Z') {
+            label[i] = (char) (label[i] + ('a' - 'A'));
+        }
+        new_word = 0;
     }
 }
 
-static void desktop_close_panel(void)
+static int desktop_has_path(const char *path)
 {
-    if (g_panel_open != 0) {
-        (void) wind_close(g_panel_handle);
-        (void) wind_delete(g_panel_handle);
-        g_panel_open = 0;
-        g_panel_handle = 0;
+    WORD i;
+
+    for (i = 0; i < g_desktop.icon_count; ++i) {
+        if (strcmp(g_desktop.icons[i].path, path) == 0) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+static void desktop_add_disk_icon(const char *path)
+{
+    desktop_icon_entry_t *entry;
+
+    if (g_desktop.icon_count >= DESKTOP_MAX_DISKS || path == NULL ||
+        desktop_has_path(path) != 0) {
+        return;
+    }
+
+    entry = &g_desktop.icons[g_desktop.icon_count];
+    memset(entry, 0, sizeof(*entry));
+    strncpy(entry->path, path, sizeof(entry->path) - 1u);
+    entry->path[sizeof(entry->path) - 1u] = '\0';
+    desktop_label_from_path(path, entry->label, sizeof(entry->label));
+    entry->asset = &desktop_disk_icon_asset;
+    entry->draw_info.asset = entry->asset;
+    entry->draw_info.label = entry->label;
+    entry->userblk.ab_code = (LONG) (intptr_t) desktop_user_draw;
+    entry->userblk.ab_parm = (LONG) (intptr_t) &entry->draw_info;
+    entry->object_id = (WORD) (DESKTOP_ICON_BASE + g_desktop.icon_count);
+    if (gem_os_space(path, &entry->total_bytes, &entry->avail_bytes) == 0) {
+        entry->total_bytes = 0;
+        entry->avail_bytes = 0;
+    }
+    ++g_desktop.icon_count;
+}
+
+static void desktop_add_disk_icon_with_label(const char *path,
+                                             const char *label)
+{
+    desktop_icon_entry_t *entry;
+
+    if (g_desktop.icon_count >= DESKTOP_MAX_DISKS || path == NULL ||
+        desktop_has_path(path) != 0) {
+        return;
+    }
+
+    entry = &g_desktop.icons[g_desktop.icon_count];
+    memset(entry, 0, sizeof(*entry));
+    strncpy(entry->path, path, sizeof(entry->path) - 1u);
+    entry->path[sizeof(entry->path) - 1u] = '\0';
+    if (label != NULL && label[0] != '\0') {
+        strncpy(entry->label, label, sizeof(entry->label) - 1u);
+        entry->label[sizeof(entry->label) - 1u] = '\0';
+    } else {
+        desktop_label_from_path(path, entry->label, sizeof(entry->label));
+    }
+    entry->asset = &desktop_disk_icon_asset;
+    entry->draw_info.asset = entry->asset;
+    entry->draw_info.label = entry->label;
+    entry->userblk.ab_code = (LONG) (intptr_t) desktop_user_draw;
+    entry->userblk.ab_parm = (LONG) (intptr_t) &entry->draw_info;
+    entry->object_id = (WORD) (DESKTOP_ICON_BASE + g_desktop.icon_count);
+    if (gem_os_space(path, &entry->total_bytes, &entry->avail_bytes) == 0) {
+        entry->total_bytes = 0;
+        entry->avail_bytes = 0;
+    }
+    ++g_desktop.icon_count;
+}
+
+static void desktop_probe_disks(void)
+{
+    gem_os_volume_iter_t iter;
+    gem_os_volume_t volume;
+
+    g_desktop.icon_count = 0;
+
+    if (gem_os_volume_iter_open(&iter) != 0) {
+        while (g_desktop.icon_count < DESKTOP_MAX_DISKS &&
+               gem_os_volume_iter_read(&iter, &volume) != 0) {
+            desktop_add_disk_icon_with_label(volume.mount_path, volume.label);
+        }
+        gem_os_volume_iter_close(&iter);
+    }
+
+    if (g_desktop.icon_count == 0) {
+        desktop_add_disk_icon("/");
     }
 }
 
-static int desktop_point_in_panel_close(WORD x, WORD y)
+static void desktop_sort_icons_by_label(void)
 {
-    WORD outer_x;
-    WORD outer_y;
-    WORD outer_w;
-    WORD outer_h;
+    WORD i;
+    WORD j;
 
-    if (g_panel_open == 0) {
+    if (g_desktop.icon_count < 2) {
+        desktop_refresh_icon_bindings();
+        return;
+    }
+
+    for (i = 0; i < g_desktop.icon_count - 1; ++i) {
+        for (j = (WORD) (i + 1); j < g_desktop.icon_count; ++j) {
+            int swap_needed = 0;
+
+            if (g_desktop.icons[i].is_trash != 0) {
+                swap_needed = 1;
+            } else if (g_desktop.icons[j].is_trash == 0 &&
+                       strcmp(g_desktop.icons[i].label,
+                           g_desktop.icons[j].label) > 0) {
+                swap_needed = 1;
+            }
+            if (swap_needed != 0) {
+                desktop_icon_entry_t swap = g_desktop.icons[i];
+
+                g_desktop.icons[i] = g_desktop.icons[j];
+                g_desktop.icons[j] = swap;
+            }
+        }
+    }
+
+    desktop_refresh_icon_bindings();
+}
+
+static void desktop_refresh_icon_bindings(void)
+{
+    WORD i;
+
+    for (i = 0; i < g_desktop.icon_count; ++i) {
+        g_desktop.icons[i].draw_info.asset = g_desktop.icons[i].asset;
+        g_desktop.icons[i].draw_info.label = g_desktop.icons[i].label;
+        g_desktop.icons[i].userblk.ab_code =
+            (LONG) (intptr_t) desktop_user_draw;
+        g_desktop.icons[i].userblk.ab_parm =
+            (LONG) (intptr_t) &g_desktop.icons[i].draw_info;
+    }
+}
+
+static void desktop_reset_tree_links(void)
+{
+    WORD i;
+
+    for (i = 0; i < DESKTOP_OBJECT_COUNT; ++i) {
+        g_desktop.desktop_tree[i].ob_next = i;
+        g_desktop.desktop_tree[i].ob_head = NIL;
+        g_desktop.desktop_tree[i].ob_tail = NIL;
+    }
+}
+
+static void desktop_init_menu_tree(void)
+{
+    OBJECT *tree = g_desktop.menu_tree;
+
+    desktop_init_object(&tree[MENU_ROOT], -1, MENU_BAR_BOX, MENU_POPUPS,
+        G_IBOX, NONE, NORMAL, 0L, 0, 0, 0, 0);
+    desktop_init_object(&tree[MENU_BAR_BOX], MENU_POPUPS, MENU_TITLES,
+        MENU_TITLES, G_BOX, NONE, NORMAL, 0x1100L, 0, 0, 80, 1);
+    desktop_init_object(&tree[MENU_TITLES], MENU_BAR_BOX, MENU_TITLE_DESK,
+        MENU_TITLE_ARRANGE, G_IBOX, NONE, NORMAL, 0L, 0, 0, 80, 1);
+    desktop_init_object(&tree[MENU_POPUPS], MENU_ROOT, MENU_DESK_BOX,
+        MENU_ARRANGE_BOX, G_IBOX, NONE, NORMAL, 0L, 0, 0, 0, 0);
+    desktop_init_object(&tree[MENU_TITLE_DESK], MENU_TITLE_FILE, NIL, NIL,
+        G_TITLE, NONE, NORMAL, (LONG) (intptr_t) " Desk ", 0, 0, 6, 1);
+    desktop_init_object(&tree[MENU_TITLE_FILE], MENU_TITLE_OPTIONS, NIL, NIL,
+        G_TITLE, NONE, NORMAL, (LONG) (intptr_t) " File ", 6, 0, 6, 1);
+    desktop_init_object(&tree[MENU_TITLE_OPTIONS], MENU_TITLE_ARRANGE, NIL, NIL,
+        G_TITLE, NONE, NORMAL, (LONG) (intptr_t) " Options ", 12, 0, 9, 1);
+    desktop_init_object(&tree[MENU_TITLE_ARRANGE], MENU_TITLES, NIL, NIL,
+        G_TITLE, LASTOB, NORMAL, (LONG) (intptr_t) " Arrange ", 21, 0, 9, 1);
+
+    desktop_init_object(&tree[MENU_DESK_BOX], MENU_FILE_BOX, MENU_DESK_ABOUT,
+        MENU_DESK_6, G_BOX, NONE, NORMAL, 0x1100L, 0, 0, 22, 8);
+    desktop_init_object(&tree[MENU_DESK_ABOUT], MENU_DESK_SEPARATOR, NIL, NIL,
+        G_STRING, NONE, NORMAL, (LONG) (intptr_t) "  Desktop info...   ", 0, 0, 22, 1);
+    desktop_init_object(&tree[MENU_DESK_SEPARATOR], MENU_DESK_1, NIL, NIL,
+        G_STRING, NONE, DISABLED, (LONG) (intptr_t) "--------------------", 0, 1, 22, 1);
+    desktop_init_object(&tree[MENU_DESK_1], MENU_DESK_2, NIL, NIL,
+        G_STRING, NONE, NORMAL, (LONG) (intptr_t) "1", 0, 2, 22, 1);
+    desktop_init_object(&tree[MENU_DESK_2], MENU_DESK_3, NIL, NIL,
+        G_STRING, NONE, NORMAL, (LONG) (intptr_t) "2", 0, 3, 22, 1);
+    desktop_init_object(&tree[MENU_DESK_3], MENU_DESK_4, NIL, NIL,
+        G_STRING, NONE, NORMAL, (LONG) (intptr_t) "3", 0, 4, 22, 1);
+    desktop_init_object(&tree[MENU_DESK_4], MENU_DESK_5, NIL, NIL,
+        G_STRING, NONE, NORMAL, (LONG) (intptr_t) "4", 0, 5, 22, 1);
+    desktop_init_object(&tree[MENU_DESK_5], MENU_DESK_6, NIL, NIL,
+        G_STRING, NONE, NORMAL, (LONG) (intptr_t) "5", 0, 6, 22, 1);
+    desktop_init_object(&tree[MENU_DESK_6], MENU_DESK_BOX, NIL, NIL,
+        G_STRING, LASTOB, NORMAL, (LONG) (intptr_t) "6", 0, 7, 22, 1);
+
+    desktop_init_object(&tree[MENU_FILE_BOX], MENU_OPTIONS_BOX, MENU_FILE_OPEN,
+        MENU_FILE_EXIT, G_BOX, NONE, NORMAL, 0x1100L, 0, 0, 31, 8);
+    desktop_init_object(&tree[MENU_FILE_OPEN], MENU_FILE_INFO, NIL, NIL,
+        G_STRING, NONE, NORMAL, (LONG) (intptr_t) "  Open", 0, 0, 31, 1);
+    desktop_init_object(&tree[MENU_FILE_INFO], MENU_FILE_SEPARATOR_1, NIL, NIL,
+        G_STRING, NONE, NORMAL, (LONG) (intptr_t) "  Info/Rename...  \aI", 0, 1, 31, 1);
+    desktop_init_object(&tree[MENU_FILE_SEPARATOR_1], MENU_FILE_DELETE, NIL, NIL,
+        G_STRING, NONE, DISABLED, (LONG) (intptr_t) "---------------------", 0, 2, 31, 1);
+    desktop_init_object(&tree[MENU_FILE_DELETE], MENU_FILE_FORMAT, NIL, NIL,
+        G_STRING, NONE, NORMAL, (LONG) (intptr_t) "  Delete...       \aD", 0, 3, 31, 1);
+    desktop_init_object(&tree[MENU_FILE_FORMAT], MENU_FILE_SEPARATOR_2, NIL, NIL,
+        G_STRING, NONE, NORMAL, (LONG) (intptr_t) "  Format...", 0, 4, 31, 1);
+    desktop_init_object(&tree[MENU_FILE_SEPARATOR_2], MENU_FILE_OUTPUT, NIL, NIL,
+        G_STRING, NONE, DISABLED, (LONG) (intptr_t) "---------------------", 0, 5, 31, 1);
+    desktop_init_object(&tree[MENU_FILE_OUTPUT], MENU_FILE_EXIT, NIL, NIL,
+        G_STRING, NONE, NORMAL, (LONG) (intptr_t) "  To Output       ^U", 0, 6, 31, 1);
+    desktop_init_object(&tree[MENU_FILE_EXIT], MENU_FILE_BOX, NIL, NIL,
+        G_STRING, LASTOB, NORMAL, (LONG) (intptr_t) "  Exit to DOS     ^Q", 0, 7, 31, 1);
+
+    desktop_init_object(&tree[MENU_OPTIONS_BOX], MENU_ARRANGE_BOX,
+        MENU_OPTIONS_INSTALL_DISK, MENU_OPTIONS_DOS,
+        G_BOX, NONE, NORMAL, 0x1100L, 0, 0, 36, 6);
+    desktop_init_object(&tree[MENU_OPTIONS_INSTALL_DISK], MENU_OPTIONS_CONFIGURE_APP,
+        NIL, NIL, G_STRING, NONE, NORMAL,
+        (LONG) (intptr_t) "  Install disk drive...", 0, 0, 36, 1);
+    desktop_init_object(&tree[MENU_OPTIONS_CONFIGURE_APP], MENU_OPTIONS_SEPARATOR,
+        NIL, NIL, G_STRING, NONE, NORMAL,
+        (LONG) (intptr_t) "  Configure application...  \aA", 0, 1, 36, 1);
+    desktop_init_object(&tree[MENU_OPTIONS_SEPARATOR], MENU_OPTIONS_PREFS,
+        NIL, NIL, G_STRING, NONE, DISABLED,
+        (LONG) (intptr_t) "-------------------------------", 0, 2, 36, 1);
+    desktop_init_object(&tree[MENU_OPTIONS_PREFS], MENU_OPTIONS_SAVE,
+        NIL, NIL, G_STRING, NONE, NORMAL,
+        (LONG) (intptr_t) "  Set preferences...", 0, 3, 36, 1);
+    desktop_init_object(&tree[MENU_OPTIONS_SAVE], MENU_OPTIONS_DOS, NIL, NIL,
+        G_STRING, NONE, NORMAL,
+        (LONG) (intptr_t) "  Save desktop              \aV", 0, 4, 36, 1);
+    desktop_init_object(&tree[MENU_OPTIONS_DOS], MENU_OPTIONS_BOX, NIL, NIL,
+        G_STRING, LASTOB, NORMAL,
+        (LONG) (intptr_t) "  Enter DOS commands        \aC", 0, 5, 36, 1);
+
+    desktop_init_object(&tree[MENU_ARRANGE_BOX], MENU_POPUPS,
+        MENU_ARRANGE_SHOW_AS_ICONS, MENU_ARRANGE_SORT_DATE,
+        G_BOX, NONE, NORMAL, 0x1100L, 0, 0, 24, 6);
+    desktop_init_object(&tree[MENU_ARRANGE_SHOW_AS_ICONS], MENU_ARRANGE_SEPARATOR,
+        NIL, NIL, G_STRING, NONE, NORMAL,
+        (LONG) (intptr_t) "  Show as icons  \aS", 0, 0, 24, 1);
+    desktop_init_object(&tree[MENU_ARRANGE_SEPARATOR], MENU_ARRANGE_SORT_NAME,
+        NIL, NIL, G_STRING, NONE, DISABLED,
+        (LONG) (intptr_t) "--------------------", 0, 1, 24, 1);
+    desktop_init_object(&tree[MENU_ARRANGE_SORT_NAME], MENU_ARRANGE_SORT_TYPE,
+        NIL, NIL, G_STRING, NONE, NORMAL,
+        (LONG) (intptr_t) "  Sort by name   \aN", 0, 2, 24, 1);
+    desktop_init_object(&tree[MENU_ARRANGE_SORT_TYPE], MENU_ARRANGE_SORT_SIZE,
+        NIL, NIL, G_STRING, NONE, NORMAL,
+        (LONG) (intptr_t) "  Sort by type   \aP", 0, 3, 24, 1);
+    desktop_init_object(&tree[MENU_ARRANGE_SORT_SIZE], MENU_ARRANGE_SORT_DATE,
+        NIL, NIL, G_STRING, NONE, NORMAL,
+        (LONG) (intptr_t) "  Sort by size   \aZ", 0, 4, 24, 1);
+    desktop_init_object(&tree[MENU_ARRANGE_SORT_DATE], MENU_ARRANGE_BOX, NIL, NIL,
+        G_STRING, LASTOB, NORMAL,
+        (LONG) (intptr_t) "  Sort by date   \aT", 0, 5, 24, 1);
+}
+
+static void desktop_init_desktop_tree(void)
+{
+    WORD i;
+
+    desktop_reset_tree_links();
+    desktop_init_object(&g_desktop.desktop_tree[DESKTOP_ROOT], NIL,
+        NIL, NIL, G_IBOX, NONE, NORMAL, 0L,
+        g_desktop.work.g_x, g_desktop.work.g_y, g_desktop.work.g_w,
+        g_desktop.work.g_h);
+
+    for (i = 0; i < g_desktop.icon_count; ++i) {
+        desktop_icon_entry_t *entry = &g_desktop.icons[i];
+
+        desktop_init_object(&g_desktop.desktop_tree[entry->object_id],
+            entry->object_id, NIL, NIL, G_USERDEF, SELECTABLE, NORMAL,
+            (LONG) (intptr_t) &entry->userblk, 0, 0,
+            DESKTOP_ICON_OBJECT_W, DESKTOP_ICON_OBJECT_H);
+        objc_add(g_desktop.desktop_tree, DESKTOP_ROOT, entry->object_id);
+    }
+}
+
+static void desktop_layout_icons(void)
+{
+    WORD i;
+    WORD column = 0;
+    WORD row = 0;
+    WORD max_rows;
+
+    max_rows = (WORD) ((g_desktop.work.g_h - DESKTOP_ICON_MARGIN_Y) /
+        DESKTOP_ICON_STEP_Y);
+    if (max_rows < 1) {
+        max_rows = 1;
+    }
+
+    for (i = 0; i < g_desktop.icon_count; ++i) {
+        desktop_icon_entry_t *entry = &g_desktop.icons[i];
+        WORD x;
+        WORD y;
+
+        if (entry->is_trash != 0) {
+            continue;
+        }
+
+        x = (WORD) (DESKTOP_ICON_MARGIN_X + column * DESKTOP_ICON_STEP_X);
+        y = (WORD) (DESKTOP_ICON_MARGIN_Y + row * DESKTOP_ICON_STEP_Y);
+        g_desktop.desktop_tree[entry->object_id].ob_x = x;
+        g_desktop.desktop_tree[entry->object_id].ob_y = y;
+        ++row;
+        if (row >= max_rows) {
+            row = 0;
+            ++column;
+        }
+    }
+
+    for (i = 0; i < g_desktop.icon_count; ++i) {
+        desktop_icon_entry_t *entry = &g_desktop.icons[i];
+
+        if (entry->is_trash == 0) {
+            continue;
+        }
+        g_desktop.desktop_tree[entry->object_id].ob_x =
+            (WORD) (g_desktop.work.g_w - DESKTOP_ICON_OBJECT_W - 12);
+        g_desktop.desktop_tree[entry->object_id].ob_y =
+            (WORD) (g_desktop.work.g_h - DESKTOP_ICON_OBJECT_H - 10);
+    }
+}
+
+static WORD desktop_user_draw(LONG parm_block)
+{
+    const PARMBLK *pb = (const PARMBLK *) (intptr_t) parm_block;
+    const desktop_icon_draw_t *draw_info;
+    WORD extent[8];
+    WORD label_box[4];
+    WORD text_x;
+    WORD icon_x;
+    WORD icon_y;
+    WORD label_y;
+    WORD previous_font;
+    WORD text_height;
+    WORD text_width;
+
+    if (pb == NULL) {
         return 0;
     }
 
-    (void) wind_get(g_panel_handle, WF_WXYWH,
-        &outer_x, &outer_y, &outer_w, &outer_h);
-    (void) outer_w;
-    (void) outer_h;
-    return x >= outer_x + 4 && y >= outer_y + 3 &&
-        x <= outer_x + 16 && y <= outer_y + 15;
+    draw_info = (const desktop_icon_draw_t *) (intptr_t) pb->pb_parm;
+    if (draw_info == NULL || draw_info->asset == NULL) {
+        return 0;
+    }
+
+    icon_x = (WORD) (pb->pb_x + (pb->pb_w - draw_info->asset->width) / 2);
+    icon_y = pb->pb_y;
+    desktop_draw_masked_icon(draw_info->asset, icon_x, icon_y);
+
+    previous_font = vst_font(g_desktop.vdi_handle, SMALL);
+    vqt_extent(g_desktop.vdi_handle, (char *) draw_info->label, extent);
+    text_width = (WORD) (extent[2] - extent[0] + 1);
+    text_height = (WORD) (extent[5] - extent[1] + 1);
+    text_x = (WORD) (pb->pb_x + (pb->pb_w - text_width) / 2);
+    label_y = (WORD) (pb->pb_y + DESKTOP_ICON_TEXT_Y + 14);
+    label_box[0] = (WORD) (text_x - 7);
+    label_box[1] = (WORD) (label_y - text_height - 2);
+    label_box[2] = (WORD) (text_x + text_width + 6);
+    label_box[3] = (WORD) (label_y + 2);
+    if (label_box[0] < pb->pb_x) {
+        label_box[0] = pb->pb_x;
+    }
+    if (label_box[2] > pb->pb_x + pb->pb_w - 1) {
+        label_box[2] = (WORD) (pb->pb_x + pb->pb_w - 1);
+    }
+    if ((pb->pb_currstate & SELECTED) != 0u) {
+        vsf_color(g_desktop.vdi_handle, WHITE);
+        v_bar(g_desktop.vdi_handle, label_box);
+        vst_color(g_desktop.vdi_handle, BLACK);
+    } else {
+        vsf_color(g_desktop.vdi_handle, BLACK);
+        v_bar(g_desktop.vdi_handle, label_box);
+        vsl_color(g_desktop.vdi_handle, WHITE);
+        v_rbox(g_desktop.vdi_handle, label_box);
+        vst_color(g_desktop.vdi_handle, WHITE);
+    }
+    v_gtext(g_desktop.vdi_handle, text_x, label_y,
+        (const BYTE *) draw_info->label);
+    (void) vst_font(g_desktop.vdi_handle, previous_font);
+    return 0;
 }
 
-static void desktop_handle_menu(WORD object, WORD screen_width, WORD screen_height)
+static void desktop_set_status(const char *text)
 {
-    WORD title_x;
-    WORD title_y;
-
-    switch (object) {
-    case desktop_menu_desktop:
-    case desktop_menu_file:
-    case desktop_menu_view:
-    case desktop_menu_help:
-        objc_offset(g_menu_tree, object, &title_x, &title_y);
-        (void) screen_width;
-        (void) screen_height;
-        desktop_open_menu_popup(object);
-        break;
-    default:
-        break;
+    if (text == NULL) {
+        g_desktop.status_text[0] = '\0';
+    } else {
+        strncpy(g_desktop.status_text, text, sizeof(g_desktop.status_text) - 1u);
+        g_desktop.status_text[sizeof(g_desktop.status_text) - 1u] = '\0';
     }
 }
 
-static void desktop_handle_menu_item(WORD screen_width,
-                                     WORD screen_height,
-                                     WORD item)
+static void desktop_draw_background_pattern(const GRECT *dirty)
 {
-    switch (g_menu_popup_title) {
-    case desktop_menu_desktop:
-        if (item == 0) {
-            desktop_open_panel(screen_width, screen_height, 48, 72,
-                "Desktop", "Hosted GEM desktop session", "Using AES trees and VDI",
-                "Real historical port comes next.");
-            desktop_set_status_message("Opened Desktop info");
-        } else if (item == 1) {
-            desktop_select_icon(NIL);
-            desktop_close_panel();
-            desktop_set_status_message("Desktop reset");
-        } else if (item == 2) {
-            desktop_close_panel();
-            desktop_set_status_message("Closed window");
+    WORD fill[4];
+    WORD x;
+    WORD y;
+    WORD x0;
+    WORD y0;
+    WORD x1;
+    WORD y1;
+
+    x0 = g_desktop.work.g_x;
+    y0 = g_desktop.work.g_y;
+    x1 = (WORD) (g_desktop.work.g_x + g_desktop.work.g_w - 1);
+    y1 = (WORD) (g_desktop.work.g_y + g_desktop.work.g_h - 1);
+
+    if (dirty != NULL) {
+        WORD dirty_x1 = (WORD) (dirty->g_x + dirty->g_w - 1);
+        WORD dirty_y1 = (WORD) (dirty->g_y + dirty->g_h - 1);
+
+        if (x0 < dirty->g_x) {
+            x0 = dirty->g_x;
         }
-        break;
-    case desktop_menu_file:
-        if (item == 0) {
-            desktop_open_panel(screen_width, screen_height, 88, 86,
-                "Files", "File views are still hosted.", "No folder browser yet.",
-                "RCS and apps can be wired next.");
-            desktop_set_status_message("Opened Files");
-        } else if (item == 1) {
-            desktop_open_panel(screen_width, screen_height, 210, 96,
-                "Tools", "Tool launching placeholder.", "Menus are now pop-downs.",
-                "App launch hooks come next.");
-            desktop_set_status_message("Opened Tools");
-        } else if (item == 2) {
-            desktop_open_panel(screen_width, screen_height, 332, 86,
-                "Trash", "Trash is empty.", "Delete/restore not wired yet.",
-                "Window is draggable now.");
-            desktop_set_status_message("Opened Trash");
+        if (y0 < dirty->g_y) {
+            y0 = dirty->g_y;
         }
-        break;
-    case desktop_menu_view:
-        if (item == 0) {
-            desktop_set_status_message("Desktop refreshed");
-        } else if (item == 1) {
-            desktop_set_status_message("");
-        } else if (item == 2) {
-            desktop_set_status_message("Closed menu");
+        if (x1 > dirty_x1) {
+            x1 = dirty_x1;
         }
-        break;
-    case desktop_menu_help:
-        if (item == 0) {
-            desktop_open_panel(screen_width, screen_height, 160, 60,
-                "About GEM", "Hosted GEM desktop launcher", "AES trees and VDI renderer",
-                "Press Esc or q to quit.");
-            desktop_set_status_message("Opened Help");
-        } else if (item == 1) {
-            desktop_open_panel(screen_width, screen_height, 190, 94,
-                "Keys", "Esc or q quits.", "Click menu titles for pop-downs.",
-                "Drag window by its title bar.");
-            desktop_set_status_message("Opened Keys");
-        } else if (item == 2) {
-            desktop_open_panel(screen_width, screen_height, 224, 128,
-                "Rasta", "Framebuffer: /tmp/rasta.fb", "Input: UDP 127.0.0.1:5000",
-                "Current host display backend.");
-            desktop_set_status_message("Opened Rasta info");
+        if (y1 > dirty_y1) {
+            y1 = dirty_y1;
         }
-        break;
-    default:
-        break;
+    }
+
+    if (x0 > x1 || y0 > y1) {
+        return;
+    }
+
+    fill[0] = x0;
+    fill[1] = y0;
+    fill[2] = x1;
+    fill[3] = y1;
+
+    vsf_color(g_desktop.vdi_handle, BLACK);
+    v_bar(g_desktop.vdi_handle, fill);
+
+    vsf_color(g_desktop.vdi_handle, WHITE);
+    for (y = y0;
+         y <= y1;
+         ++y) {
+        for (x = x0;
+             x <= x1;
+             x = (WORD) (x + 2)) {
+            WORD dot[4];
+            WORD start_x = x;
+
+            if (((y - g_desktop.work.g_y) & 1) != 0) {
+                start_x = (WORD) (start_x + 1);
+            }
+            if (start_x > x1) {
+                continue;
+            }
+            dot[0] = start_x;
+            dot[1] = y;
+            dot[2] = start_x;
+            dot[3] = y;
+            v_bar(g_desktop.vdi_handle, dot);
+        }
     }
 }
 
-static void desktop_handle_icon(WORD object, WORD screen_width, WORD screen_height)
+static void desktop_redraw(const GRECT *dirty)
 {
-    desktop_select_icon(object);
-    switch (object) {
-    case desktop_icon_trash:
-        desktop_open_panel(screen_width, screen_height, 56, 76,
-            "Trash", "Trash is empty.", "No delete or restore support yet.",
-            "Historical desktop behavior comes later.");
-        desktop_set_status_message(desktop_icon_message(object));
-        break;
-    case desktop_icon_files:
-        desktop_open_panel(screen_width, screen_height, 160, 92,
-            "Files", "File manager is not ported yet.", "Desktop launcher is using AES trees.",
-            "Historical file views will come next.");
-        desktop_set_status_message(desktop_icon_message(object));
-        break;
-    case desktop_icon_tools:
-        desktop_open_panel(screen_width, screen_height, 264, 108,
-            "Tools", "Tools area placeholder.", "Next step is real app launching.",
-            "RCS and calclock targets already build.");
-            desktop_set_status_message(desktop_icon_message(object));
-        break;
-    default:
-        desktop_set_status_message("");
-        break;
-    }
-}
+    WORD clip_xy[4];
+    WORD x0;
+    WORD y0;
+    WORD x1;
+    WORD y1;
 
-static void desktop_redraw_region(WORD screen_width,
-                                  WORD screen_height,
-                                  WORD mouse_x,
-                                  WORD mouse_y,
-                                  WORD clip_x,
-                                  WORD clip_y,
-                                  WORD clip_w,
-                                  WORD clip_h)
-{
-    (void) screen_width;
-    (void) screen_height;
+    x0 = g_desktop.work.g_x;
+    y0 = g_desktop.work.g_y;
+    x1 = (WORD) (g_desktop.work.g_x + g_desktop.work.g_w - 1);
+    y1 = (WORD) (g_desktop.work.g_y + g_desktop.work.g_h - 1);
+
+    if (dirty != NULL) {
+        WORD dirty_x1 = (WORD) (dirty->g_x + dirty->g_w - 1);
+        WORD dirty_y1 = (WORD) (dirty->g_y + dirty->g_h - 1);
+
+        if (x0 < dirty->g_x) {
+            x0 = dirty->g_x;
+        }
+        if (y0 < dirty->g_y) {
+            y0 = dirty->g_y;
+        }
+        if (x1 > dirty_x1) {
+            x1 = dirty_x1;
+        }
+        if (y1 > dirty_y1) {
+            y1 = dirty_y1;
+        }
+    }
+
+    if (x0 > x1 || y0 > y1) {
+        return;
+    }
 
     wind_update(BEG_UPDATE);
-    menu_bar(g_menu_tree, 1);
-    desktop_update_status_text(mouse_x, mouse_y);
-    objc_draw(g_menu_tree, ROOT, MAX_DEPTH,
-        clip_x, clip_y, clip_w, clip_h);
-    objc_draw(g_desktop_tree, ROOT, MAX_DEPTH,
-        clip_x, clip_y, clip_w, clip_h);
-    desktop_draw_panel(clip_x, clip_y, clip_w, clip_h);
-    desktop_draw_menu_popup(clip_x, clip_y, clip_w, clip_h);
+    (void) vswr_mode(g_desktop.vdi_handle, MD_REPLACE);
+    clip_xy[0] = x0;
+    clip_xy[1] = y0;
+    clip_xy[2] = x1;
+    clip_xy[3] = y1;
+    vs_clip(g_desktop.vdi_handle, 1, clip_xy);
+    desktop_draw_background_pattern(dirty);
+    objc_draw(g_desktop.desktop_tree, ROOT, MAX_DEPTH,
+        x0, y0, (WORD) (x1 - x0 + 1), (WORD) (y1 - y0 + 1));
+    vs_clip(g_desktop.vdi_handle, 0, NULL);
+    v_updwk(g_desktop.vdi_handle);
     wind_update(END_UPDATE);
 }
 
-static void desktop_draw_scene(WORD screen_width,
-                               WORD screen_height,
-                               WORD mouse_x,
-                               WORD mouse_y)
+static void desktop_object_rect(WORD object_id, GRECT *rect)
 {
-    desktop_redraw_region(screen_width, screen_height, mouse_x, mouse_y,
-        0, 0, screen_width, screen_height);
-}
+    WORD x;
+    WORD y;
 
-static void desktop_draw_status(WORD screen_width,
-                                WORD screen_height,
-                                WORD mouse_x,
-                                WORD mouse_y)
-{
-    WORD clip_y = (WORD) (screen_height - desktop_status_height);
-
-    desktop_redraw_region(screen_width, screen_height, mouse_x, mouse_y,
-        0, clip_y, screen_width, desktop_status_height);
-}
-
-static void desktop_draw_icons(WORD screen_width,
-                               WORD screen_height,
-                               WORD mouse_x,
-                               WORD mouse_y)
-{
-    desktop_redraw_region(screen_width, screen_height, mouse_x, mouse_y,
-        0, desktop_menu_height, screen_width, 96);
-}
-
-static void desktop_redraw_saved_panel(WORD screen_width,
-                                       WORD screen_height,
-                                       WORD mouse_x,
-                                       WORD mouse_y,
-                                       WORD x,
-                                       WORD y,
-                                       WORD w,
-                                       WORD h)
-{
-    if (w <= 0 || h <= 0) {
+    if (rect == NULL) {
         return;
     }
 
-    desktop_redraw_region(screen_width, screen_height, mouse_x, mouse_y,
-        x, y, w, h);
+    objc_offset(g_desktop.desktop_tree, object_id, &x, &y);
+    rect->g_x = x;
+    rect->g_y = y;
+    rect->g_w = g_desktop.desktop_tree[object_id].ob_width;
+    rect->g_h = g_desktop.desktop_tree[object_id].ob_height;
 }
 
-static void desktop_refresh_after_panel_change(WORD screen_width,
-                                               WORD screen_height,
-                                               WORD mouse_x,
-                                               WORD mouse_y,
-                                               WORD old_x,
-                                               WORD old_y,
-                                               WORD old_w,
-                                               WORD old_h,
-                                               WORD redraw_icons)
+static void desktop_select_icon(WORD object_id)
 {
-    desktop_redraw_saved_panel(screen_width, screen_height, mouse_x, mouse_y,
-        old_x, old_y, old_w, old_h);
-    if (g_panel_open != 0) {
-        WORD new_x;
-        WORD new_y;
-        WORD new_w;
-        WORD new_h;
+    WORD i;
 
-        desktop_get_panel_outer_rect(&new_x, &new_y, &new_w, &new_h);
-        desktop_redraw_saved_panel(screen_width, screen_height, mouse_x, mouse_y,
-            new_x, new_y, new_w, new_h);
+    g_desktop.selected_icon = object_id;
+    for (i = 0; i < g_desktop.icon_count; ++i) {
+        g_desktop.desktop_tree[g_desktop.icons[i].object_id].ob_state = NORMAL;
     }
-    if (redraw_icons != 0) {
-        desktop_draw_icons(screen_width, screen_height, mouse_x, mouse_y);
+    if (object_id != NIL) {
+        g_desktop.desktop_tree[object_id].ob_state = SELECTED;
     }
-    desktop_draw_status(screen_width, screen_height, mouse_x, mouse_y);
+}
+
+static void desktop_status_for_icon(const desktop_icon_entry_t *entry)
+{
+    char text[96];
+    int label_max;
+
+    if (entry == NULL) {
+        desktop_set_status("Select a disk or the trash can.");
+        return;
+    }
+
+    if (entry->is_trash != 0) {
+        desktop_set_status("Trash selected.");
+        return;
+    }
+
+    label_max = (int) sizeof(text) - 20;
+    (void) snprintf(text, sizeof(text), "%.*s  %llu MB free",
+        label_max, entry->label,
+        (unsigned long long) (entry->avail_bytes / (1024u * 1024u)));
+    desktop_set_status(text);
+}
+
+static void desktop_handle_icon_click(WORD object_id)
+{
+    const desktop_icon_entry_t *entry = desktop_find_icon(object_id);
+    WORD previous = g_desktop.selected_icon;
+    GRECT dirty;
+    GRECT rect;
+    int dirty_set = 0;
+
+    desktop_select_icon(object_id);
+    desktop_status_for_icon(entry);
+    if (previous != NIL) {
+        desktop_object_rect(previous, &dirty);
+        dirty_set = 1;
+    }
+    desktop_object_rect(object_id, &rect);
+    if (dirty_set == 0) {
+        dirty = rect;
+    } else {
+        WORD x0 = dirty.g_x < rect.g_x ? dirty.g_x : rect.g_x;
+        WORD y0 = dirty.g_y < rect.g_y ? dirty.g_y : rect.g_y;
+        WORD x1 = (WORD) ((dirty.g_x + dirty.g_w - 1) >
+            (rect.g_x + rect.g_w - 1) ?
+            (dirty.g_x + dirty.g_w - 1) :
+            (rect.g_x + rect.g_w - 1));
+        WORD y1 = (WORD) ((dirty.g_y + dirty.g_h - 1) >
+            (rect.g_y + rect.g_h - 1) ?
+            (dirty.g_y + dirty.g_h - 1) :
+            (rect.g_y + rect.g_h - 1));
+
+        dirty.g_x = x0;
+        dirty.g_y = y0;
+        dirty.g_w = (WORD) (x1 - x0 + 1);
+        dirty.g_h = (WORD) (y1 - y0 + 1);
+    }
+    desktop_redraw(&dirty);
+}
+
+static void desktop_install_trash_icon(void)
+{
+    desktop_icon_entry_t *entry;
+
+    entry = &g_desktop.icons[g_desktop.icon_count];
+    memset(entry, 0, sizeof(*entry));
+    strncpy(entry->label, "Trash", sizeof(entry->label) - 1u);
+    strncpy(entry->path, "trash://desktop", sizeof(entry->path) - 1u);
+    entry->asset = &desktop_trash_icon_asset;
+    entry->draw_info.asset = entry->asset;
+    entry->draw_info.label = entry->label;
+    entry->userblk.ab_code = (LONG) (intptr_t) desktop_user_draw;
+    entry->userblk.ab_parm = (LONG) (intptr_t) &entry->draw_info;
+    entry->object_id = (WORD) (DESKTOP_ICON_BASE + g_desktop.icon_count);
+    entry->is_trash = 1;
+    ++g_desktop.icon_count;
+}
+
+static void desktop_handle_menu_item(WORD item)
+{
+    char text[96];
+    const desktop_icon_entry_t *selected = desktop_find_icon(g_desktop.selected_icon);
+
+    switch (item) {
+    case MENU_DESK_ABOUT:
+        desktop_set_status("Digital Research GEM Desktop, hosted AES edition.");
+        break;
+    case MENU_DESK_1:
+    case MENU_DESK_2:
+    case MENU_DESK_3:
+    case MENU_DESK_4:
+    case MENU_DESK_5:
+    case MENU_DESK_6:
+        (void) snprintf(text, sizeof(text), "Desktop slot %d selected.",
+            (int) (item - MENU_DESK_1 + 1));
+        desktop_set_status(text);
+        break;
+    case MENU_FILE_OPEN:
+        if (selected != NULL && selected->is_trash == 0) {
+            (void) snprintf(text, sizeof(text), "Open %.72s", selected->label);
+            desktop_set_status(text);
+        } else {
+            desktop_set_status("Open requires a disk selection.");
+        }
+        break;
+    case MENU_FILE_INFO:
+        if (selected != NULL && selected->is_trash == 0) {
+            (void) snprintf(text, sizeof(text), "%s total %llu MB",
+                selected->label,
+                (unsigned long long) (selected->total_bytes / (1024u * 1024u)));
+            desktop_set_status(text);
+        } else {
+            desktop_set_status("Info/Rename requires a disk selection.");
+        }
+        break;
+    case MENU_FILE_DELETE:
+        desktop_set_status("Delete is not available on the desktop root.");
+        break;
+    case MENU_FILE_FORMAT:
+        desktop_set_status("Format is intentionally not implemented.");
+        break;
+    case MENU_FILE_OUTPUT:
+        desktop_set_status("To Output selected.");
+        break;
+    case MENU_FILE_EXIT:
+        desktop_set_status("Exit selected. Press q or Esc to quit.");
+        break;
+    case MENU_OPTIONS_INSTALL_DISK:
+        desktop_set_status("Disk install is automatic from host mount points.");
+        break;
+    case MENU_OPTIONS_CONFIGURE_APP:
+        desktop_set_status("Application configuration is not wired yet.");
+        break;
+    case MENU_OPTIONS_PREFS:
+        desktop_set_status("Preferences are fixed in this portable desktop.");
+        break;
+    case MENU_OPTIONS_SAVE:
+        desktop_set_status("Save desktop is not implemented yet.");
+        break;
+    case MENU_OPTIONS_DOS:
+        desktop_set_status("DOS command entry is not available.");
+        break;
+    case MENU_ARRANGE_SHOW_AS_ICONS:
+        desktop_set_status("Items are already shown as icons.");
+        break;
+    case MENU_ARRANGE_SORT_NAME:
+        desktop_sort_icons_by_label();
+        desktop_layout_icons();
+        desktop_set_status("Icons sorted by name.");
+        break;
+    case MENU_ARRANGE_SORT_TYPE:
+        desktop_set_status("All desktop entries are disks or trash.");
+        break;
+    case MENU_ARRANGE_SORT_SIZE:
+        desktop_set_status("Disk sizes shown in the status line.");
+        break;
+    case MENU_ARRANGE_SORT_DATE:
+        desktop_set_status("Date sorting is not applicable to disk icons.");
+        break;
+    default:
+        break;
+    }
+    desktop_redraw(NULL);
+}
+
+static int desktop_init(void)
+{
+    WORD work_in[11] = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2};
+    WORD work_out[57];
+
+    memset(&g_desktop, 0, sizeof(g_desktop));
+    g_desktop.selected_icon = NIL;
+
+    if (gem_os_init() == 0) {
+        return 0;
+    }
+
+    g_desktop.app_id = appl_init();
+    if (g_desktop.app_id < 0) {
+        gem_os_shutdown();
+        return 0;
+    }
+
+    g_desktop.vdi_handle = graf_handle(NULL, NULL, NULL, NULL);
+    v_opnvwk(work_in, &g_desktop.vdi_handle, work_out);
+    if (g_desktop.vdi_handle == 0) {
+        appl_exit();
+        gem_os_shutdown();
+        return 0;
+    }
+
+    g_desktop.screen_width = (WORD) (work_out[0] + 1);
+    g_desktop.screen_height = (WORD) (work_out[1] + 1);
+
+    desktop_init_menu_tree();
+    menu_click(1, 1);
+    menu_bar(g_desktop.menu_tree, 1);
+    wind_get(0, WF_WORKXYWH, &g_desktop.work.g_x, &g_desktop.work.g_y,
+        &g_desktop.work.g_w, &g_desktop.work.g_h);
+
+    desktop_probe_disks();
+    desktop_sort_icons_by_label();
+    desktop_install_trash_icon();
+    desktop_set_status("Select a disk or the trash can.");
+    desktop_init_desktop_tree();
+    desktop_layout_icons();
+    desktop_redraw(NULL);
+    return 1;
+}
+
+static void desktop_shutdown(void)
+{
+    menu_bar(g_desktop.menu_tree, 0);
+    if (g_desktop.vdi_handle != 0) {
+        v_clsvwk(g_desktop.vdi_handle);
+    }
+    if (g_desktop.app_id >= 0) {
+        appl_exit();
+    }
+    gem_os_shutdown();
 }
 
 int main(void)
 {
-    WORD work_in[11] = { 0 };
-    WORD work_out[57] = { 0 };
-    VDI_HANDLE handle = 0;
-    WORD screen_width;
-    WORD screen_height;
-    WORD desk_x;
-    WORD desk_y;
-    WORD desk_w;
-    WORD desk_h;
-    WORD window_handle;
-    WORD mouse_x = 0;
-    WORD mouse_y = 0;
-    int running = 1;
+    WORD done = 0;
 
-    (void) appl_init();
-    v_opnvwk(work_in, &handle, work_out);
-    if (handle == 0) {
+    if (desktop_init() == 0) {
         return 1;
     }
 
-    screen_width = (WORD) (work_out[0] + 1);
-    screen_height = (WORD) (work_out[1] + 1);
+    while (done == 0) {
+        WORD msg[8] = { 0 };
+        WORD mx = 0;
+        WORD my = 0;
+        WORD mb = 0;
+        WORD ks = 0;
+        WORD kr = 0;
+        WORD br = 0;
+        WORD event;
 
-    desktop_init_menu_tree(screen_width);
-    window_handle = wind_create(0, 0, desktop_menu_height,
-        screen_width, (WORD) (screen_height - desktop_menu_height));
-    (void) wind_open(window_handle, 0, desktop_menu_height,
-        screen_width, (WORD) (screen_height - desktop_menu_height));
-    (void) wind_get(window_handle, WF_CXYWH, &desk_x, &desk_y, &desk_w, &desk_h);
-    desktop_init_desktop_tree(desk_x, desk_y, desk_w, desk_h);
-    desktop_set_status_message("");
-    desktop_draw_scene(screen_width, screen_height, mouse_x, mouse_y);
+        event = evnt_multi((UWORD) (MU_MESAG | MU_BUTTON | MU_KEYBD),
+            1, 1, 1,
+            0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0,
+            msg, 0, 0, &mx, &my, &mb, &ks, &kr, &br);
+        (void) mb;
+        (void) ks;
+        (void) br;
 
-    while (running != 0) {
-        gem_hid_event_t evt;
+        if ((event & MU_KEYBD) != 0) {
+            WORD ch = (WORD) (kr & 0xff);
 
-        if (gem_hid_poll(&evt) == 0) {
-            gem_os_sleep_ms(8u);
-            continue;
+            if (ch == 27 || ch == 'q' || ch == 'Q') {
+                done = 1;
+            }
         }
 
-        switch (evt.type) {
-        case GEM_HID_MOUSE_MOVE:
-            mouse_x = evt.x;
-            mouse_y = evt.y;
-            if (g_dragging_panel != 0 && (evt.flags & GEM_HID_BUTTON_LEFT) != 0u) {
-                WORD old_panel_x = 0;
-                WORD old_panel_y = 0;
-                WORD old_panel_w = 0;
-                WORD old_panel_h = 0;
-                WORD new_x;
-                WORD new_y;
+        if ((event & MU_MESAG) != 0) {
+            if (msg[0] == MN_SELECTED) {
+                desktop_handle_menu_item(msg[4]);
+                menu_tnormal(g_desktop.menu_tree, msg[3], 1);
+            }
+        }
 
-                desktop_get_panel_outer_rect(&old_panel_x, &old_panel_y,
-                    &old_panel_w, &old_panel_h);
-                new_x = (WORD) (mouse_x - g_drag_offset_x);
-                new_y = (WORD) (mouse_y - g_drag_offset_y);
-                (void) wind_set(g_panel_handle, WF_WXYWH, new_x, new_y,
-                    panel_width, panel_height);
-                desktop_refresh_after_panel_change(screen_width, screen_height,
-                    mouse_x, mouse_y, old_panel_x, old_panel_y, old_panel_w,
-                    old_panel_h, 0);
+        if ((event & MU_BUTTON) != 0) {
+            WORD object = objc_find(g_desktop.desktop_tree, ROOT, MAX_DEPTH, mx, my);
+
+            if (my < g_desktop.work.g_y) {
+                continue;
+            }
+
+            if (object >= DESKTOP_ICON_BASE &&
+                object < DESKTOP_ICON_BASE + g_desktop.icon_count) {
+                desktop_handle_icon_click(object);
             } else {
-                desktop_draw_status(screen_width, screen_height, mouse_x, mouse_y);
-            }
-            break;
-        case GEM_HID_MOUSE_BUTTON:
-            mouse_x = evt.x;
-            mouse_y = evt.y;
-            if ((evt.flags & GEM_HID_BUTTON_LEFT) != 0u) {
-                WORD old_panel_x = 0;
-                WORD old_panel_y = 0;
-                WORD old_panel_w = 0;
-                WORD old_panel_h = 0;
+                GRECT dirty;
 
-                desktop_get_panel_outer_rect(&old_panel_x, &old_panel_y,
-                    &old_panel_w, &old_panel_h);
-                if (desktop_point_in_panel_close(mouse_x, mouse_y)) {
-                    desktop_close_menu_popup();
-                    desktop_close_panel();
-                    desktop_set_status_message("Closed window");
-                    desktop_refresh_after_panel_change(screen_width,
-                        screen_height, mouse_x, mouse_y,
-                        old_panel_x, old_panel_y, old_panel_w, old_panel_h, 0);
-                } else if (desktop_point_in_panel_title(mouse_x, mouse_y)) {
-                    g_dragging_panel = 1;
-                    g_drag_offset_x = (WORD) (mouse_x - old_panel_x);
-                    g_drag_offset_y = (WORD) (mouse_y - old_panel_y);
-                    desktop_set_status_message("Dragging window");
-                    desktop_draw_status(screen_width, screen_height,
-                        mouse_x, mouse_y);
-                } else if (g_menu_popup_open != 0) {
-                    static WORD desktop_menu_popup_hit(WORD x, WORD y);
-
-                    if (item != NIL) {
-                        desktop_handle_menu_item(screen_width, screen_height, item);
-                    } else {
-                        desktop_set_status_message("Closed menu");
-                    }
-                    desktop_close_menu_popup();
-                    desktop_refresh_after_panel_change(screen_width,
-                        screen_height, mouse_x, mouse_y,
-                        old_panel_x, old_panel_y, old_panel_w, old_panel_h, 0);
-                } else {
-                    WORD object = objc_find(g_menu_tree, ROOT, MAX_DEPTH,
-                        mouse_x, mouse_y);
-
-                    if (object != NIL && object != ROOT) {
-                        desktop_handle_menu(object, screen_width, screen_height);
-                        if (g_menu_popup_open != 0) {
-                            WORD popup_x;
-                            WORD popup_y;
-                            WORD popup_w;
-                            WORD popup_h;
-
-                            desktop_get_menu_popup_rect(&popup_x, &popup_y,
-                                &popup_w, &popup_h);
-                            desktop_redraw_region(screen_width, screen_height,
-                                mouse_x, mouse_y, popup_x, popup_y,
-                                popup_w, popup_h);
-                            desktop_draw_status(screen_width, screen_height,
-                                mouse_x, mouse_y);
-                        } else {
-                            desktop_refresh_after_panel_change(screen_width,
-                                screen_height, mouse_x, mouse_y,
-                                old_panel_x, old_panel_y, old_panel_w,
-                                old_panel_h, object == desktop_menu_desktop);
-                        }
-                    } else {
-                        object = objc_find(g_desktop_tree, ROOT, MAX_DEPTH,
-                            mouse_x, mouse_y);
-                        if (object == desktop_icon_trash ||
-                            object == desktop_icon_files ||
-                            object == desktop_icon_tools) {
-                            desktop_handle_icon(object, screen_width,
-                                screen_height);
-                            desktop_refresh_after_panel_change(screen_width,
-                                screen_height, mouse_x, mouse_y,
-                                old_panel_x, old_panel_y, old_panel_w,
-                                old_panel_h, 1);
-                        } else {
-                            desktop_draw_status(screen_width, screen_height,
-                                mouse_x, mouse_y);
-                        }
-                    }
+                if (g_desktop.selected_icon == NIL) {
+                    continue;
                 }
-            } else if (evt.flags == 0u) {
-                if (g_dragging_panel != 0) {
-                    g_dragging_panel = 0;
-                    desktop_set_status_message("Moved window");
-                }
-                desktop_draw_status(screen_width, screen_height, mouse_x, mouse_y);
+                desktop_object_rect(g_desktop.selected_icon, &dirty);
+                desktop_select_icon(NIL);
+                desktop_set_status("Select a disk or the trash can.");
+                desktop_redraw(&dirty);
             }
-            break;
-        case GEM_HID_KEY: {
-            WORD ch;
-
-            if ((evt.flags & 1u) == 0u) {
-                break;
-            }
-            ch = desktop_key_to_ascii(evt.key);
-            if (ch == 27 || ch == 'q') {
-                running = 0;
-            }
-            break;
-        }
-        case GEM_HID_QUIT:
-            running = 0;
-            break;
-        default:
-            break;
         }
     }
 
-    desktop_close_panel();
-    (void) wind_close(window_handle);
-    (void) wind_delete(window_handle);
-    v_clsvwk(handle);
-    (void) appl_exit();
+    desktop_shutdown();
     return 0;
 }

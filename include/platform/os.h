@@ -37,6 +37,15 @@ typedef struct gem_os_dirent {
     gem_os_file_info_t info;
 } gem_os_dirent_t;
 
+typedef struct gem_os_volume {
+    char mount_path[GEM_OS_PATH_MAX];
+    char label[GEM_OS_PATH_MAX];
+} gem_os_volume_t;
+
+typedef struct gem_os_volume_iter {
+    void *handle;
+} gem_os_volume_iter_t;
+
 /*
  * Initializes operating system services required by the GEM runtime.
  * Returns non-zero on success and zero on failure.
@@ -178,6 +187,25 @@ int      gem_os_space(const char *path, uint64_t *total_bytes,
  * Returns non-zero on success and zero on failure.
  */
 int      gem_os_set_read_only(const char *path, int read_only);
+
+/*
+ * Opens an iterator over mounted host volumes.
+ * Returns non-zero on success and zero on failure.
+ */
+int      gem_os_volume_iter_open(gem_os_volume_iter_t *iter);
+
+/*
+ * Reads the next mounted host volume into `volume`.
+ * Returns non-zero when a volume is produced, or zero on end/failure.
+ */
+int      gem_os_volume_iter_read(gem_os_volume_iter_t *iter,
+                                 gem_os_volume_t *volume);
+
+/*
+ * Closes a mounted-volume iterator previously opened by
+ * `gem_os_volume_iter_open()`.
+ */
+void     gem_os_volume_iter_close(gem_os_volume_iter_t *iter);
 
 #ifdef __cplusplus
 }

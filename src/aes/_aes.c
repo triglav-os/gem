@@ -59,11 +59,8 @@ static void _aes_draw_window_title(const aes_window_t *window,
 static void _aes_queue_window_redraw(const aes_window_t *window,
     const GRECT *dirty);
 static void _aes_present_after_window_draw(void);
-static int _aes_rects_intersect(const GRECT *left, const GRECT *right);
-static int _aes_intersect_rects(const GRECT *left, const GRECT *right,
-    GRECT *out);
-static WORD _aes_subtract_rect(const GRECT *source, const GRECT *cover,
-    GRECT out[4]);
+/* Declared in _aes.h: _aes_rects_intersect, _aes_intersect_rects,
+   _aes_subtract_rect */
 static void _aes_expand_window_damage_rect(const GRECT *src, GRECT *out);
 void _aes_redraw_region(const GRECT *dirty);
 static void _aes_desktop_rect_local(GRECT *rect);
@@ -79,7 +76,7 @@ static int _aes_menu_item_selectable(OBJECT *tree, WORD item);
 static void _aes_menu_free_saved_pixels(void);
 static void _aes_menu_restore_saved_region(void);
 static int _aes_menu_save_region(const GRECT *rect);
-static int _aes_window_is_top_local(const aes_window_t *window);
+/* Declared in _aes.h: _aes_window_is_top */
 
 /*
  * Provides a default "resource not found" answer when the desktop does
@@ -112,56 +109,38 @@ __attribute__((weak)) void gem_builtin_rsrc_free(void)
 {
 }
 
-/*
- * Appends one formatted AES runtime trace line when `GEM_TRACE_AES` is
- * enabled in the environment.
- */
-void _aes_trace(const char *fmt, ...)
+static void _aes_write_trace(const char *env_var, const char *logfile,
+                             const char *fmt, va_list ap)
 {
-    const char *trace = getenv("GEM_TRACE_AES");
+    const char *trace = getenv(env_var);
     FILE *fp;
-    va_list ap;
 
     if (trace == NULL || trace[0] == '\0') {
         return;
     }
-
-    fp = fopen("/tmp/gem_aes_trace.log", "a");
+    fp = fopen(logfile, "a");
     if (fp == NULL) {
         return;
     }
-
-    va_start(ap, fmt);
     vfprintf(fp, fmt, ap);
-    va_end(ap);
     fputc('\n', fp);
     fclose(fp);
 }
 
-/*
- * Appends one formatted object-drawing trace line when
- * `GEM_TRACE_DRAW` is enabled in the environment.
- */
+void _aes_trace(const char *fmt, ...)
+{
+    va_list ap;
+    va_start(ap, fmt);
+    _aes_write_trace("GEM_TRACE_AES", "/tmp/gem_aes_trace.log", fmt, ap);
+    va_end(ap);
+}
+
 static void _aes_draw_trace(const char *fmt, ...)
 {
-    const char *trace = getenv("GEM_TRACE_DRAW");
-    FILE *fp;
     va_list ap;
-
-    if (trace == NULL || trace[0] == '\0') {
-        return;
-    }
-
-    fp = fopen("/tmp/gem_draw_trace.log", "a");
-    if (fp == NULL) {
-        return;
-    }
-
     va_start(ap, fmt);
-    vfprintf(fp, fmt, ap);
+    _aes_write_trace("GEM_TRACE_DRAW", "/tmp/gem_draw_trace.log", fmt, ap);
     va_end(ap);
-    fputc('\n', fp);
-    fclose(fp);
 }
 
 /*
@@ -1553,7 +1532,7 @@ static void _aes_desktop_rect_local(GRECT *rect)
             (WORD) (_aes.work_out[1] + 1 - menu_height))));
 }
 
-static int _aes_rects_intersect(const GRECT *left, const GRECT *right)
+int _aes_rects_intersect(const GRECT *left, const GRECT *right)
 {
     WORD left_right;
     WORD left_bottom;
@@ -1577,8 +1556,7 @@ static int _aes_rects_intersect(const GRECT *left, const GRECT *right)
     return 1;
 }
 
-static int _aes_intersect_rects(const GRECT *left, const GRECT *right,
-                                GRECT *out)
+int _aes_intersect_rects(const GRECT *left, const GRECT *right, GRECT *out)
 {
     WORD left_right;
     WORD left_bottom;
@@ -1606,8 +1584,7 @@ static int _aes_intersect_rects(const GRECT *left, const GRECT *right,
     return 1;
 }
 
-static WORD _aes_subtract_rect(const GRECT *source, const GRECT *cover,
-                               GRECT out[4])
+WORD _aes_subtract_rect(const GRECT *source, const GRECT *cover, GRECT out[4])
 {
     GRECT overlap;
     WORD count = 0;
@@ -1908,8 +1885,7 @@ static void _aes_fill_checker_rect(WORD x0, WORD y0, WORD x1, WORD y1)
         return;
     }
 
-    _aes_fill_pattern_rect(x0, y0, x1, y1, desktop_rows,
-        sizeof(desktop_rows) / sizeof(desktop_rows[0]));
+    _aes_fill_pattern_rect(x0, y0, x1, y1, desktop_rows, sizeof(desktop_rows));
 }
 
 static int _aes_menu_subtree_rect(OBJECT *tree, WORD object, GRECT *rect)
@@ -2070,7 +2046,7 @@ static void _aes_menu_free_saved_pixels(void)
     _aes.menu_saved_count = 0;
 }
 
-static int _aes_window_is_top_local(const aes_window_t *window)
+int _aes_window_is_top(const aes_window_t *window)
 {
     size_t i;
     uint32_t top_z = 0u;
@@ -2177,38 +2153,7 @@ static WORD _aes_dark_color(void)
 static void _aes_draw_window_icon(WORD x0, WORD y0, WORD x1, WORD y1,
                                   char glyph)
 {
-    char text[2];
-    WORD text_attrib[6];
-    WORD previous_font = 0;
-    WORD system_font = 1;
-    WORD text_width;
-    WORD text_height;
-    WORD text_x;
-    WORD text_y;
-
-    if (x0 > x1 || y0 > y1) {
-        return;
-    }
-
-    if (vqt_attributes(_aes.vdi_handle, text_attrib) != 0) {
-        previous_font = text_attrib[0];
-    }
-    if (previous_font != 0 && previous_font != system_font) {
-        (void) vst_font(_aes.vdi_handle, system_font);
-    }
-
-    text[0] = glyph;
-    text[1] = '\0';
-    text_width = (WORD) _vdi_string_width(text);
-    text_height = _vdi_font_text_height();
-    text_x = (WORD) (x0 + ((x1 - x0 + 1) - text_width) / 2);
-    text_y = (WORD) (y0 + ((y1 - y0 + 1) - text_height) / 2 +
-        _vdi_font_ascent());
-    _aes_draw_text(text_x, text_y, _aes_dark_color(), text);
-
-    if (previous_font != 0 && previous_font != system_font) {
-        (void) vst_font(_aes.vdi_handle, previous_font);
-    }
+    _aes_draw_window_icon_offset(x0, y0, x1, y1, glyph, 0, 0);
 }
 
 static void _aes_draw_window_icon_offset(WORD x0, WORD y0, WORD x1, WORD y1,
@@ -2306,7 +2251,7 @@ static void _aes_draw_window_title(const aes_window_t *window,
     }
 
     text_height = _vdi_font_text_height();
-    active_title = _aes_window_is_top_local(window);
+    active_title = _aes_window_is_top(window);
     has_closer = _aes_window_closer_rect(window, &closer_rect);
     has_fuller = _aes_window_fuller_rect(window, &fuller_rect);
     title_top = (WORD) (outer_box[1] + 1);
@@ -2393,17 +2338,17 @@ static void _aes_draw_window_title(const aes_window_t *window,
                 if (title_left <= left_fill_right) {
                     _aes_fill_pattern_rect(title_left, title_top,
                         left_fill_right, title_bottom, title_rows,
-                        sizeof(title_rows) / sizeof(title_rows[0]));
+                        sizeof(title_rows));
                 }
                 if (right_fill_left <= title_right) {
                     _aes_fill_pattern_rect(right_fill_left, title_top,
                         title_right, title_bottom, title_rows,
-                        sizeof(title_rows) / sizeof(title_rows[0]));
+                        sizeof(title_rows));
                 }
             } else {
                 _aes_fill_pattern_rect(title_left, title_top, title_right,
                     title_bottom, title_rows,
-                    sizeof(title_rows) / sizeof(title_rows[0]));
+                    sizeof(title_rows));
             }
         } else {
             _aes_fill_rect(title_left, title_top, title_right, title_bottom,
@@ -2866,6 +2811,9 @@ static void _aes_draw_dialog_frame(const WORD rect[4])
     WORD bottom;
 
     for (inset = 0; inset < 5; ++inset) {
+        WORD color = (inset == 0 || inset >= 3) ?
+            _aes_dark_color() : _aes_light_color();
+
         left = (WORD) (rect[0] + inset);
         top = (WORD) (rect[1] + inset);
         right = (WORD) (rect[2] - inset);
@@ -2874,18 +2822,10 @@ static void _aes_draw_dialog_frame(const WORD rect[4])
             break;
         }
 
-        _aes_draw_hline(left, right, top,
-            (inset == 0 || inset >= 3) ? _aes_dark_color() :
-            _aes_light_color());
-        _aes_draw_hline(left, right, bottom,
-            (inset == 0 || inset >= 3) ? _aes_dark_color() :
-            _aes_light_color());
-        _aes_draw_vline(left, top, bottom,
-            (inset == 0 || inset >= 3) ? _aes_dark_color() :
-            _aes_light_color());
-        _aes_draw_vline(right, top, bottom,
-            (inset == 0 || inset >= 3) ? _aes_dark_color() :
-            _aes_light_color());
+        _aes_draw_hline(left, right, top, color);
+        _aes_draw_hline(left, right, bottom, color);
+        _aes_draw_vline(left, top, bottom, color);
+        _aes_draw_vline(right, top, bottom, color);
     }
 }
 
@@ -3139,11 +3079,7 @@ static void _aes_draw_object(const OBJECT *tree,
     text_width = 0;
     text_height = _vdi_font_text_height();
     text_ascent = _vdi_font_ascent();
-    text_x = (obj->ob_type == G_TITLE) ? (WORD) (rect[0] + 2) :
-        (WORD) (rect[0] + 2);
-    if (checked_menu_item != 0) {
-        /* Keep the menu label aligned and overlay the checkmark instead. */
-    }
+    text_x = (WORD) (rect[0] + 2);
     if (obj->ob_type == G_TITLE) {
         text_y = (WORD) (rect[1] + 3 + text_ascent);
     } else {

@@ -13,7 +13,6 @@
 
 #include <stdint.h>
 #include <stdlib.h>
-#include <stdio.h>
 #include <string.h>
 
 WORD contrl[12] __attribute__((weak));
@@ -25,7 +24,6 @@ WORD ptsout[256] __attribute__((weak));
 WORD global[15];
 
 static void _aes_desktop_rect(GRECT *rect);
-static int _aes_window_is_top(const aes_window_t *window);
 static void _aes_queue_window_message(const aes_window_t *window,
     WORD message, WORD w4, WORD w5, WORD w6, WORD w7);
 static WORD _aes_dequeue_message(WORD msg[8]);
@@ -33,11 +31,6 @@ static void _aes_draw_drag_outline(const GRECT *rect);
 static void _aes_clamp_dragged_window_position(const aes_window_t *window,
     const GRECT *desktop, WORD *x, WORD *y);
 static void _aes_toggle_window_iconified(aes_window_t *window);
-static int _aes_rects_intersect_local(const GRECT *left, const GRECT *right);
-static int _aes_intersect_rects_local(const GRECT *left, const GRECT *right,
-    GRECT *out);
-static WORD _aes_subtract_rect_local(const GRECT *source, const GRECT *cover,
-    GRECT out[4]);
 static WORD _aes_build_visible_rects(WORD handle, GRECT out[], WORD max_rects);
 static WORD _aes_track_window_interaction(const gem_hid_event_t *first_evt,
     WORD flags, WORD mepbuff[8], WORD *pmx, WORD *pmy, WORD *pmb, WORD *pks);
@@ -63,23 +56,6 @@ static void _aes_desktop_rect(GRECT *rect)
         (WORD) (_aes.work_out[1] + 1));
 }
 
-static int _aes_window_is_top(const aes_window_t *window)
-{
-    size_t i;
-    uint32_t top_z = 0u;
-
-    if (window == NULL || window->used == 0 || window->open == 0) {
-        return 0;
-    }
-
-    for (i = 0; i < AES_MAX_WINDOWS; ++i) {
-        if (_aes.windows[i].used != 0 && _aes.windows[i].open != 0 &&
-            _aes.windows[i].z_order > top_z) {
-            top_z = _aes.windows[i].z_order;
-        }
-    }
-    return window->z_order == top_z;
-}
 
 static aes_window_t *_aes_find_top_window(void)
 {
@@ -234,103 +210,6 @@ static void _aes_toggle_window_iconified(aes_window_t *window)
     }
 }
 
-static int _aes_rects_intersect_local(const GRECT *left, const GRECT *right)
-{
-    WORD left_right;
-    WORD left_bottom;
-    WORD right_right;
-    WORD right_bottom;
-
-    if (left == NULL || right == NULL || left->g_w <= 0 || left->g_h <= 0 ||
-        right->g_w <= 0 || right->g_h <= 0) {
-        return 0;
-    }
-
-    left_right = (WORD) (left->g_x + left->g_w - 1);
-    left_bottom = (WORD) (left->g_y + left->g_h - 1);
-    right_right = (WORD) (right->g_x + right->g_w - 1);
-    right_bottom = (WORD) (right->g_y + right->g_h - 1);
-
-    if (left_right < right->g_x || right_right < left->g_x ||
-        left_bottom < right->g_y || right_bottom < left->g_y) {
-        return 0;
-    }
-    return 1;
-}
-
-static int _aes_intersect_rects_local(const GRECT *left, const GRECT *right,
-                                      GRECT *out)
-{
-    WORD left_right;
-    WORD left_bottom;
-    WORD right_right;
-    WORD right_bottom;
-    WORD x0;
-    WORD y0;
-    WORD x1;
-    WORD y1;
-
-    if (out == NULL || _aes_rects_intersect_local(left, right) == 0) {
-        return 0;
-    }
-
-    left_right = (WORD) (left->g_x + left->g_w - 1);
-    left_bottom = (WORD) (left->g_y + left->g_h - 1);
-    right_right = (WORD) (right->g_x + right->g_w - 1);
-    right_bottom = (WORD) (right->g_y + right->g_h - 1);
-
-    x0 = _aes_max_word(left->g_x, right->g_x);
-    y0 = _aes_max_word(left->g_y, right->g_y);
-    x1 = _aes_min_word(left_right, right_right);
-    y1 = _aes_min_word(left_bottom, right_bottom);
-    _aes_set_rect(out, x0, y0, (WORD) (x1 - x0 + 1), (WORD) (y1 - y0 + 1));
-    return 1;
-}
-
-static WORD _aes_subtract_rect_local(const GRECT *source, const GRECT *cover,
-                                     GRECT out[4])
-{
-    GRECT overlap;
-    WORD count = 0;
-    WORD source_right;
-    WORD source_bottom;
-    WORD overlap_right;
-    WORD overlap_bottom;
-
-    if (out == NULL || source == NULL || source->g_w <= 0 || source->g_h <= 0) {
-        return 0;
-    }
-
-    if (cover == NULL || cover->g_w <= 0 || cover->g_h <= 0 ||
-        _aes_intersect_rects_local(source, cover, &overlap) == 0) {
-        out[0] = *source;
-        return 1;
-    }
-
-    source_right = (WORD) (source->g_x + source->g_w - 1);
-    source_bottom = (WORD) (source->g_y + source->g_h - 1);
-    overlap_right = (WORD) (overlap.g_x + overlap.g_w - 1);
-    overlap_bottom = (WORD) (overlap.g_y + overlap.g_h - 1);
-
-    if (source->g_y < overlap.g_y) {
-        _aes_set_rect(&out[count++], source->g_x, source->g_y, source->g_w,
-            (WORD) (overlap.g_y - source->g_y));
-    }
-    if (overlap_bottom < source_bottom) {
-        _aes_set_rect(&out[count++], source->g_x, (WORD) (overlap_bottom + 1),
-            source->g_w, (WORD) (source_bottom - overlap_bottom));
-    }
-    if (source->g_x < overlap.g_x) {
-        _aes_set_rect(&out[count++], source->g_x, overlap.g_y,
-            (WORD) (overlap.g_x - source->g_x), overlap.g_h);
-    }
-    if (overlap_right < source_right) {
-        _aes_set_rect(&out[count++], (WORD) (overlap_right + 1), overlap.g_y,
-            (WORD) (source_right - overlap_right), overlap.g_h);
-    }
-
-    return count;
-}
 
 static WORD _aes_build_visible_rects(WORD handle, GRECT out[], WORD max_rects)
 {
@@ -379,7 +258,7 @@ static WORD _aes_build_visible_rects(WORD handle, GRECT out[], WORD max_rects)
 
         for (j = 0; j < pending_count; ++j) {
             GRECT fragments[4];
-            WORD fragment_count = _aes_subtract_rect_local(&pending[j],
+            WORD fragment_count = _aes_subtract_rect(&pending[j],
                 &cover->outer, fragments);
             WORD k;
 
@@ -711,13 +590,6 @@ static void _aes_resource_fix_bitblk(BITBLK *bitblk)
 WORD appl_init(void)
 {
     size_t i;
-    FILE *trace_fp;
-
-    trace_fp = fopen("/tmp/gem_appl_init_seen.log", "a");
-    if (trace_fp != NULL) {
-        fputs("appl_init\n", trace_fp);
-        fclose(trace_fp);
-    }
 
     if (_aes.initialized == 0) {
         _aes_reset_state();
@@ -731,11 +603,6 @@ WORD appl_init(void)
             strcpy(_aes.apps[i].name, "APP");
             _aes.current_app_id = _aes.apps[i].id;
             global[2] = _aes.current_app_id;
-            trace_fp = fopen("/tmp/gem_appl_init_seen.log", "a");
-            if (trace_fp != NULL) {
-                fputs("appl_init_return\n", trace_fp);
-                fclose(trace_fp);
-            }
             _aes_trace("appl_init return id=%d", _aes.current_app_id);
             return _aes.current_app_id;
         }
