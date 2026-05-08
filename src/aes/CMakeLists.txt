@@ -1,4 +1,5 @@
 add_library(aes SHARED
+    alert_icons.c
     _aes.c
     aes.c
 )
@@ -24,4 +25,3 @@ target_compile_options(aes
         $<$<CONFIG:Debug>:-g>
         $<$<CONFIG:Debug>:-fsanitize=address,undefined>
 )
-

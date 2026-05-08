@@ -2411,6 +2411,53 @@ static void _aes_menu_restore_saved_region(void)
     _aes_menu_free_saved_pixels();
 }
 
+int _aes_save_region_pixels(const GRECT *rect, uint8_t **pixels_out)
+{
+    WORD x;
+    WORD y;
+    size_t count;
+    size_t index = 0;
+    uint8_t *pixels;
+
+    if (rect == NULL || pixels_out == NULL || rect->g_w <= 0 || rect->g_h <= 0) {
+        return 0;
+    }
+
+    count = (size_t) rect->g_w * (size_t) rect->g_h;
+    pixels = (uint8_t *) gem_os_alloc(count);
+    if (pixels == NULL) {
+        return 0;
+    }
+
+    for (y = 0; y < rect->g_h; ++y) {
+        for (x = 0; x < rect->g_w; ++x) {
+            pixels[index++] = (uint8_t) _vdi_get_screen_pixel(
+                (WORD) (rect->g_x + x), (WORD) (rect->g_y + y));
+        }
+    }
+
+    *pixels_out = pixels;
+    return 1;
+}
+
+void _aes_restore_region_pixels(const GRECT *rect, uint8_t *pixels)
+{
+    WORD x;
+    WORD y;
+    size_t index = 0;
+
+    if (rect == NULL || pixels == NULL || rect->g_w <= 0 || rect->g_h <= 0) {
+        return;
+    }
+
+    for (y = 0; y < rect->g_h; ++y) {
+        for (x = 0; x < rect->g_w; ++x) {
+            _vdi_set_screen_pixel((WORD) (rect->g_x + x),
+                (WORD) (rect->g_y + y), (WORD) pixels[index++]);
+        }
+    }
+}
+
 static int _aes_menu_save_region(const GRECT *rect)
 {
     WORD x;
@@ -2445,18 +2492,6 @@ static int _aes_menu_save_region(const GRECT *rect)
 
 static WORD _aes_light_color(void)
 {
-    const char *value = getenv("GEM_RASTA_INVERSE");
-
-    if (value == NULL || value[0] == '\0') {
-        value = getenv("RASTA_INVERSE");
-    }
-    if (value == NULL || value[0] == '\0') {
-        return BLACK;
-    }
-    if (strcmp(value, "off") == 0 || strcmp(value, "false") == 0 ||
-        strcmp(value, "0") == 0) {
-        return WHITE;
-    }
     return BLACK;
 }
 

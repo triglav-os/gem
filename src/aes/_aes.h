@@ -250,5 +250,7 @@ int _aes_load_file(const char *filename, void **data_out, size_t *size_out);
 int _aes_try_resolve_path(const char *filename,
                           char *resolved,
                           size_t resolved_size);
+int _aes_save_region_pixels(const GRECT *rect, uint8_t **pixels_out);
+void _aes_restore_region_pixels(const GRECT *rect, uint8_t *pixels);
 
 #endif

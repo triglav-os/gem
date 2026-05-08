@@ -13,6 +13,7 @@ add_subdirectory(demo28)
 add_subdirectory(demo29)
 add_subdirectory(demo30)
 add_subdirectory(demo31)
+add_subdirectory(demo32)
 
 function(add_manual_demo target_name source_file)
     add_executable(${target_name}

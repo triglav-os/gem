@@ -59,6 +59,20 @@ add_custom_target(gem_runtime_desktop_icons ALL
     COMMENT "Generating GEM desktop icon resource"
 )
 
+add_custom_target(gem_runtime_alert_icons ALL
+    COMMAND ${CMAKE_COMMAND} -E env
+        ASAN_OPTIONS=detect_leaks=0
+        LSAN_OPTIONS=detect_leaks=0
+        $<TARGET_FILE:resgen> icons
+        -o ${PROJECT_BINARY_DIR}/alert_icons.rsc
+        -o ${PROJECT_SOURCE_DIR}/bin/alert_icons.rsc
+        ${PROJECT_SOURCE_DIR}/docs/orig/icons/EXCLAMATION.PNG
+        ${PROJECT_SOURCE_DIR}/docs/orig/icons/QUESTION.PNG
+        ${PROJECT_SOURCE_DIR}/docs/orig/icons/STOP.PNG
+    DEPENDS resgen
+    COMMENT "Generating GEM alert icon resource"
+)
+
 set(clock_number_sources
     ${PROJECT_SOURCE_DIR}/docs/orig/clock/01.png
     ${PROJECT_SOURCE_DIR}/docs/orig/clock/02.png
