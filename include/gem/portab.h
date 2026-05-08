@@ -15,30 +15,30 @@
 
 #include <stdint.h>
 
-#define BYTE    char
-#define UBYTE   unsigned char
-#define WORD    int16_t
-#define UWORD   uint16_t
-#define LONG    intptr_t
-#define ULONG   uintptr_t
-#define BOOLEAN int16_t
+#define BYTE    char           /* Signed character type. */
+#define UBYTE   unsigned char  /* Unsigned byte type. */
+#define WORD    int16_t        /* Signed 16-bit integer type. */
+#define UWORD   uint16_t       /* Unsigned 16-bit integer type. */
+#define LONG    intptr_t       /* Pointer-width signed integer type. */
+#define ULONG   uintptr_t      /* Pointer-width unsigned integer type. */
+#define BOOLEAN int16_t        /* Historical GEM boolean type. */
 
-#define REG     register
-#define LOCAL   auto
-#define EXTERN  extern
-#define MLOCAL  static
-#define GLOBAL
-#define VOID    void
-#define CONST   const
+#define REG     register       /* Historical register storage hint. */
+#define LOCAL   auto           /* Historical local storage alias. */
+#define EXTERN  extern         /* Historical external linkage alias. */
+#define MLOCAL  static         /* Historical internal linkage alias. */
+#define GLOBAL                 /* Historical global definition marker. */
+#define VOID    void           /* Historical alias for `void`. */
+#define CONST   const          /* Historical alias for `const`. */
 
-#define FAILURE (-1)
-#define SUCCESS (0)
-#define YES     1
-#define NO      0
-#define FOREVER for (;;)
-#define NULL    0
-#define NULLPTR ((void *) 0)
-#define TRUE    (1)
-#define FALSE   (0)
+#define FAILURE (-1)           /* Conventional failure status. */
+#define SUCCESS (0)            /* Conventional success status. */
+#define YES     1              /* Historical affirmative constant. */
+#define NO      0              /* Historical negative constant. */
+#define FOREVER for (;;)       /* Infinite loop helper macro. */
+#define NULL    0              /* Historical null integer constant. */
+#define NULLPTR ((void *) 0)   /* Explicit null pointer constant. */
+#define TRUE    (1)            /* Historical boolean true constant. */
+#define FALSE   (0)            /* Historical boolean false constant. */
 
 #endif /* PORTAB_H */

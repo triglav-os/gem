@@ -42,6 +42,18 @@ VDI_HANDLE vdi_handle;
 WORD work_in[11] = {1,1,1,1,1,1,1,1,1,1,2};
 WORD work_out[57];
 
+WORD sample_string_width(const char *text)
+{
+    WORD extent[8];
+
+    if (text == NULL || *text == '\0') {
+        return 0;
+    }
+
+    vqt_extent(vdi_handle, (char *) text, extent);
+    return (WORD) (extent[2] - extent[0]);
+}
+
 void init_object(OBJECT *object,
     UWORD type, UWORD flags, UWORD state, LONG spec,
     WORD x, WORD y, WORD w, WORD h)
@@ -216,8 +228,8 @@ void set_field_caret_from_click(demo25_state_t *state, WORD object, WORD mouse_x
     WORD *index_ptr;
     WORD length;
     WORD rel_x;
-    WORD char_width;
     WORD index;
+    char prefix[24];
 
     if (object != D25_FIELD_NAME && object != D25_FIELD_CITY) {
         return;
@@ -229,21 +241,36 @@ void set_field_caret_from_click(demo25_state_t *state, WORD object, WORD mouse_x
         &state->city_index;
     length = (WORD) strlen(buffer);
     rel_x = (WORD) (mouse_x - rect.g_x - 2);
-    (void) graf_handle(&char_width, NULL, NULL, NULL);
-    if (char_width <= 0) {
-        char_width = 6;
-    }
 
     if (rel_x <= 0) {
         *index_ptr = 0;
+        objc_edit(state->tree, object, 0, index_ptr, EDINIT);
         return;
     }
 
-    index = (WORD) ((rel_x + char_width / 2) / char_width);
-    if (index > length) {
-        index = length;
+    for (index = 0; index < length; ++index) {
+        WORD left_width;
+        WORD right_width;
+        WORD midpoint;
+
+        memcpy(prefix, buffer, (size_t) index);
+        prefix[index] = '\0';
+        left_width = sample_string_width(prefix);
+
+        memcpy(prefix, buffer, (size_t) (index + 1));
+        prefix[index + 1] = '\0';
+        right_width = sample_string_width(prefix);
+
+        midpoint = (WORD) (left_width + (right_width - left_width) / 2);
+        if (rel_x <= midpoint) {
+            *index_ptr = index;
+            objc_edit(state->tree, object, 0, index_ptr, EDINIT);
+            return;
+        }
     }
-    *index_ptr = index;
+
+    *index_ptr = length;
+    objc_edit(state->tree, object, 0, index_ptr, EDINIT);
 }
 
 int handle_button(demo25_state_t *state, WORD object, WORD mouse_x)
@@ -413,9 +440,12 @@ int main(void)
             if ((key_return & 0xff) == 8) {
                 char *buffer = (state.active_field == D25_FIELD_NAME) ?
                     state.name : state.city;
+                size_t length = strlen(buffer);
+
                 if (*index_ptr > 0) {
                     --(*index_ptr);
-                    buffer[*index_ptr] = '\0';
+                    memmove(&buffer[*index_ptr], &buffer[*index_ptr + 1],
+                        length - (size_t) *index_ptr);
                 }
             } else {
                 objc_edit(state.tree, state.active_field, (WORD) (key_return & 0xff),

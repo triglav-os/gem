@@ -15,6 +15,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <netinet/in.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -41,23 +42,82 @@ struct rasta_input_message {
     int16_t par2;
 };
 
+enum {
+    rasta_mod_rshift = 0x0001,
+    rasta_mod_lshift = 0x0002,
+    rasta_mod_ctrl = 0x0004,
+    rasta_mod_alt = 0x0008
+};
+
 static int g_socket_fd = -1;
 static int16_t g_mouse_x;
 static int16_t g_mouse_y;
 static uint16_t g_button_flags;
+static uint16_t g_key_mods;
 
-static uint16_t rasta_key_to_gem(uint16_t key)
+static void rasta_hid_trace(const char *fmt, ...)
+{
+    const char *trace = getenv("GEM_TRACE_HID");
+    FILE *fp;
+    va_list ap;
+
+    if (trace == NULL || trace[0] == '\0') {
+        return;
+    }
+
+    fp = fopen("/tmp/gem_hid_trace.log", "a");
+    if (fp == NULL) {
+        return;
+    }
+
+    va_start(ap, fmt);
+    vfprintf(fp, fmt, ap);
+    va_end(ap);
+    fputc('\n', fp);
+    fclose(fp);
+}
+
+static uint16_t rasta_modifier_mask(uint16_t key)
+{
+    switch (key) {
+    case 224u:
+    case 228u:
+        return rasta_mod_ctrl;
+    case 225u:
+        return rasta_mod_lshift;
+    case 229u:
+        return rasta_mod_rshift;
+    case 226u:
+    case 230u:
+        return rasta_mod_alt;
+    default:
+        return 0u;
+    }
+}
+
+static int rasta_shift_active(uint16_t mods)
+{
+    return (mods & (rasta_mod_lshift | rasta_mod_rshift)) != 0u;
+}
+
+static uint16_t rasta_key_to_gem(uint16_t key, uint16_t mods)
 {
     uint8_t ascii = 0u;
+    int shifted = rasta_shift_active(mods);
 
     if (key >= 4u && key <= 29u) {
-        ascii = (uint8_t) ('a' + (char) (key - 4u));
+        ascii = (uint8_t) ((shifted != 0 ? 'A' : 'a') +
+            (char) (key - 4u));
     } else if (key >= 30u && key <= 38u) {
-        ascii = (uint8_t) ('1' + (char) (key - 30u));
+        static const char unshifted_digits[] = "123456789";
+        static const char shifted_digits[] = "!@#$%^&*(";
+
+        ascii = (uint8_t) ((shifted != 0 ? shifted_digits :
+            unshifted_digits)[key - 30u]);
     } else {
         switch (key) {
         case 39u:
-            ascii = '0';
+            ascii = (uint8_t) ((shifted != 0) ? ')' : '0');
             break;
         case 40u:
             ascii = '\n';
@@ -68,32 +128,44 @@ static uint16_t rasta_key_to_gem(uint16_t key)
         case 42u:
             ascii = '\b';
             break;
+        case 43u:
+            ascii = '\t';
+            break;
         case 44u:
             ascii = ' ';
             break;
         case 45u:
-            ascii = '-';
+            ascii = (uint8_t) ((shifted != 0) ? '_' : '-');
+            break;
+        case 46u:
+            ascii = (uint8_t) ((shifted != 0) ? '+' : '=');
             break;
         case 47u:
-            ascii = '[';
+            ascii = (uint8_t) ((shifted != 0) ? '{' : '[');
             break;
         case 48u:
-            ascii = ']';
+            ascii = (uint8_t) ((shifted != 0) ? '}' : ']');
+            break;
+        case 49u:
+            ascii = (uint8_t) ((shifted != 0) ? '|' : '\\');
             break;
         case 51u:
-            ascii = ';';
+            ascii = (uint8_t) ((shifted != 0) ? ':' : ';');
             break;
         case 52u:
-            ascii = '\'';
+            ascii = (uint8_t) ((shifted != 0) ? '"' : '\'');
+            break;
+        case 53u:
+            ascii = (uint8_t) ((shifted != 0) ? '~' : '`');
             break;
         case 54u:
-            ascii = ',';
+            ascii = (uint8_t) ((shifted != 0) ? '<' : ',');
             break;
         case 55u:
-            ascii = '.';
+            ascii = (uint8_t) ((shifted != 0) ? '>' : '.');
             break;
         case 56u:
-            ascii = '/';
+            ascii = (uint8_t) ((shifted != 0) ? '?' : '/');
             break;
         default:
             break;
@@ -370,6 +442,17 @@ static void fill_button_event(gem_hid_event_t *evt, uint16_t button,
 static void fill_key_event(gem_hid_event_t *evt,
     const struct rasta_input_message *message, int pressed)
 {
+    uint16_t key = (uint16_t) message->par1;
+    uint16_t modifier = rasta_modifier_mask(key);
+
+    if (modifier != 0u) {
+        if (pressed != 0) {
+            g_key_mods = (uint16_t) (g_key_mods | modifier);
+        } else {
+            g_key_mods = (uint16_t) (g_key_mods & (uint16_t) ~modifier);
+        }
+    }
+
     evt->type = GEM_HID_KEY;
     evt->flags = (uint16_t) ((pressed != 0) ? 1u : 0u);
     evt->x = g_mouse_x;
@@ -377,8 +460,13 @@ static void fill_key_event(gem_hid_event_t *evt,
     evt->dx = 0;
     evt->dy = 0;
     evt->button = 0u;
-    evt->key = rasta_key_to_gem((uint16_t) message->par1);
-    evt->mod = 0u;
+    evt->key = rasta_key_to_gem(key, g_key_mods);
+    evt->mod = g_key_mods;
+    rasta_hid_trace("key raw=%u pressed=%d gem=0x%04x ascii=%u scan=%u mod=0x%04x",
+        (unsigned) key, pressed, evt->key,
+        (unsigned) (evt->key & 0xffu),
+        (unsigned) ((evt->key >> 8) & 0xffu),
+        (unsigned) evt->mod);
 }
 
 static int translate_message(gem_hid_event_t *evt,
@@ -466,6 +554,7 @@ int gem_hid_init(void)
     g_mouse_x = 0;
     g_mouse_y = 0;
     g_button_flags = 0u;
+    g_key_mods = 0u;
     return 1;
 }
 
@@ -479,6 +568,7 @@ void gem_hid_shutdown(void)
     g_mouse_x = 0;
     g_mouse_y = 0;
     g_button_flags = 0u;
+    g_key_mods = 0u;
 }
 
 int gem_hid_poll(gem_hid_event_t *evt)

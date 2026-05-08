@@ -26,8 +26,29 @@ enum {
     resgen_cursor_slots = 8,
     resgen_max_outputs = 8,
     resgen_default_text_height = 8,
+    resgen_default_cursor_arrow_hot_x = 0,
+    resgen_default_cursor_arrow_hot_y = 0,
+    resgen_default_cursor_text_hot_x = 8,
+    resgen_default_cursor_text_hot_y = 8,
     resgen_default_cursor_bee_hot_x = 7,
-    resgen_default_cursor_bee_hot_y = 7
+    resgen_default_cursor_bee_hot_y = 7,
+    resgen_default_cursor_point_hand_hot_x = 4,
+    resgen_default_cursor_point_hand_hot_y = 0,
+    resgen_default_cursor_flat_hand_hot_x = 7,
+    resgen_default_cursor_flat_hand_hot_y = 0,
+    resgen_default_cursor_cross_hot_x = 8,
+    resgen_default_cursor_cross_hot_y = 8
+};
+
+enum {
+    resgen_cursor_arrow = 0,
+    resgen_cursor_text = 1,
+    resgen_cursor_bee = 2,
+    resgen_cursor_point_hand = 3,
+    resgen_cursor_flat_hand = 4,
+    resgen_cursor_thin_cross = 5,
+    resgen_cursor_thick_cross = 6,
+    resgen_cursor_outline_cross = 7
 };
 
 typedef struct resource_output {
@@ -61,8 +82,7 @@ typedef struct cursor_spec {
 } cursor_spec_t;
 
 typedef struct cursor_options {
-    cursor_spec_t arrow;
-    cursor_spec_t bee;
+    cursor_spec_t slots[resgen_cursor_slots];
     const char *type_list;
 } cursor_options_t;
 
@@ -92,14 +112,16 @@ static void print_usage(FILE *stream, const char *program_name)
 {
     fprintf(stream,
         "Usage:\n"
-        "  %s cursors -t ab POINTER.PNG BEE.PNG -o out.rsc [-o out2.rsc]\n"
+        "  %s cursors -t 01234567 CUR0.PNG ... CUR7.PNG -o out.rsc\n"
         "  %s icons -o out.rsc [-o out2.rsc] ICON1.PNG [ICON2.PNG ...]\n"
         "  %s bitmaps -o out.rsc [-o out2.rsc] BMP1.PNG [BMP2.PNG ...]\n"
         "\n"
         "Cursor mode options:\n"
-        "  -t TYPES  file type list, e.g. 'ab' for arrow then bee\n"
-        "  -A X,Y    arrow hot spot (default 0,0)\n"
-        "  -B X,Y    bee hot spot (default 7,7)\n"
+        "  -t TYPES  selector list, e.g. '01234567' in Atari ST order\n"
+        "            0=arrow 1=text 2=bee 3=point 4=flat 5=thin\n"
+        "            6=thick 7=outline (legacy 'a' and 'b' still work)\n"
+        "  -A X,Y    arrow hot spot override (selector 0)\n"
+        "  -B X,Y    bee hot spot override (selector 2)\n"
         "\n"
         "Shared options:\n"
         "  -o FILE   output resource path (repeatable)\n"
@@ -195,8 +217,9 @@ static void free_options(resgen_options_t *options)
 
     if (options->mode_name != NULL &&
         strcmp(options->mode_name, "cursors") == 0) {
-        free_image_form(&options->mode.cursor.arrow.form);
-        free_image_form(&options->mode.cursor.bee.form);
+        for (i = 0; i < resgen_cursor_slots; ++i) {
+            free_image_form(&options->mode.cursor.slots[i].form);
+        }
     } else if (options->mode_name != NULL &&
         strcmp(options->mode_name, "icons") == 0) {
         if (options->mode.icon.entries != NULL) {
@@ -553,10 +576,11 @@ static int build_cursor_rsc(const resgen_options_t *options,
     memset(&header, 0, sizeof(header));
     memset(icons, 0, sizeof(icons));
     for (i = 0; i < resgen_cursor_slots; ++i) {
-        slots[i] = options->mode.cursor.arrow;
+        slots[i] = options->mode.cursor.slots[resgen_cursor_arrow];
+        if (options->mode.cursor.slots[i].path != NULL) {
+            slots[i] = options->mode.cursor.slots[i];
+        }
     }
-    slots[0] = options->mode.cursor.arrow;
-    slots[2] = options->mode.cursor.bee;
 
     header.rsh_vrsn = 0;
     header.rsh_object = (WORD) sizeof(RSHDR);
@@ -830,10 +854,38 @@ static int parse_cursor_mode(int argc,
     int file_count;
     int i;
 
-    options->mode.cursor.arrow.hot_x = 0;
-    options->mode.cursor.arrow.hot_y = 0;
-    options->mode.cursor.bee.hot_x = resgen_default_cursor_bee_hot_x;
-    options->mode.cursor.bee.hot_y = resgen_default_cursor_bee_hot_y;
+    options->mode.cursor.slots[resgen_cursor_arrow].hot_x =
+        resgen_default_cursor_arrow_hot_x;
+    options->mode.cursor.slots[resgen_cursor_arrow].hot_y =
+        resgen_default_cursor_arrow_hot_y;
+    options->mode.cursor.slots[resgen_cursor_text].hot_x =
+        resgen_default_cursor_text_hot_x;
+    options->mode.cursor.slots[resgen_cursor_text].hot_y =
+        resgen_default_cursor_text_hot_y;
+    options->mode.cursor.slots[resgen_cursor_bee].hot_x =
+        resgen_default_cursor_bee_hot_x;
+    options->mode.cursor.slots[resgen_cursor_bee].hot_y =
+        resgen_default_cursor_bee_hot_y;
+    options->mode.cursor.slots[resgen_cursor_point_hand].hot_x =
+        resgen_default_cursor_point_hand_hot_x;
+    options->mode.cursor.slots[resgen_cursor_point_hand].hot_y =
+        resgen_default_cursor_point_hand_hot_y;
+    options->mode.cursor.slots[resgen_cursor_flat_hand].hot_x =
+        resgen_default_cursor_flat_hand_hot_x;
+    options->mode.cursor.slots[resgen_cursor_flat_hand].hot_y =
+        resgen_default_cursor_flat_hand_hot_y;
+    options->mode.cursor.slots[resgen_cursor_thin_cross].hot_x =
+        resgen_default_cursor_cross_hot_x;
+    options->mode.cursor.slots[resgen_cursor_thin_cross].hot_y =
+        resgen_default_cursor_cross_hot_y;
+    options->mode.cursor.slots[resgen_cursor_thick_cross].hot_x =
+        resgen_default_cursor_cross_hot_x;
+    options->mode.cursor.slots[resgen_cursor_thick_cross].hot_y =
+        resgen_default_cursor_cross_hot_y;
+    options->mode.cursor.slots[resgen_cursor_outline_cross].hot_x =
+        resgen_default_cursor_cross_hot_x;
+    options->mode.cursor.slots[resgen_cursor_outline_cross].hot_y =
+        resgen_default_cursor_cross_hot_y;
 
     optind = 1;
     while ((opt = getopt(argc, argv, "t:A:B:o:h")) != -1) {
@@ -842,14 +894,16 @@ static int parse_cursor_mode(int argc,
             options->mode.cursor.type_list = optarg;
             break;
         case 'A':
-            if (!parse_hotspot(optarg, &options->mode.cursor.arrow.hot_x,
-                &options->mode.cursor.arrow.hot_y)) {
+            if (!parse_hotspot(optarg,
+                &options->mode.cursor.slots[resgen_cursor_arrow].hot_x,
+                &options->mode.cursor.slots[resgen_cursor_arrow].hot_y)) {
                 return 0;
             }
             break;
         case 'B':
-            if (!parse_hotspot(optarg, &options->mode.cursor.bee.hot_x,
-                &options->mode.cursor.bee.hot_y)) {
+            if (!parse_hotspot(optarg,
+                &options->mode.cursor.slots[resgen_cursor_bee].hot_x,
+                &options->mode.cursor.slots[resgen_cursor_bee].hot_y)) {
                 return 0;
             }
             break;
@@ -876,30 +930,54 @@ static int parse_cursor_mode(int argc,
     for (i = 0; i < file_count; ++i) {
         const char type = options->mode.cursor.type_list[i];
         const char *path = argv[optind + i];
+        int slot = -1;
 
         switch (type) {
+        case '0':
         case 'a':
-            options->mode.cursor.arrow.path = path;
+            slot = resgen_cursor_arrow;
             break;
+        case '1':
+            slot = resgen_cursor_text;
+            break;
+        case '2':
         case 'b':
-            options->mode.cursor.bee.path = path;
+            slot = resgen_cursor_bee;
+            break;
+        case '3':
+            slot = resgen_cursor_point_hand;
+            break;
+        case '4':
+            slot = resgen_cursor_flat_hand;
+            break;
+        case '5':
+            slot = resgen_cursor_thin_cross;
+            break;
+        case '6':
+            slot = resgen_cursor_thick_cross;
+            break;
+        case '7':
+            slot = resgen_cursor_outline_cross;
             break;
         default:
             return 0;
         }
+
+        options->mode.cursor.slots[slot].path = path;
     }
 
-    if (options->mode.cursor.arrow.path == NULL ||
-        options->mode.cursor.bee.path == NULL) {
+    if (options->mode.cursor.slots[resgen_cursor_arrow].path == NULL ||
+        options->mode.cursor.slots[resgen_cursor_bee].path == NULL) {
         return 0;
     }
-    if (!load_png_form(options->mode.cursor.arrow.path,
-        &options->mode.cursor.arrow.form)) {
-        return 0;
-    }
-    if (!load_png_form(options->mode.cursor.bee.path,
-        &options->mode.cursor.bee.form)) {
-        return 0;
+    for (i = 0; i < resgen_cursor_slots; ++i) {
+        if (options->mode.cursor.slots[i].path == NULL) {
+            continue;
+        }
+        if (!load_png_form(options->mode.cursor.slots[i].path,
+            &options->mode.cursor.slots[i].form)) {
+            return 0;
+        }
     }
     return 1;
 }

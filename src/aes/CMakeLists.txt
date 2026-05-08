@@ -1,7 +1,14 @@
 add_library(aes SHARED
     alert_icons.c
     _aes.c
+    _menu.c
+    _window.c
     aes.c
+    event.c
+    file_selector.c
+    menu.c
+    resource.c
+    window.c
 )
 
 target_include_directories(aes

@@ -77,9 +77,14 @@ typedef struct aes_state {
     OBJECT *menu_tree;
     WORD menu_visible;
     WORD menu_popup_root_direct;
+    OBJECT *hover_tree;
     OBJECT *edit_tree;
     WORD edit_object;
     WORD edit_index;
+    WORD mouse_base_cursor;
+    WORD mouse_applied_cursor;
+    WORD mouse_cursor_hidden;
+    WORD key_state;
     WORD menu_saved_count;
     GRECT menu_saved_rects[AES_MAX_MENU_SAVED_REGIONS];
     uint8_t *menu_saved_pixels[AES_MAX_MENU_SAVED_REGIONS];
@@ -194,12 +199,20 @@ int gem_builtin_rsrc_gaddr(WORD type, WORD index, void **addr);
 void gem_builtin_rsrc_free(void);
 
 void _aes_trace(const char *fmt, ...);
+WORD _aes_dequeue_message(WORD msg[8]);
+void _aes_dispatch_hid_event(const gem_hid_event_t *evt);
 WORD _aes_menu_bar_height(void);
 void _aes_store_mouse_state(const gem_hid_event_t *evt);
+void _aes_store_key_state(const gem_hid_event_t *evt);
+void _aes_desktop_rect(GRECT *rect);
 void _aes_menu_prepare_tree(OBJECT *tree);
 void _aes_menu_hide_popups(OBJECT *tree);
 void _aes_menu_redraw_tree(OBJECT *tree);
 void _aes_menu_clear_saved_region(void);
+int _aes_menu_subtree_rect(OBJECT *tree, WORD object, GRECT *rect);
+WORD _aes_menu_key_event(OBJECT *tree,
+                         const gem_hid_event_t *evt,
+                         WORD mepbuff[8]);
 WORD _aes_menu_event(OBJECT *tree,
                      const gem_hid_event_t *first_evt,
                      WORD mepbuff[8]);
@@ -215,6 +228,17 @@ void _aes_reset_state(void);
 int _aes_ensure_vdi(void);
 aes_app_t *_aes_find_app_by_id(WORD id);
 aes_window_t *_aes_find_window(WORD handle);
+aes_window_t *_aes_find_top_window(void);
+WORD _aes_find_parent(OBJECT *tree, WORD object);
+LONG _aes_resolve_spec(const OBJECT *obj);
+int _aes_menu_is_separator_text(const char *text);
+int _aes_menu_split_shortcut(const char *text,
+                             char *label,
+                             size_t label_size,
+                             char *shortcut,
+                             size_t shortcut_size);
+WORD _aes_light_color(void);
+WORD _aes_dark_color(void);
 void _aes_compute_work(aes_window_t *window);
 WORD _aes_wind_set_text(WORD handle, WORD field, const char *text);
 void _aes_draw_window_frame(const aes_window_t *window);

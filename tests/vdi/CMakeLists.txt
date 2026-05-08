@@ -5,11 +5,20 @@ add_executable(test_vdi
     vdi_test_host.c
     vdi_reference.c
     vdi_optimized.c
-    ${PROJECT_SOURCE_DIR}/src/vdi/vdi.c
-    ${PROJECT_SOURCE_DIR}/src/vdi/_vdi.c
+    ${PROJECT_SOURCE_DIR}/src/vdi/workstation.c
+    ${PROJECT_SOURCE_DIR}/src/vdi/alpha.c
+    ${PROJECT_SOURCE_DIR}/src/vdi/input.c
+    ${PROJECT_SOURCE_DIR}/src/vdi/misc.c
+    ${PROJECT_SOURCE_DIR}/src/vdi/primitives.c
+    ${PROJECT_SOURCE_DIR}/src/vdi/raster.c
+    ${PROJECT_SOURCE_DIR}/src/vdi/text.c
+    ${PROJECT_SOURCE_DIR}/src/vdi/_core.c
+    ${PROJECT_SOURCE_DIR}/src/vdi/_cursor.c
+    ${PROJECT_SOURCE_DIR}/src/vdi/_fonts.c
+    ${PROJECT_SOURCE_DIR}/src/vdi/_surface.c
 )
 
-add_dependencies(test_vdi gem_runtime_fonts)
+add_dependencies(test_vdi gem_runtime_fonts gem_runtime_cursors)
 
 target_include_directories(test_vdi
     PRIVATE

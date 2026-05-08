@@ -34,12 +34,27 @@ add_custom_target(gem_runtime_cursors ALL
         ASAN_OPTIONS=detect_leaks=0
         LSAN_OPTIONS=detect_leaks=0
         $<TARGET_FILE:resgen> cursors
-        -t ab
+        -t 01234567
         ${PROJECT_SOURCE_DIR}/docs/orig/cursors/POINTER.PNG
+        ${PROJECT_SOURCE_DIR}/docs/orig/cursors/IBEAM.PNG
         ${PROJECT_SOURCE_DIR}/docs/orig/cursors/BEE.PNG
+        ${PROJECT_SOURCE_DIR}/docs/orig/cursors/POINTHAND.PNG
+        ${PROJECT_SOURCE_DIR}/docs/orig/cursors/FLATHAND.PNG
+        ${PROJECT_SOURCE_DIR}/docs/orig/cursors/THINCROSS.PNG
+        ${PROJECT_SOURCE_DIR}/docs/orig/cursors/THICKCROSS.PNG
+        ${PROJECT_SOURCE_DIR}/docs/orig/cursors/OUTLINECROSS.PNG
         -o ${PROJECT_BINARY_DIR}/cursors.rsc
         -o ${PROJECT_SOURCE_DIR}/bin/cursors.rsc
-    DEPENDS resgen
+    DEPENDS
+        resgen
+        ${PROJECT_SOURCE_DIR}/docs/orig/cursors/POINTER.PNG
+        ${PROJECT_SOURCE_DIR}/docs/orig/cursors/IBEAM.PNG
+        ${PROJECT_SOURCE_DIR}/docs/orig/cursors/BEE.PNG
+        ${PROJECT_SOURCE_DIR}/docs/orig/cursors/POINTHAND.PNG
+        ${PROJECT_SOURCE_DIR}/docs/orig/cursors/FLATHAND.PNG
+        ${PROJECT_SOURCE_DIR}/docs/orig/cursors/THINCROSS.PNG
+        ${PROJECT_SOURCE_DIR}/docs/orig/cursors/THICKCROSS.PNG
+        ${PROJECT_SOURCE_DIR}/docs/orig/cursors/OUTLINECROSS.PNG
     COMMENT "Generating GEM runtime cursor resource"
 )
 
