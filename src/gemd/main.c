@@ -326,6 +326,24 @@ static int32_t gemd_dispatch(gemd_session_t *session,
         }
         break;
 
+    case GEM_RPC_EVNT_MULTI:
+        {
+            const gem_rpc_evnt_multi_req_t *req =
+                (const gem_rpc_evnt_multi_req_t *) payload;
+            gem_rpc_evnt_multi_rsp_t *rsp =
+                (gem_rpc_evnt_multi_rsp_t *) response;
+
+            memset(rsp, 0, sizeof(*rsp));
+            rsp->event = evnt_multi(req->flags, req->bclk, req->bmsk,
+                req->bst, req->m1flags, req->m1x, req->m1y, req->m1w,
+                req->m1h, req->m2flags, req->m2x, req->m2y, req->m2w,
+                req->m2h, rsp->msg, req->tlc, req->thc, &rsp->mx, &rsp->my,
+                &rsp->mb, &rsp->ks, &rsp->kr, &rsp->br);
+            status = rsp->event;
+            *response_size = (uint32_t) sizeof(*rsp);
+        }
+        break;
+
     case GEM_RPC_GRAF_HANDLE:
         {
             gem_rpc_words16_t *rsp = (gem_rpc_words16_t *) response;
@@ -342,6 +360,27 @@ static int32_t gemd_dispatch(gemd_session_t *session,
                     sizeof(g_server_work_out));
             }
             *response_size = (uint32_t) sizeof(*rsp);
+        }
+        break;
+
+    case GEM_RPC_GRAF_MOUSE:
+        {
+            const gem_rpc_graf_mouse_req_t *req =
+                (const gem_rpc_graf_mouse_req_t *) payload;
+
+            status = graf_mouse(req->mode, NULL);
+        }
+        break;
+
+    case GEM_RPC_FORM_ALERT:
+        {
+            const gem_rpc_form_alert_req_t *req =
+                (const gem_rpc_form_alert_req_t *) payload;
+            char text[GEM_RPC_TEXT_MAX];
+
+            memcpy(text, req->text, sizeof(text));
+            text[sizeof(text) - 1u] = '\0';
+            status = form_alert(req->defbut, text);
         }
         break;
 
@@ -387,6 +426,34 @@ static int32_t gemd_dispatch(gemd_session_t *session,
         }
         break;
 
+    case GEM_RPC_VSL_TYPE:
+        {
+            const gem_rpc_handle_word_req_t *req =
+                (const gem_rpc_handle_word_req_t *) payload;
+
+            status = vsl_type(g_server_vdi_handle, req->value);
+        }
+        break;
+
+    case GEM_RPC_VSL_WIDTH:
+        {
+            const gem_rpc_handle_word_req_t *req =
+                (const gem_rpc_handle_word_req_t *) payload;
+
+            status = vsl_width(g_server_vdi_handle, req->value);
+        }
+        break;
+
+    case GEM_RPC_VSL_COLOR:
+        {
+            const gem_rpc_color_req_t *req =
+                (const gem_rpc_color_req_t *) payload;
+
+            vsl_color(g_server_vdi_handle, req->color);
+            status = 1;
+        }
+        break;
+
     case GEM_RPC_VSF_COLOR:
         {
             const gem_rpc_color_req_t *req =
@@ -396,6 +463,42 @@ static int32_t gemd_dispatch(gemd_session_t *session,
             _aes_trace("gemd vsf_color handle=%d color=%d",
                 g_server_vdi_handle, req->color);
             status = 1;
+        }
+        break;
+
+    case GEM_RPC_VSF_INTERIOR:
+        {
+            const gem_rpc_handle_word_req_t *req =
+                (const gem_rpc_handle_word_req_t *) payload;
+
+            status = vsf_interior(g_server_vdi_handle, req->value);
+        }
+        break;
+
+    case GEM_RPC_VSF_STYLE:
+        {
+            const gem_rpc_handle_word_req_t *req =
+                (const gem_rpc_handle_word_req_t *) payload;
+
+            status = vsf_style(g_server_vdi_handle, req->value);
+        }
+        break;
+
+    case GEM_RPC_VSF_PERIMETER:
+        {
+            const gem_rpc_handle_word_req_t *req =
+                (const gem_rpc_handle_word_req_t *) payload;
+
+            status = vsf_perimeter(g_server_vdi_handle, req->value);
+        }
+        break;
+
+    case GEM_RPC_VSWR_MODE:
+        {
+            const gem_rpc_handle_word_req_t *req =
+                (const gem_rpc_handle_word_req_t *) payload;
+
+            status = vswr_mode(g_server_vdi_handle, req->value);
         }
         break;
 
@@ -430,6 +533,16 @@ static int32_t gemd_dispatch(gemd_session_t *session,
                 (const gem_rpc_pline_req_t *) payload;
 
             v_pline(g_server_vdi_handle, req->count, req->pxy);
+            status = 1;
+        }
+        break;
+
+    case GEM_RPC_V_FILLAREA:
+        {
+            const gem_rpc_pline_req_t *req =
+                (const gem_rpc_pline_req_t *) payload;
+
+            v_fillarea(g_server_vdi_handle, req->count, (WORD *) req->pxy);
             status = 1;
         }
         break;

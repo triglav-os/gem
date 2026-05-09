@@ -32,7 +32,12 @@ add_custom_target(gem_runtime_fonts ALL
 
 add_subdirectory(lib/platform/rasta)
 add_subdirectory(lib/platform/linux)
+add_subdirectory(lib/musashi)
+add_subdirectory(lib/prg)
 add_subdirectory(tools/resgen)
+add_subdirectory(tools/fat12)
+add_subdirectory(tools/msa)
+add_subdirectory(tools/stout)
 add_subdirectory(src/vdi)
 add_subdirectory(src/aes)
 add_subdirectory(src/gem)

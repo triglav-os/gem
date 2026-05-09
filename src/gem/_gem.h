@@ -25,15 +25,26 @@ typedef enum gem_rpc_opcode {
     GEM_RPC_APPL_INIT = 1,
     GEM_RPC_APPL_EXIT,
     GEM_RPC_EVNT_MESAG,
+    GEM_RPC_EVNT_MULTI,
     GEM_RPC_GRAF_HANDLE,
+    GEM_RPC_GRAF_MOUSE,
+    GEM_RPC_FORM_ALERT,
     GEM_RPC_V_OPNVWK,
     GEM_RPC_V_CLSVWK,
     GEM_RPC_V_CLRWK,
     GEM_RPC_V_UPDWK,
     GEM_RPC_VSF_COLOR,
     GEM_RPC_VST_COLOR,
+    GEM_RPC_VSL_TYPE,
+    GEM_RPC_VSL_WIDTH,
+    GEM_RPC_VSL_COLOR,
+    GEM_RPC_VSF_INTERIOR,
+    GEM_RPC_VSF_STYLE,
+    GEM_RPC_VSF_PERIMETER,
+    GEM_RPC_VSWR_MODE,
     GEM_RPC_VS_CLIP,
     GEM_RPC_V_PLINE,
+    GEM_RPC_V_FILLAREA,
     GEM_RPC_V_BAR,
     GEM_RPC_VR_RECFL,
     GEM_RPC_V_GTEXT,
@@ -70,6 +81,41 @@ typedef struct gem_rpc_words8 {
     WORD values[8];
 } gem_rpc_words8_t;
 
+typedef struct gem_rpc_handle_word_req {
+    WORD handle;
+    WORD value;
+} gem_rpc_handle_word_req_t;
+
+typedef struct gem_rpc_evnt_multi_req {
+    UWORD flags;
+    UWORD bclk;
+    UWORD bmsk;
+    UWORD bst;
+    UWORD m1flags;
+    WORD m1x;
+    WORD m1y;
+    WORD m1w;
+    WORD m1h;
+    UWORD m2flags;
+    WORD m2x;
+    WORD m2y;
+    WORD m2w;
+    WORD m2h;
+    UWORD tlc;
+    UWORD thc;
+} gem_rpc_evnt_multi_req_t;
+
+typedef struct gem_rpc_evnt_multi_rsp {
+    WORD event;
+    WORD mx;
+    WORD my;
+    WORD mb;
+    WORD ks;
+    WORD kr;
+    WORD br;
+    WORD msg[8];
+} gem_rpc_evnt_multi_rsp_t;
+
 typedef struct gem_rpc_opnvwk_req {
     WORD work_in[11];
 } gem_rpc_opnvwk_req_t;
@@ -99,6 +145,15 @@ typedef struct gem_rpc_pline_req {
     WORD count;
     WORD pxy[256];
 } gem_rpc_pline_req_t;
+
+typedef struct gem_rpc_form_alert_req {
+    WORD defbut;
+    char text[GEM_RPC_TEXT_MAX];
+} gem_rpc_form_alert_req_t;
+
+typedef struct gem_rpc_graf_mouse_req {
+    WORD mode;
+} gem_rpc_graf_mouse_req_t;
 
 typedef struct gem_rpc_rect_req {
     WORD handle;

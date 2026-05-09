@@ -193,6 +193,82 @@ WORD evnt_mesag(WORD msg[8])
     }
 }
 
+WORD evnt_multi(UWORD flags,
+                UWORD bclk,
+                UWORD bmsk,
+                UWORD bst,
+                UWORD m1flags,
+                WORD m1x,
+                WORD m1y,
+                WORD m1w,
+                WORD m1h,
+                UWORD m2flags,
+                WORD m2x,
+                WORD m2y,
+                WORD m2w,
+                WORD m2h,
+                WORD mepbuff[8],
+                UWORD tlc,
+                UWORD thc,
+                WORD *pmx,
+                WORD *pmy,
+                WORD *pmb,
+                WORD *pks,
+                WORD *pkr,
+                WORD *pbr)
+{
+    int32_t status = 0;
+    gem_rpc_evnt_multi_req_t req;
+    gem_rpc_evnt_multi_rsp_t rsp;
+
+    memset(&req, 0, sizeof(req));
+    memset(&rsp, 0, sizeof(rsp));
+    req.flags = flags;
+    req.bclk = bclk;
+    req.bmsk = bmsk;
+    req.bst = bst;
+    req.m1flags = m1flags;
+    req.m1x = m1x;
+    req.m1y = m1y;
+    req.m1w = m1w;
+    req.m1h = m1h;
+    req.m2flags = m2flags;
+    req.m2x = m2x;
+    req.m2y = m2y;
+    req.m2w = m2w;
+    req.m2h = m2h;
+    req.tlc = tlc;
+    req.thc = thc;
+
+    if (!gem_rpc_call(GEM_RPC_EVNT_MULTI, &req, sizeof(req), &status, &rsp,
+            sizeof(rsp))) {
+        return 0;
+    }
+
+    if (mepbuff != NULL) {
+        memcpy(mepbuff, rsp.msg, sizeof(rsp.msg));
+    }
+    if (pmx != NULL) {
+        *pmx = rsp.mx;
+    }
+    if (pmy != NULL) {
+        *pmy = rsp.my;
+    }
+    if (pmb != NULL) {
+        *pmb = rsp.mb;
+    }
+    if (pks != NULL) {
+        *pks = rsp.ks;
+    }
+    if (pkr != NULL) {
+        *pkr = rsp.kr;
+    }
+    if (pbr != NULL) {
+        *pbr = rsp.br;
+    }
+    return rsp.event;
+}
+
 WORD graf_handle(WORD *charw, WORD *charh, WORD *boxw, WORD *boxh)
 {
     int32_t status = 0;
@@ -214,6 +290,37 @@ WORD graf_handle(WORD *charw, WORD *charh, WORD *boxw, WORD *boxh)
     }
     if (boxh != NULL) {
         *boxh = rsp.values[3];
+    }
+    return (WORD) status;
+}
+
+WORD graf_mouse(WORD mode, void *form)
+{
+    int32_t status = 0;
+    gem_rpc_graf_mouse_req_t req;
+
+    (void) form;
+    req.mode = mode;
+    if (!gem_rpc_call(GEM_RPC_GRAF_MOUSE, &req, sizeof(req), &status,
+            NULL, 0u)) {
+        return 0;
+    }
+    return (WORD) status;
+}
+
+WORD form_alert(WORD defbut, char *astring)
+{
+    int32_t status = 0;
+    gem_rpc_form_alert_req_t req;
+
+    memset(&req, 0, sizeof(req));
+    req.defbut = defbut;
+    if (astring != NULL) {
+        strncpy(req.text, astring, sizeof(req.text) - 1u);
+    }
+    if (!gem_rpc_call(GEM_RPC_FORM_ALERT, &req, sizeof(req), &status,
+            NULL, 0u)) {
+        return 0;
     }
     return (WORD) status;
 }
@@ -288,6 +395,101 @@ VOID vsf_color(WORD handle, WORD color)
         NULL, 0u);
 }
 
+WORD vsl_type(WORD handle, WORD style)
+{
+    int32_t status = 0;
+    gem_rpc_handle_word_req_t req;
+
+    req.handle = handle;
+    req.value = style;
+    if (!gem_rpc_call(GEM_RPC_VSL_TYPE, &req, sizeof(req), &status,
+            NULL, 0u)) {
+        return 0;
+    }
+    return (WORD) status;
+}
+
+WORD vsl_width(WORD handle, WORD width)
+{
+    int32_t status = 0;
+    gem_rpc_handle_word_req_t req;
+
+    req.handle = handle;
+    req.value = width;
+    if (!gem_rpc_call(GEM_RPC_VSL_WIDTH, &req, sizeof(req), &status,
+            NULL, 0u)) {
+        return 0;
+    }
+    return (WORD) status;
+}
+
+VOID vsl_color(WORD handle, WORD color)
+{
+    int32_t status = 0;
+    gem_rpc_color_req_t req;
+
+    req.handle = handle;
+    req.color = color;
+    (void) gem_rpc_call(GEM_RPC_VSL_COLOR, &req, sizeof(req), &status,
+        NULL, 0u);
+}
+
+WORD vsf_interior(WORD handle, WORD style)
+{
+    int32_t status = 0;
+    gem_rpc_handle_word_req_t req;
+
+    req.handle = handle;
+    req.value = style;
+    if (!gem_rpc_call(GEM_RPC_VSF_INTERIOR, &req, sizeof(req), &status,
+            NULL, 0u)) {
+        return 0;
+    }
+    return (WORD) status;
+}
+
+WORD vsf_style(WORD handle, WORD style)
+{
+    int32_t status = 0;
+    gem_rpc_handle_word_req_t req;
+
+    req.handle = handle;
+    req.value = style;
+    if (!gem_rpc_call(GEM_RPC_VSF_STYLE, &req, sizeof(req), &status,
+            NULL, 0u)) {
+        return 0;
+    }
+    return (WORD) status;
+}
+
+WORD vsf_perimeter(WORD handle, WORD per_vis)
+{
+    int32_t status = 0;
+    gem_rpc_handle_word_req_t req;
+
+    req.handle = handle;
+    req.value = per_vis;
+    if (!gem_rpc_call(GEM_RPC_VSF_PERIMETER, &req, sizeof(req), &status,
+            NULL, 0u)) {
+        return 0;
+    }
+    return (WORD) status;
+}
+
+WORD vswr_mode(WORD handle, WORD mode)
+{
+    int32_t status = 0;
+    gem_rpc_handle_word_req_t req;
+
+    req.handle = handle;
+    req.value = mode;
+    if (!gem_rpc_call(GEM_RPC_VSWR_MODE, &req, sizeof(req), &status,
+            NULL, 0u)) {
+        return 0;
+    }
+    return (WORD) status;
+}
+
 VOID vst_color(WORD handle, WORD color)
 {
     int32_t status = 0;
@@ -331,6 +533,27 @@ VOID v_pline(VDI_HANDLE handle, WORD count, CONST WORD *pxy)
         memcpy(req.pxy, pxy, values * sizeof(req.pxy[0]));
     }
     (void) gem_rpc_call(GEM_RPC_V_PLINE, &req, sizeof(req), &status, NULL, 0u);
+}
+
+VOID v_fillarea(WORD handle, WORD count, WORD xy[])
+{
+    int32_t status = 0;
+    gem_rpc_pline_req_t req;
+    size_t values;
+
+    memset(&req, 0, sizeof(req));
+    req.handle = handle;
+    req.count = count;
+    values = (count > 0) ? (size_t) count * 2u : 0u;
+    if (values > sizeof(req.pxy) / sizeof(req.pxy[0])) {
+        values = sizeof(req.pxy) / sizeof(req.pxy[0]);
+        req.count = (WORD) (values / 2u);
+    }
+    if (xy != NULL && values > 0u) {
+        memcpy(req.pxy, xy, values * sizeof(req.pxy[0]));
+    }
+    (void) gem_rpc_call(GEM_RPC_V_FILLAREA, &req, sizeof(req), &status,
+        NULL, 0u);
 }
 
 VOID v_bar(VDI_HANDLE handle, CONST WORD xy[4])
