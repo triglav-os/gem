@@ -276,7 +276,7 @@ static int _aes_window_closer_rect(const aes_window_t *window, GRECT *rect)
     _aes_set_rect(rect,
         (WORD) (window->outer.g_x + 1),
         (WORD) (window->outer.g_y + 1),
-        side,
+        (WORD) (side + 1),
         side);
     return 1;
 }
@@ -1126,9 +1126,9 @@ static void _aes_draw_window_title(const aes_window_t *window,
         close_sep[3] = (WORD) (closer_rect.g_y + closer_rect.g_h - 1);
         vsl_color(_aes.vdi_handle, _aes_dark_color());
         v_pline(_aes.vdi_handle, 2, close_sep);
-        _aes_draw_window_icon(closer_rect.g_x, closer_rect.g_y,
+        _aes_draw_window_icon_offset(closer_rect.g_x, closer_rect.g_y,
             close_right,
-            (WORD) (closer_rect.g_y + closer_rect.g_h - 1), 5);
+            (WORD) (closer_rect.g_y + closer_rect.g_h - 1), 5, 0, 0);
         title_left = (WORD) (close_sep[0] + 1);
     }
 

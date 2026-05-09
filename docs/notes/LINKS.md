@@ -35,3 +35,11 @@ https://github.com/frno7/fonts
 # Docs
 
 https://bumbershootsoft.wordpress.com/platform-guide-atari-st/
+
+# Graphics
+
+Icon
+https://nikoichu.itch.io/pixel-icons
+
+Blender
+https://devtalk.blender.org/t/2-8-outlined-coloured-icon-adaptation/6620

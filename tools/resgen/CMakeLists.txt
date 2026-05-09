@@ -134,3 +134,82 @@ add_custom_target(gem_runtime_clock_numbers ALL
     DEPENDS resgen ${clock_number_icons}
     COMMENT "Generating GEM clock number resource"
 )
+
+set(gemscape_toolbar_sources
+    ${PROJECT_SOURCE_DIR}/docs/orig/toolbars/BACK.PNG
+    ${PROJECT_SOURCE_DIR}/docs/orig/toolbars/FORE.PNG
+    ${PROJECT_SOURCE_DIR}/docs/orig/toolbars/RELOAD.PNG
+    ${PROJECT_SOURCE_DIR}/docs/orig/toolbars/MENU.PNG
+)
+
+set(gemscape_toolbar_icons)
+foreach(gemscape_toolbar_source IN LISTS gemscape_toolbar_sources)
+    get_filename_component(gemscape_toolbar_name
+        ${gemscape_toolbar_source} NAME)
+    set(gemscape_toolbar_icon
+        ${PROJECT_BINARY_DIR}/gemscape_toolbar_icons/${gemscape_toolbar_name})
+    add_custom_command(
+        OUTPUT ${gemscape_toolbar_icon}
+        COMMAND ${CMAKE_COMMAND} -E make_directory
+            ${PROJECT_BINARY_DIR}/gemscape_toolbar_icons
+        COMMAND convert ${gemscape_toolbar_source}
+            -background white
+            -alpha remove
+            -alpha off
+            PNG32:${gemscape_toolbar_icon}
+        DEPENDS ${gemscape_toolbar_source}
+        COMMENT "Flattening Gemscape toolbar icon ${gemscape_toolbar_name}"
+    )
+    list(APPEND gemscape_toolbar_icons ${gemscape_toolbar_icon})
+endforeach()
+
+add_custom_target(gem_runtime_gemscape_toolbar ALL
+    COMMAND ${CMAKE_COMMAND} -E env
+        ASAN_OPTIONS=detect_leaks=0
+        LSAN_OPTIONS=detect_leaks=0
+        $<TARGET_FILE:resgen> bitmaps
+        -o ${PROJECT_BINARY_DIR}/gemscape_toolbar.rsc
+        -o ${PROJECT_SOURCE_DIR}/bin/gemscape_toolbar.rsc
+        ${gemscape_toolbar_icons}
+    DEPENDS resgen ${gemscape_toolbar_icons}
+    COMMENT "Generating Gemscape toolbar resource"
+)
+
+set(maestro_tree_sources
+    ${PROJECT_SOURCE_DIR}/docs/orig/tree/FOLDER.PNG
+    ${PROJECT_SOURCE_DIR}/docs/orig/tree/DOCUMENT.PNG
+    ${PROJECT_SOURCE_DIR}/docs/orig/tree/EXPAND.PNG
+    ${PROJECT_SOURCE_DIR}/docs/orig/tree/COLLAPSE.PNG
+)
+
+set(maestro_tree_icons)
+foreach(maestro_tree_source IN LISTS maestro_tree_sources)
+    get_filename_component(maestro_tree_name ${maestro_tree_source} NAME)
+    set(maestro_tree_icon
+        ${PROJECT_BINARY_DIR}/maestro_tree_icons/${maestro_tree_name})
+    add_custom_command(
+        OUTPUT ${maestro_tree_icon}
+        COMMAND ${CMAKE_COMMAND} -E make_directory
+            ${PROJECT_BINARY_DIR}/maestro_tree_icons
+        COMMAND convert ${maestro_tree_source}
+            -background white
+            -alpha remove
+            -alpha off
+            PNG32:${maestro_tree_icon}
+        DEPENDS ${maestro_tree_source}
+        COMMENT "Flattening Maestro tree icon ${maestro_tree_name}"
+    )
+    list(APPEND maestro_tree_icons ${maestro_tree_icon})
+endforeach()
+
+add_custom_target(gem_runtime_maestro_tree ALL
+    COMMAND ${CMAKE_COMMAND} -E env
+        ASAN_OPTIONS=detect_leaks=0
+        LSAN_OPTIONS=detect_leaks=0
+        $<TARGET_FILE:resgen> bitmaps
+        -o ${PROJECT_BINARY_DIR}/maestro_tree.rsc
+        -o ${PROJECT_SOURCE_DIR}/bin/maestro_tree.rsc
+        ${maestro_tree_icons}
+    DEPENDS resgen ${maestro_tree_icons}
+    COMMENT "Generating Maestro tree resource"
+)
