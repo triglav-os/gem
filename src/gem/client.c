@@ -780,3 +780,66 @@ WORD wind_calc(WORD type, UWORD kind, WORD inx, WORD iny, WORD inw, WORD inh,
     }
     return (WORD) status;
 }
+
+/*
+ * Mirrors the hosted AES engine's own _aes_menu_last_object: this
+ * codebase's convention is a flat array where exactly one object (the
+ * physically last one) carries LASTOB, rather than per-level sibling
+ * termination. Scan for it instead of walking ob_head/ob_next.
+ */
+static WORD gem_menu_tree_extent(const OBJECT *tree)
+{
+    WORD i;
+
+    for (i = 0; i < (WORD) GEM_RPC_MENU_MAX_OBJECTS; ++i) {
+        if ((tree[i].ob_flags & LASTOB) != 0u) {
+            return i;
+        }
+    }
+    return 0;
+}
+
+WORD menu_bar(OBJECT *tree, WORD show)
+{
+    int32_t status = 0;
+    gem_rpc_menu_bar_req_t req;
+    WORD extent;
+    WORD i;
+
+    if (tree == NULL) {
+        return 0;
+    }
+
+    memset(&req, 0, sizeof(req));
+    req.show = show;
+    extent = gem_menu_tree_extent(tree);
+    req.object_count = (WORD) (extent + 1);
+    if (req.object_count > (WORD) GEM_RPC_MENU_MAX_OBJECTS) {
+        req.object_count = (WORD) GEM_RPC_MENU_MAX_OBJECTS;
+    }
+    memcpy(req.objects, tree,
+        (size_t) req.object_count * sizeof(OBJECT));
+
+    for (i = 0; i < req.object_count &&
+            req.string_count < (WORD) GEM_RPC_MENU_MAX_STRINGS; ++i) {
+        const char *text;
+
+        if (tree[i].ob_type != G_TITLE && tree[i].ob_type != G_STRING) {
+            continue;
+        }
+        if ((tree[i].ob_flags & INDIRECT) != 0 || tree[i].ob_spec == 0) {
+            continue;
+        }
+        text = (const char *) (intptr_t) tree[i].ob_spec;
+        req.strings[req.string_count].object = i;
+        strncpy(req.strings[req.string_count].text, text,
+            sizeof(req.strings[req.string_count].text) - 1u);
+        ++req.string_count;
+    }
+
+    if (!gem_rpc_call(GEM_RPC_MENU_BAR, &req, sizeof(req), &status,
+            NULL, 0u)) {
+        return 0;
+    }
+    return (WORD) status;
+}

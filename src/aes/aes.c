@@ -23,6 +23,8 @@ WORD ptsout[256] __attribute__((weak));
 
 WORD global[15];
 
+static void _aes_union_message_rects(WORD target[8], const WORD incoming[8]);
+
 WORD _aes_dequeue_message(WORD msg[8]);
 WORD appl_init(void);
 WORD appl_exit(void);
@@ -138,36 +140,111 @@ WORD appl_write(WORD ap_wid, WORD ap_wlength, void *ap_wpbuff)
         return 0;
     }
 
+    if (words[0] == WM_REDRAW) {
+        for (i = 0; i < AES_MAX_MESSAGES; ++i) {
+            if (_aes.messages[i].used != 0 &&
+                _aes.messages[i].dest == ap_wid &&
+                _aes.messages[i].data[0] == WM_REDRAW &&
+                _aes.messages[i].data[3] == words[3]) {
+                _aes_union_message_rects(_aes.messages[i].data, words);
+                return 1;
+            }
+        }
+    }
+
     for (i = 0; i < AES_MAX_MESSAGES; ++i) {
         if (_aes.messages[i].used == 0) {
             _aes.messages[i].used = 1;
             _aes.messages[i].dest = ap_wid;
+            _aes.messages[i].seq = _aes.next_message_seq++;
             memcpy(_aes.messages[i].data, words,
                 sizeof(_aes.messages[i].data));
             return 1;
         }
     }
+    _aes_trace("appl_write queue full: dropped message dest=%d type=%d",
+        ap_wid, words[0]);
     return 0;
 }
 
 WORD appl_read(WORD ap_rwid, WORD ap_rlength, void *ap_rpbuff)
 {
     size_t i;
+    size_t best_control = AES_MAX_MESSAGES;
+    size_t best_redraw = AES_MAX_MESSAGES;
+    uint32_t best_control_seq = 0u;
+    uint32_t best_redraw_seq = 0u;
 
     if (ap_rpbuff == NULL || ap_rlength < 8) {
         return 0;
     }
 
     for (i = 0; i < AES_MAX_MESSAGES; ++i) {
-        if (_aes.messages[i].used != 0 &&
-            _aes.messages[i].dest == ap_rwid) {
-            memcpy(ap_rpbuff, _aes.messages[i].data,
-                sizeof(_aes.messages[i].data));
-            _aes.messages[i].used = 0;
-            return 1;
+        if (_aes.messages[i].used == 0 || _aes.messages[i].dest != ap_rwid) {
+            continue;
+        }
+
+        if (_aes.messages[i].data[0] == WM_REDRAW) {
+            if (best_redraw == AES_MAX_MESSAGES ||
+                _aes.messages[i].seq < best_redraw_seq) {
+                best_redraw = i;
+                best_redraw_seq = _aes.messages[i].seq;
+            }
+        } else {
+            if (best_control == AES_MAX_MESSAGES ||
+                _aes.messages[i].seq < best_control_seq) {
+                best_control = i;
+                best_control_seq = _aes.messages[i].seq;
+            }
         }
     }
+
+    if (best_control != AES_MAX_MESSAGES) {
+        memcpy(ap_rpbuff, _aes.messages[best_control].data,
+            sizeof(_aes.messages[best_control].data));
+        _aes.messages[best_control].used = 0;
+        _aes.messages[best_control].seq = 0u;
+        return 1;
+    }
+
+    if (best_redraw != AES_MAX_MESSAGES) {
+        memcpy(ap_rpbuff, _aes.messages[best_redraw].data,
+            sizeof(_aes.messages[best_redraw].data));
+        _aes.messages[best_redraw].used = 0;
+        _aes.messages[best_redraw].seq = 0u;
+        return 1;
+    }
+
     return 0;
+}
+
+static void _aes_union_message_rects(WORD target[8], const WORD incoming[8])
+{
+    WORD target_x1;
+    WORD target_y1;
+    WORD incoming_x1;
+    WORD incoming_y1;
+    WORD x0;
+    WORD y0;
+    WORD x1;
+    WORD y1;
+
+    if (target == NULL || incoming == NULL) {
+        return;
+    }
+
+    target_x1 = (WORD) (target[4] + target[6] - 1);
+    target_y1 = (WORD) (target[5] + target[7] - 1);
+    incoming_x1 = (WORD) (incoming[4] + incoming[6] - 1);
+    incoming_y1 = (WORD) (incoming[5] + incoming[7] - 1);
+    x0 = _aes_min_word(target[4], incoming[4]);
+    y0 = _aes_min_word(target[5], incoming[5]);
+    x1 = _aes_max_word(target_x1, incoming_x1);
+    y1 = _aes_max_word(target_y1, incoming_y1);
+    target[4] = x0;
+    target[5] = y0;
+    target[6] = (WORD) (x1 - x0 + 1);
+    target[7] = (WORD) (y1 - y0 + 1);
 }
 
 WORD appl_tplay(void *pbuff, WORD length, WORD scale)

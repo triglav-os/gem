@@ -1017,8 +1017,15 @@ static WORD _aes_run_alert(aes_alert_t *alert)
 
 WORD menu_bar(OBJECT *tree, WORD show)
 {
+    aes_app_t *app = _aes_find_app_by_id(_aes.current_app_id);
+
     _aes.menu_tree = tree;
     _aes.menu_visible = (show != 0) ? 1 : 0;
+    _aes.menu_owner_app_id = _aes.current_app_id;
+    if (app != NULL) {
+        app->menu_tree = tree;
+        app->menu_visible = _aes.menu_visible;
+    }
     if (show != 0 && tree != NULL) {
         _aes_menu_prepare_tree(tree);
         _aes_menu_hide_popups(tree);

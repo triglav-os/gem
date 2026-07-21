@@ -47,6 +47,7 @@ WORD _aes_wind_set_text(WORD handle, WORD field, const char *text);
 static void _aes_present_after_window_draw(void);
 static void _aes_desktop_rect_local(GRECT *rect);
 static void _aes_expand_window_damage_rect(const GRECT *src, GRECT *out);
+static void _aes_window_draw_cover_rect(const aes_window_t *window, GRECT *out);
 void _aes_redraw_region(const GRECT *dirty);
 static void _aes_queue_window_redraw(const aes_window_t *window,
                                      const GRECT *dirty);
@@ -685,9 +686,22 @@ static void _aes_expand_window_damage_rect(const GRECT *src, GRECT *out)
     out->g_h = (WORD) (src->g_h + 1);
 }
 
+static void _aes_window_draw_cover_rect(const aes_window_t *window, GRECT *out)
+{
+    if (out == NULL) {
+        return;
+    }
+
+    if (window == NULL || window->open == 0 || window->used == 0) {
+        _aes_set_rect(out, 0, 0, 0, 0);
+        return;
+    }
+
+    _aes_expand_window_damage_rect(&window->outer, out);
+}
+
 void _aes_redraw_region(const GRECT *dirty)
 {
-    uint32_t target_z;
     WORD clip[4];
     GRECT desktop;
     GRECT menu_rect;
@@ -730,23 +744,51 @@ void _aes_redraw_region(const GRECT *dirty)
     _vdi_begin_update();
     vs_clip(_aes.vdi_handle, 1, clip);
     _aes_fill_checker_rect(clip[0], clip[1], clip[2], clip[3]);
-    for (target_z = 1u; target_z < _aes.next_window_z; ++target_z) {
-        size_t i;
+    /*
+     * z_order only ever increases -- every window open and every
+     * window topped hands out a fresh value that's never reused or
+     * compacted, so next_window_z keeps growing for the life of the
+     * process. Scanning every z-value up to it (as opposed to just
+     * the handful of windows that actually exist) made each redraw
+     * cost grow with the total number of window-topping operations
+     * ever performed in the session, not with how many windows are
+     * actually open -- redraws would get slower and slower the
+     * longer a session ran. Collect the (at most AES_MAX_WINDOWS)
+     * windows that actually need drawing and sort just those instead.
+     */
+    {
+        aes_window_t *painted[AES_MAX_WINDOWS];
+        WORD painted_count = 0;
+        WORD a;
+        WORD b;
 
-        for (i = 0; i < AES_MAX_WINDOWS; ++i) {
-            if (_aes.windows[i].used != 0 && _aes.windows[i].open != 0 &&
-                _aes.windows[i].z_order == target_z &&
-                _aes_rects_intersect(&_aes.windows[i].outer, dirty) != 0) {
-                _aes_trace("redraw_region draw handle=%d z=%lu outer=%d,%d %dx%d",
-                    _aes.windows[i].handle,
-                    (unsigned long) _aes.windows[i].z_order,
-                    _aes.windows[i].outer.g_x,
-                    _aes.windows[i].outer.g_y,
-                    _aes.windows[i].outer.g_w,
-                    _aes.windows[i].outer.g_h);
-                _aes_draw_window_frame(&_aes.windows[i]);
-                _aes_queue_window_redraw(&_aes.windows[i], dirty);
+        for (a = 0; a < (WORD) AES_MAX_WINDOWS; ++a) {
+            GRECT cover_rect;
+
+            _aes_window_draw_cover_rect(&_aes.windows[a], &cover_rect);
+            if (_aes.windows[a].used != 0 && _aes.windows[a].open != 0 &&
+                _aes_rects_intersect(&cover_rect, dirty) != 0) {
+                painted[painted_count++] = &_aes.windows[a];
             }
+        }
+        for (a = 1; a < painted_count; ++a) {
+            aes_window_t *key = painted[a];
+            uint32_t key_z = key->z_order;
+
+            b = (WORD) (a - 1);
+            while (b >= 0 && painted[b]->z_order > key_z) {
+                painted[(size_t) b + 1] = painted[b];
+                --b;
+            }
+            painted[(size_t) b + 1] = key;
+        }
+        for (a = 0; a < painted_count; ++a) {
+            _aes_trace("redraw_region draw handle=%d z=%lu outer=%d,%d %dx%d",
+                painted[a]->handle, (unsigned long) painted[a]->z_order,
+                painted[a]->outer.g_x, painted[a]->outer.g_y,
+                painted[a]->outer.g_w, painted[a]->outer.g_h);
+            _aes_draw_window_frame(painted[a]);
+            _aes_queue_window_redraw(painted[a], dirty);
         }
     }
     vs_clip(_aes.vdi_handle, 0, clip);
@@ -761,12 +803,8 @@ void _aes_redraw_region(const GRECT *dirty)
 static void _aes_queue_window_redraw(const aes_window_t *window,
                                      const GRECT *dirty)
 {
-    GRECT pending[64];
-    GRECT next_pending[64];
     GRECT redraw;
     WORD msg[8];
-    WORD pending_count = 0;
-    size_t i;
 
     if (window == NULL || dirty == NULL || window->owner == 0 ||
         window->work.g_w <= 0 || window->work.g_h <= 0) {
@@ -774,48 +812,41 @@ static void _aes_queue_window_redraw(const aes_window_t *window,
     }
 
     if (_aes_intersect_rects(&window->work, dirty, &redraw) == 0) {
+        _aes_trace("queue_redraw skip handle=%d dirty=%d,%d %dx%d work=%d,%d %dx%d",
+            window->handle, dirty->g_x, dirty->g_y, dirty->g_w, dirty->g_h,
+            window->work.g_x, window->work.g_y, window->work.g_w,
+            window->work.g_h);
         return;
     }
 
-    pending[0] = redraw;
-    pending_count = 1;
-
-    for (i = 0; i < AES_MAX_WINDOWS && pending_count > 0; ++i) {
-        WORD next_count = 0;
-        WORD j;
-
-        if (_aes.windows[i].used == 0 || _aes.windows[i].open == 0 ||
-            _aes.windows[i].handle == window->handle ||
-            _aes.windows[i].z_order <= window->z_order) {
-            continue;
-        }
-
-        for (j = 0; j < pending_count; ++j) {
-            GRECT fragments[4];
-            WORD fragment_count = _aes_subtract_rect(&pending[j],
-                &_aes.windows[i].outer, fragments);
-            WORD k;
-
-            for (k = 0; k < fragment_count && next_count < 64; ++k) {
-                next_pending[next_count++] = fragments[k];
-            }
-        }
-
-        memcpy(pending, next_pending, (size_t) next_count * sizeof(GRECT));
-        pending_count = next_count;
-    }
-
-    for (i = 0; i < (size_t) pending_count; ++i) {
-        msg[0] = WM_REDRAW;
-        msg[1] = _aes.current_app_id;
-        msg[2] = 0;
-        msg[3] = window->handle;
-        msg[4] = pending[i].g_x;
-        msg[5] = pending[i].g_y;
-        msg[6] = pending[i].g_w;
-        msg[7] = pending[i].g_h;
-        (void) appl_write(window->owner, 8, msg);
-    }
+    /*
+     * This used to subtract every higher window's outer rect from
+     * `redraw` and post one WM_REDRAW per resulting fragment (up to
+     * 64 messages for one damaged window). That precision is never
+     * actually needed: every client here re-derives the true
+     * occlusion-aware visible-rect list itself via
+     * wind_get(WF_FIRSTXYWH/WF_NEXTXYWH) before drawing, so the rect
+     * in this message is only a "something changed here" hint, safe
+     * to be coarser than exact. Posting one message per fragment
+     * instead just multiplied traffic through the shared, fixed-size
+     * (AES_MAX_MESSAGES) message queue -- easy to exhaust with only a
+     * few overlapping windows, silently dropping later messages
+     * (appl_write returns failure but every caller here discards it)
+     * and leaving whichever window's redraw got dropped stuck showing
+     * stale pixels until something else happens to repaint it.
+     */
+    msg[0] = WM_REDRAW;
+    msg[1] = _aes.current_app_id;
+    msg[2] = 0;
+    msg[3] = window->handle;
+    msg[4] = redraw.g_x;
+    msg[5] = redraw.g_y;
+    msg[6] = redraw.g_w;
+    msg[7] = redraw.g_h;
+    _aes_trace("queue_redraw handle=%d owner=%d dirty=%d,%d %dx%d redraw=%d,%d %dx%d",
+        window->handle, window->owner, dirty->g_x, dirty->g_y, dirty->g_w,
+        dirty->g_h, redraw.g_x, redraw.g_y, redraw.g_w, redraw.g_h);
+    (void) appl_write(window->owner, 8, msg);
 }
 
 void _aes_redraw_window_change(const GRECT *before, const GRECT *after)
@@ -830,10 +861,19 @@ void _aes_redraw_window_change(const GRECT *before, const GRECT *after)
     _aes_expand_window_damage_rect(after, &expanded_after);
     exposed_count = _aes_subtract_rect(&expanded_before, &expanded_after,
         exposed);
+    _aes_trace("window_change before=%d,%d %dx%d after=%d,%d %dx%d exposed=%d",
+        expanded_before.g_x, expanded_before.g_y, expanded_before.g_w,
+        expanded_before.g_h, expanded_after.g_x, expanded_after.g_y,
+        expanded_after.g_w, expanded_after.g_h, exposed_count);
 
     for (i = 0; i < exposed_count; ++i) {
+        _aes_trace("window_change exposed[%d]=%d,%d %dx%d", i,
+            exposed[i].g_x, exposed[i].g_y, exposed[i].g_w, exposed[i].g_h);
         _aes_redraw_region(&exposed[i]);
     }
+    _aes_trace("window_change redraw_after=%d,%d %dx%d",
+        expanded_after.g_x, expanded_after.g_y, expanded_after.g_w,
+        expanded_after.g_h);
     _aes_redraw_region(&expanded_after);
 }
 
@@ -846,8 +886,9 @@ void _aes_redraw_window_title_states(const aes_window_t *previous_top,
         previous_top->used != 0) {
         dirty.g_x = previous_top->outer.g_x;
         dirty.g_y = previous_top->outer.g_y;
-        dirty.g_w = previous_top->outer.g_w;
-        dirty.g_h = (WORD) (previous_top->work.g_y - previous_top->outer.g_y);
+        dirty.g_w = (WORD) (previous_top->outer.g_w + 1);
+        dirty.g_h = (WORD) (previous_top->work.g_y -
+            previous_top->outer.g_y + 1);
         if (dirty.g_w > 0 && dirty.g_h > 0) {
             _aes_redraw_region(&dirty);
         }
@@ -855,10 +896,11 @@ void _aes_redraw_window_title_states(const aes_window_t *previous_top,
 
     if (new_top != NULL && new_top->open != 0 && new_top->used != 0 &&
         new_top != previous_top) {
+        _aes_menu_switch_to_app(new_top->owner);
         dirty.g_x = new_top->outer.g_x;
         dirty.g_y = new_top->outer.g_y;
-        dirty.g_w = new_top->outer.g_w;
-        dirty.g_h = (WORD) (new_top->work.g_y - new_top->outer.g_y);
+        dirty.g_w = (WORD) (new_top->outer.g_w + 1);
+        dirty.g_h = (WORD) (new_top->work.g_y - new_top->outer.g_y + 1);
         if (dirty.g_w > 0 && dirty.g_h > 0) {
             _aes_redraw_region(&dirty);
         }
@@ -967,7 +1009,7 @@ static void _aes_fill_pattern_rect(WORD x0, WORD y0, WORD x1, WORD y1,
 static void _aes_fill_checker_rect(WORD x0, WORD y0, WORD x1, WORD y1)
 {
     static const uint8_t desktop_rows[] = {
-        0xaa, 0x55, 0xaa
+        0xaa, 0x55
     };
 
     if (x0 > x1 || y0 > y1) {

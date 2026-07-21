@@ -71,6 +71,21 @@ enum {
     calc_work_height = 238
 };
 
+enum {
+    calc_menu_title_file = 3,
+    calc_menu_item_quit = 6
+};
+
+static OBJECT calc_menu_tree[] = {
+    {-1, 1, 3, G_IBOX, NONE, NORMAL, 0L, 0, 0, 0, 0},
+    {0, 2, 2, G_BOX, NONE, NORMAL, 0x1100L, 0, 0, 80, 1},
+    {1, 3, 3, G_IBOX, NONE, NORMAL, 0L, 0, 0, 80, 1},
+    {2, -1, -1, G_TITLE, NONE, NORMAL, (LONG) " File ", 0, 0, 6, 1},
+    {0, 5, 5, G_IBOX, NONE, NORMAL, 0L, 0, 0, 0, 0},
+    {4, 6, 6, G_BOX, NONE, NORMAL, 0x1100L, 0, 0, 20, 1},
+    {5, -1, -1, G_STRING, LASTOB, NORMAL, (LONG) "  Quit \t^Q", 0, 0, 20, 1}
+};
+
 static void calc_init_object(OBJECT *object,
                              UWORD type,
                              UWORD flags,
@@ -894,6 +909,7 @@ int calc_main(void)
     wind_get(0, WF_WXYWH, &full_rect.g_x, &full_rect.g_y, &full_rect.g_w,
         &full_rect.g_h);
     (void) graf_mouse(M_ON, NULL);
+    (void) menu_bar(calc_menu_tree, 1);
     calc_draw(&state, NULL);
 
     FOREVER {
@@ -907,7 +923,12 @@ int calc_main(void)
             &key_code, &button_return);
 
         if ((event_flags & MU_MESAG) != 0) {
-            if (msg[3] != state.handle) {
+            if (msg[0] == MN_SELECTED) {
+                if (msg[3] == calc_menu_title_file &&
+                    msg[4] == calc_menu_item_quit) {
+                    break;
+                }
+            } else if (msg[3] != state.handle) {
             } else {
                 if (msg[0] == WM_CLOSED) {
                     break;

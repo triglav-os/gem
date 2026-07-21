@@ -18,7 +18,18 @@
 
 enum {
     AES_MAX_APPS = 16,
-    AES_MAX_MESSAGES = 16,
+    /*
+     * Shared across every app and message type (WM_REDRAW, WM_TOPPED,
+     * WM_MOVED/SIZED, MN_SELECTED, ...) with no per-app reservation --
+     * with up to AES_MAX_APPS concurrent apps, 16 total slots left as
+     * little as one message of headroom per app, so a single window
+     * drag (which can post several WM_SIZED/WM_REDRAW pairs in quick
+     * succession) could exhaust it and silently strand other apps'
+     * messages. appl_write() has no back-pressure or retry, so a
+     * dropped message here was permanently lost. Sized up for real
+     * headroom; cost is a few hundred bytes.
+     */
+    AES_MAX_MESSAGES = 64,
     AES_MAX_WINDOWS = 16,
     AES_MAX_MENU_SAVED_REGIONS = 2,
     AES_PATH_LEN = 260,
@@ -31,6 +42,7 @@ enum {
 typedef struct aes_message {
     WORD used;
     WORD dest;
+    uint32_t seq;
     WORD data[8];
 } aes_message_t;
 
@@ -38,6 +50,23 @@ typedef struct aes_app {
     WORD used;
     WORD id;
     char name[9];
+    OBJECT *menu_tree;
+    WORD menu_visible;
+    /*
+     * This app's own outstanding wind_update(BEG_UPDATE) calls not
+     * yet matched by END_UPDATE. _aes.update_depth is a single global
+     * counter shared by every app (gemd can legitimately interleave
+     * different apps' BEG/END pairs), so if this app disconnects
+     * mid-redraw there is no way to tell how much of the global depth
+     * is "owed" to it without tracking each app's own contribution
+     * separately. See gemd_cleanup_app.
+     */
+    WORD update_depth;
+    WORD enum_handle;
+    WORD enum_stage;
+    WORD enum_count;
+    WORD enum_index;
+    GRECT enum_rects[64];
 } aes_app_t;
 
 typedef struct aes_window {
@@ -70,12 +99,14 @@ typedef struct aes_state {
     WORD dclick_rate;
     WORD menu_click;
     WORD update_depth;
+    uint32_t next_message_seq;
     WORD vdi_ready;
     VDI_HANDLE vdi_handle;
     WORD work_in[11];
     WORD work_out[57];
     OBJECT *menu_tree;
     WORD menu_visible;
+    WORD menu_owner_app_id;
     WORD menu_popup_root_direct;
     OBJECT *hover_tree;
     OBJECT *edit_tree;
@@ -102,11 +133,6 @@ typedef struct aes_state {
     aes_window_t windows[AES_MAX_WINDOWS];
     WORD desktop_bvdisk;
     WORD desktop_bvhard;
-    WORD enum_handle;
-    WORD enum_stage;
-    WORD enum_count;
-    WORD enum_index;
-    GRECT enum_rects[64];
 } aes_state_t;
 
 extern aes_state_t _aes;
@@ -209,6 +235,7 @@ void _aes_menu_prepare_tree(OBJECT *tree);
 void _aes_menu_hide_popups(OBJECT *tree);
 void _aes_menu_redraw_tree(OBJECT *tree);
 void _aes_menu_clear_saved_region(void);
+void _aes_menu_switch_to_app(WORD app_id);
 int _aes_menu_subtree_rect(OBJECT *tree, WORD object, GRECT *rect);
 WORD _aes_menu_key_event(OBJECT *tree,
                          const gem_hid_event_t *evt,

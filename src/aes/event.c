@@ -17,6 +17,8 @@ extern WORD _vdi_select_system_mouse_form(WORD selector);
 static void _aes_queue_window_message(const aes_window_t *window,
     WORD message, WORD w4, WORD w5, WORD w6, WORD w7);
 static void _aes_draw_drag_outline(const GRECT *rect);
+static void _aes_begin_interaction_lock(void);
+static void _aes_end_interaction_lock(void);
 static void _aes_clamp_dragged_window_position(const aes_window_t *window,
     const GRECT *desktop, WORD *x, WORD *y);
 static void _aes_toggle_window_iconified(aes_window_t *window);
@@ -104,14 +106,28 @@ WORD graf_handle(WORD *charw, WORD *charh, WORD *boxw, WORD *boxh);
 WORD graf_mouse(WORD mode, void *form);
 VOID graf_mkstate(WORD *pmx, WORD *pmy, WORD *pmb, WORD *pks);
 
+static void _aes_post_menu_selection(WORD mepbuff[8])
+{
+    if (_aes.menu_owner_app_id == 0) {
+        return;
+    }
+    (void) appl_write(_aes.menu_owner_app_id, 8, mepbuff);
+}
+
 void _aes_dispatch_hid_event(const gem_hid_event_t *evt)
 {
+    WORD mepbuff[8];
+
     if (evt == NULL) {
         return;
     }
 
     if (evt->type == GEM_HID_KEY) {
         _aes_store_key_state(evt);
+        if (_aes.menu_visible != 0 && _aes.menu_tree != NULL &&
+            _aes_menu_key_event(_aes.menu_tree, evt, mepbuff) != 0) {
+            _aes_post_menu_selection(mepbuff);
+        }
         return;
     }
 
@@ -119,6 +135,11 @@ void _aes_dispatch_hid_event(const gem_hid_event_t *evt)
         evt->type == GEM_HID_MOUSE_BUTTON) {
         _aes_store_mouse_state(evt);
         if (evt->type == GEM_HID_MOUSE_BUTTON) {
+            if (_aes.menu_visible != 0 && _aes.menu_tree != NULL &&
+                _aes_menu_event(_aes.menu_tree, evt, mepbuff) != 0) {
+                _aes_post_menu_selection(mepbuff);
+                return;
+            }
             (void) _aes_track_window_interaction(evt, 0, NULL, NULL, NULL,
                 NULL, NULL);
         }
@@ -171,6 +192,20 @@ static void _aes_draw_drag_outline(const GRECT *rect)
     vsl_color(_aes.vdi_handle, WHITE);
     v_pline(_aes.vdi_handle, 5, box);
     (void) vswr_mode(_aes.vdi_handle, previous_mode);
+}
+
+static void _aes_begin_interaction_lock(void)
+{
+    ++_aes.update_depth;
+    _vdi_begin_update();
+}
+
+static void _aes_end_interaction_lock(void)
+{
+    if (_aes.update_depth > 0) {
+        --_aes.update_depth;
+        _vdi_end_update();
+    }
 }
 
 static void _aes_clamp_dragged_window_position(const aes_window_t *window,
@@ -260,6 +295,8 @@ static WORD _aes_track_window_interaction(const gem_hid_event_t *first_evt,
     WORD start_x;
     WORD start_y;
     WORD raised;
+    int defer_raise = 0;
+    int interaction_lock = 0;
 
     if (first_evt == NULL || first_evt->type != GEM_HID_MOUSE_BUTTON ||
         ((first_evt->button != GEM_HID_BUTTON_LEFT &&
@@ -281,16 +318,28 @@ static WORD _aes_track_window_interaction(const gem_hid_event_t *first_evt,
         return 0;
     }
 
-    raised = (_aes_window_is_top(window) == 0) ? 1 : 0;
-    if (raised != 0) {
-        aes_window_t *previous_top = _aes_find_top_window();
-        _aes_raise_window(window);
-        _aes_redraw_window_title_states(previous_top, window);
-    }
-
     part = _aes_window_hit_part(window, (WORD) first_evt->x, (WORD) first_evt->y);
     start_x = (WORD) first_evt->x;
     start_y = (WORD) first_evt->y;
+    raised = (_aes_window_is_top(window) == 0) ? 1 : 0;
+    defer_raise = raised != 0 &&
+        part == AES_WINDOW_PART_TITLE &&
+        (window->kind & MOVER) != 0u;
+    interaction_lock = (part == AES_WINDOW_PART_TITLE &&
+        (window->kind & MOVER) != 0u) ||
+        (part == AES_WINDOW_PART_SIZER && (window->kind & SIZER) != 0u) ||
+        part == AES_WINDOW_PART_VSLIDE || part == AES_WINDOW_PART_HSLIDE;
+
+    if (interaction_lock != 0) {
+        _aes_begin_interaction_lock();
+    }
+
+    if (raised != 0 && defer_raise == 0) {
+        aes_window_t *previous_top = _aes_find_top_window();
+        _aes_raise_window(window);
+        _aes_redraw_window_change(&window->outer, &window->outer);
+        _aes_redraw_window_title_states(previous_top, window);
+    }
 
     if (part == AES_WINDOW_PART_CLOSER) {
         gem_hid_event_t evt;
@@ -399,12 +448,14 @@ static WORD _aes_track_window_interaction(const gem_hid_event_t *first_evt,
         if (part == AES_WINDOW_PART_VSLIDE) {
             if (_aes_window_vslot_rect(window, &slot) == 0 ||
                 _aes_window_vthumb_rect(window, &thumb) == 0) {
+                _aes_end_interaction_lock();
                 return 0;
             }
             press_offset = (WORD) (start_y - thumb.g_y);
         } else {
             if (_aes_window_hslot_rect(window, &slot) == 0 ||
                 _aes_window_hthumb_rect(window, &thumb) == 0) {
+                _aes_end_interaction_lock();
                 return 0;
             }
             press_offset = (WORD) (start_x - thumb.g_x);
@@ -506,8 +557,10 @@ static WORD _aes_track_window_interaction(const gem_hid_event_t *first_evt,
 
         if ((flags & MU_MESAG) != 0u && mepbuff != NULL &&
             _aes_dequeue_message(mepbuff) != 0) {
+            _aes_end_interaction_lock();
             return MU_MESAG;
         }
+        _aes_end_interaction_lock();
         return 0;
     }
 
@@ -561,6 +614,9 @@ static WORD _aes_track_window_interaction(const gem_hid_event_t *first_evt,
             if (evt.type == GEM_HID_MOUSE_BUTTON &&
                 evt.button == GEM_HID_BUTTON_LEFT &&
                 (evt.flags & GEM_HID_BUTTON_LEFT) == 0u) {
+                GRECT previous_outer = window->outer;
+                aes_window_t *previous_top = NULL;
+
                 _vdi_begin_update();
                 v_hide_c(_aes.vdi_handle);
                 _aes_store_mouse_state(&evt);
@@ -569,16 +625,39 @@ static WORD _aes_track_window_interaction(const gem_hid_event_t *first_evt,
                 }
                 v_show_c(_aes.vdi_handle, 1);
                 _vdi_end_update();
+                if (defer_raise != 0) {
+                    previous_top = _aes_find_top_window();
+                    _aes_raise_window(window);
+                }
+                window->previous_outer = previous_outer;
+                _aes_set_rect(&window->outer, drag_rect.g_x, drag_rect.g_y,
+                    drag_rect.g_w, drag_rect.g_h);
                 if (window->iconified != 0) {
                     window->restored_outer.g_x = drag_rect.g_x;
                     window->restored_outer.g_y = drag_rect.g_y;
+                    window->restored_outer.g_w = drag_rect.g_w;
+                } else {
+                    window->restored_outer = window->outer;
+                }
+                _aes_compute_work(window);
+                if (window->open != 0) {
+                    _aes_redraw_window_change(&window->previous_outer,
+                        &window->outer);
+                }
+                if (defer_raise != 0) {
+                    _aes_redraw_window_title_states(previous_top, window);
                 }
                 _aes_queue_window_message(window, WM_MOVED, drag_rect.g_x,
                     drag_rect.g_y, drag_rect.g_w, drag_rect.g_h);
+                if (defer_raise != 0) {
+                    _aes_queue_window_message(window, WM_TOPPED, 0, 0, 0, 0);
+                }
                 if ((flags & MU_MESAG) != 0u && mepbuff != NULL &&
                     _aes_dequeue_message(mepbuff) != 0) {
+                    _aes_end_interaction_lock();
                     return MU_MESAG;
                 }
+                _aes_end_interaction_lock();
                 return 0;
             }
         }
@@ -635,6 +714,8 @@ static WORD _aes_track_window_interaction(const gem_hid_event_t *first_evt,
             if (evt.type == GEM_HID_MOUSE_BUTTON &&
                 evt.button == GEM_HID_BUTTON_LEFT &&
                 (evt.flags & GEM_HID_BUTTON_LEFT) == 0u) {
+                GRECT previous_outer = window->outer;
+
                 _vdi_begin_update();
                 v_hide_c(_aes.vdi_handle);
                 _aes_store_mouse_state(&evt);
@@ -643,12 +724,25 @@ static WORD _aes_track_window_interaction(const gem_hid_event_t *first_evt,
                 }
                 v_show_c(_aes.vdi_handle, 1);
                 _vdi_end_update();
+                window->previous_outer = previous_outer;
+                _aes_set_rect(&window->outer, drag_rect.g_x, drag_rect.g_y,
+                    drag_rect.g_w, drag_rect.g_h);
+                if (window->iconified == 0) {
+                    window->restored_outer = window->outer;
+                }
+                _aes_compute_work(window);
+                if (window->open != 0) {
+                    _aes_redraw_window_change(&window->previous_outer,
+                        &window->outer);
+                }
                 _aes_queue_window_message(window, WM_SIZED, drag_rect.g_x,
                     drag_rect.g_y, drag_rect.g_w, drag_rect.g_h);
                 if ((flags & MU_MESAG) != 0u && mepbuff != NULL &&
                     _aes_dequeue_message(mepbuff) != 0) {
+                    _aes_end_interaction_lock();
                     return MU_MESAG;
                 }
+                _aes_end_interaction_lock();
                 return 0;
             }
         }

@@ -37,6 +37,80 @@
                 "kind": "build",
                 "isDefault": true
             }
+        },
+        {
+            "label": "Build Menu Demo",
+            "type": "shell",
+            "command": "cmake",
+            "args": [
+                "--build",
+                "build",
+                "--target",
+                "gemd",
+                "menu_demo"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "dependsOn": "Configure CMake",
+            "problemMatcher": [
+                "$gcc"
+            ]
+        },
+        {
+            "label": "Start gemd",
+            "type": "shell",
+            "command": "${workspaceFolder}/tools/start-gemd.sh",
+            "options": {
+                "cwd": "${workspaceFolder}",
+                "env": {
+                    "GEM_RASTA_FRAMEBUFFER": "/tmp/rasta.fb",
+                    "GEM_RASTA_HOST": "127.0.0.1",
+                    "GEM_RASTA_PORT": "5000"
+                }
+            },
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "clear": true
+            }
+        },
+        {
+            "label": "Start rasta viewer",
+            "type": "shell",
+            "command": "${workspaceFolder}/tools/start-rasta.sh",
+            "options": {
+                "cwd": "${workspaceFolder}",
+                "env": {
+                    "GEM_RASTA_PORT": "5000"
+                }
+            },
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "clear": false
+            }
+        },
+        {
+            "label": "Build + Start gemd",
+            "dependsOn": [
+                "Build Menu Demo",
+                "Start rasta viewer",
+                "Start gemd"
+            ],
+            "dependsOrder": "sequence",
+            "problemMatcher": []
+        },
+        {
+            "label": "Build Desktop + Start rasta",
+            "dependsOn": [
+                "Build Desktop",
+                "Start rasta viewer"
+            ],
+            "dependsOrder": "sequence",
+            "problemMatcher": []
         }
     ]
 }

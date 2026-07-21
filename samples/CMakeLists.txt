@@ -16,6 +16,8 @@ add_subdirectory(demo31)
 add_subdirectory(demo32)
 add_subdirectory(demo33)
 add_subdirectory(multi)
+add_subdirectory(menu_demo)
+add_subdirectory(terminal)
 
 function(add_manual_demo target_name source_file)
     add_executable(${target_name}

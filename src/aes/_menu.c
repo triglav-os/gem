@@ -18,6 +18,8 @@ static int _aes_menu_redraw_in_progress;
 static WORD _aes_menu_popup_container(OBJECT *tree);
 static WORD _aes_menu_first_popup_child(OBJECT *tree, WORD popup_parent);
 static WORD _aes_menu_last_object(OBJECT *tree);
+static WORD _aes_menu_last_reachable_object(const OBJECT *tree,
+    WORD object, uint8_t visited[256]);
 static WORD _aes_menu_title_container(OBJECT *tree);
 static WORD _aes_menu_nth_child(OBJECT *tree, WORD parent, WORD index);
 static WORD _aes_menu_index_for_title(OBJECT *tree, WORD title);
@@ -85,19 +87,47 @@ static WORD _aes_menu_first_popup_child(OBJECT *tree, WORD popup_parent)
 
 static WORD _aes_menu_last_object(OBJECT *tree)
 {
-    WORD i;
+    uint8_t visited[256] = {0};
 
     if (tree == NULL) {
         return ROOT;
     }
 
-    for (i = ROOT; i < 256; ++i) {
-        if ((tree[i].ob_flags & LASTOB) != 0u) {
-            return i;
-        }
+    return _aes_menu_last_reachable_object(tree, ROOT, visited);
+}
+
+static WORD _aes_menu_last_reachable_object(const OBJECT *tree,
+    WORD object, uint8_t visited[256])
+{
+    WORD last;
+    WORD child;
+
+    if (tree == NULL || visited == NULL || object < ROOT || object >= 256) {
+        return ROOT;
+    }
+    if (visited[object] != 0u) {
+        return ROOT;
     }
 
-    return ROOT;
+    visited[object] = 1u;
+    last = object;
+    child = tree[object].ob_head;
+
+    while (child != NIL && child != object) {
+        WORD branch_last = _aes_menu_last_reachable_object(tree, child,
+            visited);
+
+        if (branch_last > last) {
+            last = branch_last;
+        }
+        if (child == tree[object].ob_tail || tree[child].ob_next == object ||
+            tree[child].ob_next == ROOT || tree[child].ob_next == NIL) {
+            break;
+        }
+        child = tree[child].ob_next;
+    }
+
+    return last;
 }
 
 static WORD _aes_menu_title_container(OBJECT *tree)
@@ -428,6 +458,37 @@ void _aes_menu_clear_saved_region(void)
     _vdi_end_update();
 }
 
+void _aes_menu_switch_to_app(WORD app_id)
+{
+    aes_app_t *app = _aes_find_app_by_id(app_id);
+    OBJECT *tree = (app != NULL) ? app->menu_tree : NULL;
+    WORD visible = (app != NULL) ? app->menu_visible : 0;
+
+    if (tree == _aes.menu_tree && visible == _aes.menu_visible) {
+        return;
+    }
+
+    if (_aes.menu_visible != 0) {
+        _aes_menu_clear_saved_region();
+    }
+
+    _aes.menu_tree = tree;
+    _aes.menu_visible = visible;
+    _aes.menu_owner_app_id = (app != NULL) ? app_id : 0;
+
+    if (visible != 0 && tree != NULL) {
+        /*
+         * menu_bar() already normalized this tree's linkage once when
+         * the owning app installed it. _aes_menu_prepare_tree() is not
+         * idempotent (its re-link guard only holds before ROOT.ob_tail
+         * gets rewritten to the popup root), so calling it again here
+         * on every focus switch corrupts popup lookups.
+         */
+        _aes_menu_hide_popups(tree);
+        _aes_menu_redraw_tree(tree);
+    }
+}
+
 void _aes_menu_prepare_tree(OBJECT *tree)
 {
     WORD last_object;
@@ -675,24 +736,25 @@ void _aes_menu_prepare_tree(OBJECT *tree)
         tree[popup_parent].ob_height = menu_item_height;
     }
 
-    if (_aes.menu_popup_root_direct != 0) {
-        WORD popup = _aes_menu_first_popup_child(tree, ROOT);
+    if (popup_parent != NIL) {
+        WORD popup = _aes_menu_first_popup_child(tree, popup_parent);
         WORD title = first_title;
 
         while (popup != NIL && title != NIL && title <= last_title) {
             WORD title_x = 0;
             WORD title_y = 0;
+            WORD next = tree[popup].ob_next;
 
             _aes_object_extent(tree, title, &title_x, &title_y);
             tree[popup].ob_x = title_x;
             tree[popup].ob_y = (WORD) _aes_max_word((WORD) 0,
                 (WORD) (tree[bar].ob_height - 1));
 
-            if (popup == tree[ROOT].ob_tail || tree[popup].ob_next == ROOT ||
-                tree[popup].ob_next == NIL) {
+            if (popup == tree[popup_parent].ob_tail || next == popup_parent ||
+                next == ROOT || next == NIL) {
                 break;
             }
-            popup = tree[popup].ob_next;
+            popup = next;
             if (title == last_title) {
                 title = NIL;
             } else {
@@ -701,8 +763,8 @@ void _aes_menu_prepare_tree(OBJECT *tree)
         }
     }
 
-    if (_aes.menu_popup_root_direct != 0) {
-        WORD popup = _aes_menu_first_popup_child(tree, ROOT);
+    if (popup_parent != NIL) {
+        WORD popup = _aes_menu_first_popup_child(tree, popup_parent);
         const WORD popup_inner_right_padding = 3;
 
         while (popup != NIL) {
@@ -710,6 +772,7 @@ void _aes_menu_prepare_tree(OBJECT *tree)
             WORD popup_width = tree[popup].ob_width;
             WORD popup_height = 0;
             WORD row_y = 1;
+            WORD next = tree[popup].ob_next;
 
             while (child != NIL) {
                 LONG child_spec = _aes_resolve_spec(&tree[child]);
@@ -780,11 +843,11 @@ void _aes_menu_prepare_tree(OBJECT *tree)
             tree[popup].ob_height = (WORD) _aes_max_word((WORD) 2,
                 (WORD) (popup_height + 1));
 
-            if (popup == tree[ROOT].ob_tail || tree[popup].ob_next == ROOT ||
-                tree[popup].ob_next == NIL) {
+            if (popup == tree[popup_parent].ob_tail || next == popup_parent ||
+                next == ROOT || next == NIL) {
                 break;
             }
-            popup = tree[popup].ob_next;
+            popup = next;
         }
     }
 
@@ -1079,6 +1142,15 @@ WORD _aes_menu_event(OBJECT *tree,
 
             if (_aes_menu_item_selectable(tree, release_hit)) {
                 item = release_hit;
+            } else {
+                /*
+                 * Releasing off any selectable item must cancel,
+                 * not fall back to whatever was last highlighted
+                 * while dragging through the popup -- otherwise a
+                 * release anywhere (even outside the whole menu)
+                 * reports that stale item as chosen.
+                 */
+                item = NIL;
             }
 
             if (item == NIL && sticky) {

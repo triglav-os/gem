@@ -1,5 +1,6 @@
 add_library(gem SHARED
     client.c
+    client_objc.c
 )
 
 target_include_directories(gem

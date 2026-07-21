@@ -15,6 +15,7 @@
 
 #include <errno.h>
 #include <poll.h>
+#include <signal.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -31,7 +32,17 @@ typedef struct gemd_session {
     int fd;
     WORD app_id;
     WORD vdi_open;
+    OBJECT *menu_objects;
+    char *menu_strings_blob;
 } gemd_session_t;
+
+static void gemd_free_session_menu(gemd_session_t *session)
+{
+    free(session->menu_objects);
+    session->menu_objects = NULL;
+    free(session->menu_strings_blob);
+    session->menu_strings_blob = NULL;
+}
 
 static int g_listen_fd = -1;
 static gemd_session_t g_sessions[GEMD_MAX_SESSIONS];
@@ -192,6 +203,30 @@ static void gemd_cleanup_app(WORD app_id)
         }
     }
 
+    /*
+     * If this app disconnected between its own wind_update(BEG_UPDATE)
+     * and END_UPDATE (crash, kill, or just a bug), _aes.update_depth
+     * would otherwise stay stuck above 0 forever -- it is a single
+     * counter shared by every app, so gemd_pump_hid()'s "don't touch
+     * input mid-update" guard would then silently stop processing
+     * mouse/keyboard input for the *entire* desktop, for every app,
+     * until gemd itself was restarted. Since gemd can legitimately
+     * interleave different apps' BEG/END pairs, only unwind exactly
+     * what this app itself still owed -- not the whole counter, which
+     * may also carry another app's still-legitimate in-progress
+     * update. current_app_id is already this app_id here, so
+     * wind_update() finds the right per-app count.
+     */
+    {
+        aes_app_t *app = _aes_find_app_by_id(app_id);
+        WORD owed = (app != NULL) ? app->update_depth : 0;
+
+        while (owed > 0) {
+            (void) wind_update(END_UPDATE);
+            --owed;
+        }
+    }
+
     if (_aes.current_app_id == app_id) {
         _aes.current_app_id = 0;
         global[2] = 0;
@@ -220,6 +255,7 @@ static void gemd_close_session(gemd_session_t *session)
             --g_server_vdi_refs;
         }
     }
+    gemd_free_session_menu(session);
 
     (void) close(session->fd);
     session->fd = -1;
@@ -285,6 +321,22 @@ static void gemd_shutdown(void)
     (void) unlink(GEMD_SOCKET_PATH);
 }
 
+static int gemd_session_may_run(const gemd_session_t *session)
+{
+    aes_app_t *app;
+
+    if (session == NULL) {
+        return 0;
+    }
+
+    if (_aes.update_depth == 0) {
+        return 1;
+    }
+
+    app = _aes_find_app_by_id(session->app_id);
+    return (app != NULL && app->update_depth > 0) ? 1 : 0;
+}
+
 static int32_t gemd_dispatch(gemd_session_t *session,
                              const gem_rpc_header_t *header,
                              const uint8_t *payload,
@@ -309,6 +361,7 @@ static int32_t gemd_dispatch(gemd_session_t *session,
         }
         gemd_cleanup_app(session->app_id);
         session->app_id = 0;
+        gemd_free_session_menu(session);
         status = 1;
         break;
 
@@ -332,13 +385,33 @@ static int32_t gemd_dispatch(gemd_session_t *session,
                 (const gem_rpc_evnt_multi_req_t *) payload;
             gem_rpc_evnt_multi_rsp_t *rsp =
                 (gem_rpc_evnt_multi_rsp_t *) response;
+            UWORD client_wants_timer = (UWORD) (req->flags & MU_TIMER);
+            UWORD bounded_flags = (UWORD) (req->flags | MU_TIMER);
+            UWORD bounded_tlc = client_wants_timer != 0u ? req->tlc : 20u;
+            UWORD bounded_thc = client_wants_timer != 0u ? req->thc : 0u;
 
+            /*
+             * evnt_multi()'s own timeout early-exit only fires when
+             * MU_TIMER is set (see event.c); a client that omits it
+             * (real single-tasking GEM apps commonly poll with
+             * tlc=thc=0, expecting an instant "nothing happened"
+             * return) would otherwise block this single-threaded
+             * dispatch loop -- and therefore every other session --
+             * for as long as it takes an event to show up, which can
+             * be forever. Force a small bound here whenever the
+             * client didn't already opt into one, and swallow a
+             * resulting MU_TIMER it never requested so its own logic
+             * still sees plain "no event" and just polls again.
+             */
             memset(rsp, 0, sizeof(*rsp));
-            rsp->event = evnt_multi(req->flags, req->bclk, req->bmsk,
+            rsp->event = evnt_multi(bounded_flags, req->bclk, req->bmsk,
                 req->bst, req->m1flags, req->m1x, req->m1y, req->m1w,
                 req->m1h, req->m2flags, req->m2x, req->m2y, req->m2w,
-                req->m2h, rsp->msg, req->tlc, req->thc, &rsp->mx, &rsp->my,
-                &rsp->mb, &rsp->ks, &rsp->kr, &rsp->br);
+                req->m2h, rsp->msg, bounded_tlc, bounded_thc, &rsp->mx,
+                &rsp->my, &rsp->mb, &rsp->ks, &rsp->kr, &rsp->br);
+            if (rsp->event == MU_TIMER && client_wants_timer == 0u) {
+                rsp->event = 0;
+            }
             status = rsp->event;
             *response_size = (uint32_t) sizeof(*rsp);
         }
@@ -695,6 +768,63 @@ static int32_t gemd_dispatch(gemd_session_t *session,
         }
         break;
 
+    case GEM_RPC_MENU_BAR:
+        {
+            const gem_rpc_menu_bar_req_t *req =
+                (const gem_rpc_menu_bar_req_t *) payload;
+            WORD count = req->object_count;
+            WORD i;
+            OBJECT *objects;
+            char *strings_blob = NULL;
+
+            if (count <= 0 || count > (WORD) GEM_RPC_MENU_MAX_OBJECTS) {
+                status = 0;
+                break;
+            }
+
+            objects = malloc((size_t) count * sizeof(OBJECT));
+            if (objects == NULL) {
+                status = 0;
+                break;
+            }
+            memcpy(objects, req->objects, (size_t) count * sizeof(OBJECT));
+
+            if (req->string_count > 0) {
+                strings_blob = malloc((size_t) req->string_count *
+                    GEM_RPC_MENU_STRING_MAX);
+                if (strings_blob == NULL) {
+                    free(objects);
+                    status = 0;
+                    break;
+                }
+            }
+
+            for (i = 0; i < req->string_count; ++i) {
+                WORD obj_index = req->strings[i].object;
+                char *slot = strings_blob + (size_t) i * GEM_RPC_MENU_STRING_MAX;
+
+                memcpy(slot, req->strings[i].text, GEM_RPC_MENU_STRING_MAX);
+                slot[GEM_RPC_MENU_STRING_MAX - 1u] = '\0';
+                if (obj_index >= 0 && obj_index < count) {
+                    objects[obj_index].ob_spec = (LONG) (intptr_t) slot;
+                }
+            }
+
+            gemd_free_session_menu(session);
+            session->menu_objects = objects;
+            session->menu_strings_blob = strings_blob;
+
+            status = menu_bar(objects, req->show);
+            _aes_trace("gemd menu_bar app=%d objects=%d strings=%d "
+                "title0=%s show=%d status=%d",
+                session->app_id, count, req->string_count,
+                req->string_count > 0
+                    ? (const char *) (intptr_t) objects[req->strings[0].object].ob_spec
+                    : "(none)",
+                req->show, (int) status);
+        }
+        break;
+
     default:
         status = -1;
         break;
@@ -731,8 +861,17 @@ static int gemd_handle_request(gemd_session_t *session)
 
 int main(void)
 {
-    struct pollfd pollfds[GEMD_MAX_SESSIONS + 1];
     size_t i;
+
+    /*
+     * Writing to a session socket whose peer already closed its end
+     * raises SIGPIPE, whose default disposition kills the process --
+     * taking down every other connected client with it. gemd_send_all
+     * already handles a plain -1/EPIPE return gracefully; ignoring the
+     * signal is what lets that code path run instead of the process
+     * dying first.
+     */
+    (void) signal(SIGPIPE, SIG_IGN);
 
     for (i = 0; i < GEMD_MAX_SESSIONS; ++i) {
         g_sessions[i].fd = -1;
@@ -743,20 +882,44 @@ int main(void)
     }
 
     printf("gemd listening on %s\n", GEMD_SOCKET_PATH);
+    fflush(stdout);
 
     for (;;) {
+        /*
+         * pollfds[] and poll_owner[] are built together, in the same
+         * pass, so pollfds[k] and poll_owner[k] always describe the
+         * same fd by construction. Earlier versions rebuilt this
+         * fd-to-session mapping a second time (by re-running the same
+         * "skip if not connected" scan) for the close/dispatch pass
+         * below; that second derivation could drift from the first
+         * whenever a session was accepted, closed, or reused in
+         * between, silently pointing a session at another session's
+         * poll result. That one fragile pattern was the root cause of
+         * several different-looking failures (a session that never
+         * got serviced, one serviced with the wrong readiness state,
+         * a freshly-accepted connection closed on the spot). Deriving
+         * the mapping exactly once removes the whole class of bug
+         * rather than one instance of it.
+         */
+        struct pollfd pollfds[GEMD_MAX_SESSIONS + 1];
+        gemd_session_t *poll_owner[GEMD_MAX_SESSIONS + 1];
+        nfds_t nfds = 0;
+        nfds_t k;
         int rc;
-        nfds_t nfds = 1;
 
-        pollfds[0].fd = g_listen_fd;
-        pollfds[0].events = POLLIN;
-        pollfds[0].revents = 0;
+        pollfds[nfds].fd = g_listen_fd;
+        pollfds[nfds].events = POLLIN;
+        pollfds[nfds].revents = 0;
+        poll_owner[nfds] = NULL;
+        ++nfds;
 
         for (i = 0; i < GEMD_MAX_SESSIONS; ++i) {
-            if (g_sessions[i].fd >= 0) {
+            if (g_sessions[i].fd >= 0 &&
+                gemd_session_may_run(&g_sessions[i]) != 0) {
                 pollfds[nfds].fd = g_sessions[i].fd;
                 pollfds[nfds].events = POLLIN;
                 pollfds[nfds].revents = 0;
+                poll_owner[nfds] = &g_sessions[i];
                 ++nfds;
             }
         }
@@ -771,37 +934,32 @@ int main(void)
             break;
         }
 
-        if ((pollfds[0].revents & POLLIN) != 0) {
-            gemd_session_t *session = gemd_alloc_session();
+        for (k = 1; k < nfds; ++k) {
+            gemd_session_t *session = poll_owner[k];
 
-            if (session != NULL) {
-                int fd = accept(g_listen_fd, NULL, NULL);
-
-                if (fd >= 0) {
-                    session->fd = fd;
-                    session->app_id = 0;
-                    session->vdi_open = 0;
-                }
-            } else {
-                int fd = accept(g_listen_fd, NULL, NULL);
-
-                if (fd >= 0) {
-                    (void) close(fd);
-                }
+            if (session == NULL || pollfds[k].revents == 0) {
+                continue;
+            }
+            if ((pollfds[k].revents & (POLLERR | POLLHUP | POLLNVAL)) != 0 ||
+                ((pollfds[k].revents & POLLIN) != 0 &&
+                    !gemd_handle_request(session))) {
+                gemd_close_session(session);
             }
         }
 
-        nfds = 1;
-        for (i = 0; i < GEMD_MAX_SESSIONS; ++i) {
-            if (g_sessions[i].fd < 0) {
-                continue;
+        if ((pollfds[0].revents & POLLIN) != 0) {
+            gemd_session_t *session = gemd_alloc_session();
+            int fd = accept(g_listen_fd, NULL, NULL);
+
+            if (fd >= 0) {
+                if (session != NULL) {
+                    session->fd = fd;
+                    session->app_id = 0;
+                    session->vdi_open = 0;
+                } else {
+                    (void) close(fd);
+                }
             }
-            if ((pollfds[nfds].revents & (POLLERR | POLLHUP | POLLNVAL)) != 0 ||
-                ((pollfds[nfds].revents & POLLIN) != 0 &&
-                    !gemd_handle_request(&g_sessions[i]))) {
-                gemd_close_session(&g_sessions[i]);
-            }
-            ++nfds;
         }
 
         gemd_pump_hid();

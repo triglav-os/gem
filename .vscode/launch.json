@@ -1,5 +1,16 @@
 {
     "version": "0.2.0",
+    "compounds": [
+        {
+            "name": "Debug Menu Demo (gemd + 2 apps)",
+            "preLaunchTask": "Build + Start gemd",
+            "configurations": [
+                "Debug Menu Demo A",
+                "Debug Menu Demo B"
+            ],
+            "stopAll": true
+        }
+    ],
     "configurations": [
         {
             "name": "Debug Desktop",
@@ -24,13 +35,88 @@
                 }
             ],
             "externalConsole": false,
+            "miDebuggerArgs": "-iex \"set debuginfod enabled off\"",
             "MIMode": "gdb",
-            "miDebuggerPath": "/usr/bin/gdb",
-            "preLaunchTask": "Build Desktop",
+            "miDebuggerPath": "${workspaceFolder}/tools/gdb-no-debuginfod.sh",
+            "preLaunchTask": "Build Desktop + Start rasta",
             "setupCommands": [
+                {
+                    "description": "Enable async MI so Pause/interrupt works while the target is running",
+                    "text": "-gdb-set mi-async on",
+                    "ignoreFailures": true
+                },
                 {
                     "description": "Enable pretty-printing for gdb",
                     "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Disable pagination in gdb",
+                    "text": "set pagination off",
+                    "ignoreFailures": true
+                }
+            ]
+        },
+        {
+            "name": "Debug Menu Demo A",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/bin/menu_demo",
+            "args": [
+                "A"
+            ],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "externalConsole": false,
+            "miDebuggerArgs": "-iex \"set debuginfod enabled off\"",
+            "MIMode": "gdb",
+            "miDebuggerPath": "${workspaceFolder}/tools/gdb-no-debuginfod.sh",
+            "setupCommands": [
+                {
+                    "description": "Enable async MI so Pause/interrupt works while the target is running",
+                    "text": "-gdb-set mi-async on",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Disable pagination in gdb",
+                    "text": "set pagination off",
+                    "ignoreFailures": true
+                }
+            ]
+        },
+        {
+            "name": "Debug Menu Demo B",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/bin/menu_demo",
+            "args": [
+                "B"
+            ],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "externalConsole": false,
+            "miDebuggerArgs": "-iex \"set debuginfod enabled off\"",
+            "MIMode": "gdb",
+            "miDebuggerPath": "${workspaceFolder}/tools/gdb-no-debuginfod.sh",
+            "setupCommands": [
+                {
+                    "description": "Enable async MI so Pause/interrupt works while the target is running",
+                    "text": "-gdb-set mi-async on",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Disable pagination in gdb",
+                    "text": "set pagination off",
                     "ignoreFailures": true
                 }
             ]

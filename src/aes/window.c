@@ -12,6 +12,7 @@
 
 aes_window_t *_aes_find_top_window(void);
 static WORD _aes_build_visible_rects(WORD handle, GRECT out[], WORD max_rects);
+static void _aes_window_cover_rect(const aes_window_t *window, GRECT *rect);
 static void _aes_union_rects(const GRECT *left, const GRECT *right, GRECT *out);
 static void _aes_redraw_scrollbar_delta(const aes_window_t *before,
     const aes_window_t *after, WORD field);
@@ -54,11 +55,33 @@ aes_window_t *_aes_find_top_window(void)
     return best;
 }
 
+static void _aes_window_cover_rect(const aes_window_t *window, GRECT *rect)
+{
+    if (rect == NULL) {
+        return;
+    }
+
+    if (window == NULL || window->used == 0 || window->open == 0 ||
+        window->outer.g_w <= 0 || window->outer.g_h <= 0) {
+        _aes_set_rect(rect, 0, 0, 0, 0);
+        return;
+    }
+
+    /*
+     * Hosted AES draws a one-pixel shadow on the right and bottom
+     * edges, so visible-region enumeration must treat that shadow as
+     * occupied by the covering window too.
+     */
+    _aes_set_rect(rect, window->outer.g_x, window->outer.g_y,
+        (WORD) (window->outer.g_w + 1), (WORD) (window->outer.g_h + 1));
+}
+
 static WORD _aes_build_visible_rects(WORD handle, GRECT out[], WORD max_rects)
 {
     GRECT pending[64];
     GRECT next_pending[64];
     GRECT base;
+    aes_window_t *target = NULL;
     WORD pending_count = 0;
     size_t i;
 
@@ -75,6 +98,7 @@ static WORD _aes_build_visible_rects(WORD handle, GRECT out[], WORD max_rects)
             window->work.g_h <= 0) {
             return 0;
         }
+        target = window;
         base = window->work;
     }
 
@@ -82,27 +106,38 @@ static WORD _aes_build_visible_rects(WORD handle, GRECT out[], WORD max_rects)
         return 0;
     }
 
+    _aes_trace("visible_rects begin handle=%d base=%d,%d %dx%d target_z=%lu",
+        handle, base.g_x, base.g_y, base.g_w, base.g_h,
+        (unsigned long) ((target != NULL) ? target->z_order : 0u));
+
     pending[0] = base;
     pending_count = 1;
 
     for (i = 0; i < AES_MAX_WINDOWS && pending_count > 0; ++i) {
         const aes_window_t *cover = &_aes.windows[i];
+        GRECT cover_rect;
         WORD next_count = 0;
         WORD j;
 
         if (cover->used == 0 || cover->open == 0) {
             continue;
         }
-        if (handle != 0 &&
-            (cover->handle == handle ||
-            cover->z_order <= _aes_find_window(handle)->z_order)) {
+        if (target != NULL &&
+            (cover->handle == handle || cover->z_order <= target->z_order)) {
             continue;
         }
+        _aes_window_cover_rect(cover, &cover_rect);
+        if (cover_rect.g_w <= 0 || cover_rect.g_h <= 0) {
+            continue;
+        }
+        _aes_trace("visible_rects cover handle=%d z=%lu rect=%d,%d %dx%d pending=%d",
+            cover->handle, (unsigned long) cover->z_order, cover_rect.g_x,
+            cover_rect.g_y, cover_rect.g_w, cover_rect.g_h, pending_count);
 
         for (j = 0; j < pending_count; ++j) {
             GRECT fragments[4];
             WORD fragment_count = _aes_subtract_rect(&pending[j],
-                &cover->outer, fragments);
+                &cover_rect, fragments);
             WORD k;
 
             for (k = 0; k < fragment_count && next_count < max_rects; ++k) {
@@ -114,6 +149,12 @@ static WORD _aes_build_visible_rects(WORD handle, GRECT out[], WORD max_rects)
         pending_count = next_count;
     }
 
+    for (i = 0; i < (size_t) pending_count; ++i) {
+        _aes_trace("visible_rects out[%lu]=%d,%d %dx%d",
+            (unsigned long) i, pending[i].g_x, pending[i].g_y,
+            pending[i].g_w, pending[i].g_h);
+    }
+    _aes_trace("visible_rects end handle=%d count=%d", handle, pending_count);
     memcpy(out, pending, (size_t) pending_count * sizeof(GRECT));
     return pending_count;
 }
@@ -212,9 +253,6 @@ WORD wind_open(WORD handle, WORD x, WORD y, WORD w, WORD h)
     aes_window_t *window = _aes_find_window(handle);
     aes_window_t *previous_top = NULL;
     GRECT previous_outer;
-    GRECT desktop;
-    size_t i;
-    int had_open_windows = 0;
     int was_open = 0;
 
     if (window == NULL) {
@@ -222,13 +260,6 @@ WORD wind_open(WORD handle, WORD x, WORD y, WORD w, WORD h)
     }
     was_open = (window->open != 0);
     previous_top = _aes_find_top_window();
-    for (i = 0; i < AES_MAX_WINDOWS; ++i) {
-        if (_aes.windows[i].used != 0 && _aes.windows[i].open != 0 &&
-            _aes.windows[i].handle != handle) {
-            had_open_windows = 1;
-            break;
-        }
-    }
     if (was_open != 0) {
         previous_outer = window->outer;
     } else {
@@ -241,12 +272,6 @@ WORD wind_open(WORD handle, WORD x, WORD y, WORD w, WORD h)
     window->previous_outer = window->outer;
     _aes_compute_work(window);
     window->open = 1;
-    if (had_open_windows == 0) {
-        _aes_desktop_rect(&desktop);
-        if (desktop.g_w > 0 && desktop.g_h > 0) {
-            _aes_redraw_region(&desktop);
-        }
-    }
     _aes_redraw_window_change(&previous_outer, &window->outer);
     if (was_open == 0) {
         _aes_redraw_window_title_states(previous_top, window);
@@ -281,6 +306,7 @@ WORD wind_delete(WORD handle)
 
 WORD wind_get(WORD handle, WORD field, WORD *w1, WORD *w2, WORD *w3, WORD *w4)
 {
+    aes_app_t *app = _aes_find_app_by_id(_aes.current_app_id);
     aes_window_t *window = _aes_find_window(handle);
     const GRECT *rect;
     GRECT rect_value;
@@ -317,26 +343,34 @@ WORD wind_get(WORD handle, WORD field, WORD *w1, WORD *w2, WORD *w3, WORD *w4)
             (WORD) (rect_value.g_h - menu_height));
 
         if (field == WF_FIRSTXYWH) {
-            _aes.enum_handle = 0;
-            _aes.enum_index = 0;
-            _aes.enum_count = _aes_build_visible_rects(0, _aes.enum_rects, 64);
-            if (_aes.enum_count > 0) {
-                rect_value = _aes.enum_rects[0];
-                _aes.enum_stage = 1;
+            if (app != NULL) {
+                app->enum_handle = 0;
+                app->enum_index = 0;
+                app->enum_count = _aes_build_visible_rects(0,
+                    app->enum_rects, 64);
+                if (app->enum_count > 0) {
+                    rect_value = app->enum_rects[0];
+                    app->enum_stage = 1;
+                } else {
+                    app->enum_stage = 0;
+                    _aes_set_rect(&rect_value, 0, 0, 0, 0);
+                }
             } else {
-                _aes.enum_stage = 0;
                 _aes_set_rect(&rect_value, 0, 0, 0, 0);
             }
         } else if (field == WF_NEXTXYWH) {
-            if (_aes.enum_handle == 0 &&
-                _aes.enum_stage != 0 &&
-                _aes.enum_index + 1 < _aes.enum_count) {
-                ++_aes.enum_index;
-                rect_value = _aes.enum_rects[_aes.enum_index];
+            if (app != NULL &&
+                app->enum_handle == 0 &&
+                app->enum_stage != 0 &&
+                app->enum_index + 1 < app->enum_count) {
+                ++app->enum_index;
+                rect_value = app->enum_rects[app->enum_index];
             } else {
-                _aes.enum_stage = 0;
-                _aes.enum_count = 0;
-                _aes.enum_index = 0;
+                if (app != NULL) {
+                    app->enum_stage = 0;
+                    app->enum_count = 0;
+                    app->enum_index = 0;
+                }
                 _aes_set_rect(&rect_value, 0, 0, 0, 0);
             }
         }
@@ -361,28 +395,37 @@ WORD wind_get(WORD handle, WORD field, WORD *w1, WORD *w2, WORD *w3, WORD *w4)
     }
 
     if (field == WF_FIRSTXYWH) {
-        _aes.enum_handle = handle;
-        _aes.enum_index = 0;
-        _aes.enum_count = _aes_build_visible_rects(handle, _aes.enum_rects, 64);
-        if (_aes.enum_count > 0) {
-            rect = &_aes.enum_rects[0];
-            _aes.enum_stage = 1;
+        if (app != NULL) {
+            app->enum_handle = handle;
+            app->enum_index = 0;
+            app->enum_count = _aes_build_visible_rects(handle, app->enum_rects,
+                64);
+            if (app->enum_count > 0) {
+                rect = &app->enum_rects[0];
+                app->enum_stage = 1;
+            } else {
+                rect = &rect_value;
+                app->enum_stage = 0;
+                _aes_set_rect(&rect_value, 0, 0, 0, 0);
+            }
         } else {
             rect = &rect_value;
-            _aes.enum_stage = 0;
             _aes_set_rect(&rect_value, 0, 0, 0, 0);
         }
     } else if (field == WF_NEXTXYWH) {
-        if (_aes.enum_handle == handle &&
-            _aes.enum_stage != 0 &&
-            _aes.enum_index + 1 < _aes.enum_count) {
-            ++_aes.enum_index;
-            rect = &_aes.enum_rects[_aes.enum_index];
+        if (app != NULL &&
+            app->enum_handle == handle &&
+            app->enum_stage != 0 &&
+            app->enum_index + 1 < app->enum_count) {
+            ++app->enum_index;
+            rect = &app->enum_rects[app->enum_index];
         } else {
             rect = &rect_value;
-            _aes.enum_stage = 0;
-            _aes.enum_count = 0;
-            _aes.enum_index = 0;
+            if (app != NULL) {
+                app->enum_stage = 0;
+                app->enum_count = 0;
+                app->enum_index = 0;
+            }
             _aes_set_rect(&rect_value, 0, 0, 0, 0);
         }
     } else if (field == WF_WXYWH) {
@@ -462,6 +505,11 @@ WORD wind_set(WORD handle, WORD field, WORD w1, WORD w2, WORD w3, WORD w4)
     case WF_TOP:
     {
         aes_window_t *previous_top = _aes_find_top_window();
+
+        if (previous_top == window) {
+            break;
+        }
+
         _aes_raise_window(window);
         _aes_redraw_window_change(&window->outer, &window->outer);
         _aes_redraw_window_title_states(previous_top, window);
@@ -471,6 +519,21 @@ WORD wind_set(WORD handle, WORD field, WORD w1, WORD w2, WORD w3, WORD w4)
     case WF_CXYWH:
         window->previous_outer = window->outer;
         _aes_set_rect(&window->outer, w1, w2, w3, w4);
+        if (window->outer.g_x == window->previous_outer.g_x &&
+            window->outer.g_y == window->previous_outer.g_y &&
+            window->outer.g_w == window->previous_outer.g_w &&
+            window->outer.g_h == window->previous_outer.g_h) {
+            if (window->iconified != 0) {
+                window->restored_outer.g_x = w1;
+                window->restored_outer.g_y = w2;
+                window->restored_outer.g_w = w3;
+            } else {
+                window->restored_outer = window->outer;
+                window->iconified = 0;
+            }
+            _aes_compute_work(window);
+            break;
+        }
         if (window->iconified != 0) {
             window->restored_outer.g_x = w1;
             window->restored_outer.g_y = w2;
@@ -563,11 +626,19 @@ WORD wind_find(WORD x, WORD y)
 
 WORD wind_update(WORD flag)
 {
+    aes_app_t *app = _aes_find_app_by_id(_aes.current_app_id);
+
     if (flag == BEG_UPDATE) {
         ++_aes.update_depth;
+        if (app != NULL) {
+            ++app->update_depth;
+        }
         _vdi_begin_update();
     } else if (flag == END_UPDATE && _aes.update_depth > 0) {
         --_aes.update_depth;
+        if (app != NULL && app->update_depth > 0) {
+            --app->update_depth;
+        }
         _vdi_end_update();
     }
     return 1;

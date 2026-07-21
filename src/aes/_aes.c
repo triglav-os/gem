@@ -238,6 +238,7 @@ void _aes_reset_state(void)
     memset(&_aes, 0, sizeof(_aes));
     _aes.next_app_id = 1;
     _aes.next_window_z = 1u;
+    _aes.next_message_seq = 1u;
     _aes.dclick_rate = 3;
     _aes.menu_click = 1;
     _aes.edit_object = NIL;

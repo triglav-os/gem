@@ -19,7 +19,10 @@
 #define GEM_RPC_MAGIC 0x47454d31u
 #define GEM_RPC_VERSION 1u
 #define GEM_RPC_TEXT_MAX 512u
-#define GEM_RPC_PAYLOAD_MAX 1024u
+#define GEM_RPC_MENU_MAX_OBJECTS 64u
+#define GEM_RPC_MENU_MAX_STRINGS 32u
+#define GEM_RPC_MENU_STRING_MAX 64u
+#define GEM_RPC_PAYLOAD_MAX 8192u
 
 typedef enum gem_rpc_opcode {
     GEM_RPC_APPL_INIT = 1,
@@ -57,7 +60,8 @@ typedef enum gem_rpc_opcode {
     GEM_RPC_WIND_SET_STR,
     GEM_RPC_WIND_FIND,
     GEM_RPC_WIND_UPDATE,
-    GEM_RPC_WIND_CALC
+    GEM_RPC_WIND_CALC,
+    GEM_RPC_MENU_BAR
 } gem_rpc_opcode_t;
 
 typedef struct gem_rpc_header {
@@ -234,6 +238,25 @@ typedef struct gem_rpc_wind_calc_rsp {
     WORD outw;
     WORD outh;
 } gem_rpc_wind_calc_rsp_t;
+
+/*
+ * Carries one object's ob_spec string, keyed by its index in the tree
+ * being sent. Only G_TITLE/G_STRING objects (plain pointer, not
+ * INDIRECT) get an entry; box/container specs travel as raw bytes
+ * inside the object array itself.
+ */
+typedef struct gem_rpc_menu_string {
+    WORD object;
+    char text[GEM_RPC_MENU_STRING_MAX];
+} gem_rpc_menu_string_t;
+
+typedef struct gem_rpc_menu_bar_req {
+    WORD show;
+    WORD object_count;
+    WORD string_count;
+    OBJECT objects[GEM_RPC_MENU_MAX_OBJECTS];
+    gem_rpc_menu_string_t strings[GEM_RPC_MENU_MAX_STRINGS];
+} gem_rpc_menu_bar_req_t;
 
 int gem_rpc_call(gem_rpc_opcode_t opcode,
                  const void *request,
