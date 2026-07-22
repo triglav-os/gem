@@ -29,6 +29,7 @@ enum {
 
 static WORD g_objc_char_w;
 static WORD g_objc_char_h;
+typedef WORD (*gem_user_draw_t)(LONG parm_block);
 
 static void gem_objc_ensure_metrics(void)
 {
@@ -340,8 +341,43 @@ static void gem_objc_draw_ted(const OBJECT *obj, const TEDINFO *ted,
     gem_objc_draw_text(text_x, text_y, GEM_OBJC_DARK_COLOR, text);
 }
 
+static void gem_objc_draw_userdef(const OBJECT *tree, WORD object,
+    const OBJECT *obj, const WORD rect[4], const WORD clip[4])
+{
+    USERBLK *user;
+    PARMBLK parm;
+    gem_user_draw_t draw;
+
+    if (tree == NULL || obj == NULL) {
+        return;
+    }
+
+    user = (USERBLK *) (intptr_t) gem_objc_resolve_spec(obj);
+    if (user == NULL || user->ab_code == 0) {
+        return;
+    }
+
+    memset(&parm, 0, sizeof(parm));
+    parm.pb_tree = (LONG) (intptr_t) tree;
+    parm.pb_obj = object;
+    parm.pb_prevstate = obj->ob_state;
+    parm.pb_currstate = obj->ob_state;
+    parm.pb_x = rect[0];
+    parm.pb_y = rect[1];
+    parm.pb_w = obj->ob_width;
+    parm.pb_h = obj->ob_height;
+    parm.pb_xc = clip[0];
+    parm.pb_yc = clip[1];
+    parm.pb_wc = (WORD) (clip[2] - clip[0] + 1);
+    parm.pb_hc = (WORD) (clip[3] - clip[1] + 1);
+    parm.pb_parm = user->ab_parm;
+
+    draw = (gem_user_draw_t) (intptr_t) user->ab_code;
+    (void) draw((LONG) (intptr_t) &parm);
+}
+
 static void gem_objc_draw_object(const OBJECT *tree, WORD object, WORD abs_x,
-    WORD abs_y)
+    WORD abs_y, const WORD clip[4])
 {
     const OBJECT *obj;
     LONG spec;
@@ -367,8 +403,9 @@ static void gem_objc_draw_object(const OBJECT *tree, WORD object, WORD abs_x,
     rect[3] = (WORD) (rect[1] + obj->ob_height - 1);
 
     switch (obj->ob_type) {
-    case G_BOX:
     case G_IBOX:
+        return;
+    case G_BOX:
         gem_objc_fill_rect(rect[0], rect[1], rect[2], rect[3],
             GEM_OBJC_LIGHT_COLOR);
         if (object != ROOT) {
@@ -392,6 +429,9 @@ static void gem_objc_draw_object(const OBJECT *tree, WORD object, WORD abs_x,
     case G_FTEXT:
     case G_FBOXTEXT:
         gem_objc_draw_ted(obj, (const TEDINFO *) (intptr_t) spec, rect);
+        return;
+    case G_USERDEF:
+        gem_objc_draw_userdef(tree, object, obj, rect, clip);
         return;
     default:
         break;
@@ -436,7 +476,7 @@ static void gem_objc_draw_tree_recursive(const OBJECT *tree, WORD object,
 
     abs_x = (WORD) (parent_x + tree[object].ob_x);
     abs_y = (WORD) (parent_y + tree[object].ob_y);
-    gem_objc_draw_object(tree, object, abs_x, abs_y);
+    gem_objc_draw_object(tree, object, abs_x, abs_y, clip);
 
     if (depth == 0 || tree[object].ob_head == NIL) {
         return;

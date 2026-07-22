@@ -53,6 +53,7 @@ static void clock_free_bitblk(BITBLK *bitblk)
 /*
  * Releases any app-owned bitmap planes referenced by one icon block.
  */
+#ifndef CLOCK_GEMD_CLIENT
 static void clock_free_icon(ICONBLK *icon)
 {
     if (icon == NULL) {
@@ -64,6 +65,7 @@ static void clock_free_icon(ICONBLK *icon)
     icon->ib_pmask = 0;
     icon->ib_pdata = 0;
 }
+#endif
 
 /*
  * Releases all app-owned bitmap resources held in the clock state.
@@ -86,6 +88,7 @@ static void clock_free_icons(clock_state_t *state)
  * Deep-copies one resource bit block so its bitmap plane survives
  * after `rsrc_free()`.
  */
+#ifndef CLOCK_GEMD_CLIENT
 static int clock_clone_bitblk(BITBLK *dst, const BITBLK *src)
 {
     size_t plane_bytes;
@@ -142,6 +145,7 @@ static int clock_clone_icon(ICONBLK *dst, const ICONBLK *src)
     dst->ib_ptext = 0;
     return 1;
 }
+#endif
 
 /*
  * Returns the current local broken-down time. When the host clock
@@ -175,6 +179,7 @@ static void clock_local_time(struct tm *out_tm)
  * Loads the external numeral resource and copies the bit blocks into
  * local state for later direct bitmap drawing.
  */
+#ifndef CLOCK_GEMD_CLIENT
 static int clock_load_bitblks_from_resource(const char *primary_path,
                                             const char *fallback_path,
                                             BITBLK *bitblks,
@@ -245,6 +250,7 @@ static int clock_load_icons_from_resource(const char *primary_path,
     rsrc_free();
     return 1;
 }
+#endif
 
 /*
  * Loads the external numeral resource and copies the icon blocks into
@@ -255,9 +261,13 @@ static int clock_load_numbers(clock_state_t *state)
     if (state == NULL) {
         return 0;
     }
+#ifdef CLOCK_GEMD_CLIENT
+    state->numbers_loaded = 0;
+#else
     state->numbers_loaded = clock_load_bitblks_from_resource(
         "bin/clock_numbers.rsc", "clock_numbers.rsc",
         state->numbers, clock_number_count);
+#endif
     return state->numbers_loaded;
 }
 
@@ -284,6 +294,7 @@ static void clock_point(WORD cx,
  * Draws one transparent image plane at the requested screen
  * position.
  */
+#ifndef CLOCK_GEMD_CLIENT
 static void clock_draw_bitmap_plane(WORD handle,
                                     WORD width,
                                     WORD height,
@@ -358,6 +369,7 @@ static void clock_draw_number_bitmap(WORD handle,
     clock_draw_bitmap_plane(handle, width, bitblk->bi_hl,
         (WORD) (bitblk->bi_wb / 2), bitblk->bi_pdata, dst_x, dst_y);
 }
+#endif
 
 /*
  * Draws all twelve numerals around the clock face.
@@ -370,10 +382,35 @@ static void clock_draw_numbers(WORD handle,
 {
     WORD ii;
 
-    if (state == NULL || state->numbers_loaded == 0) {
+    if (state == NULL) {
         return;
     }
 
+#ifdef CLOCK_GEMD_CLIENT
+    (void) vst_font(handle, ATARI);
+    vst_color(handle, WHITE);
+    for (ii = 0; ii < clock_number_count; ++ii) {
+        char label[3];
+        WORD extent[8];
+        WORD number_x;
+        WORD number_y;
+        WORD text_width;
+        WORD text_height;
+        double angle = (double) (ii + 1) * (clock_pi / 6.0);
+
+        (void) snprintf(label, sizeof(label), "%d", ii + 1);
+        vqt_extent(handle, label, extent);
+        text_width = (WORD) (extent[2] - extent[0] + 1);
+        text_height = (WORD) (extent[5] - extent[1] + 1);
+        clock_point(cx, cy, (double) radius, angle, &number_x, &number_y);
+        number_x = (WORD) (number_x - text_width / 2);
+        number_y = (WORD) (number_y + text_height / 2 - 2);
+        v_gtext(handle, number_x, number_y, (const BYTE *) label);
+    }
+#else
+    if (state->numbers_loaded == 0) {
+        return;
+    }
     for (ii = 0; ii < clock_number_count; ++ii) {
         const BITBLK *bitblk = &state->numbers[ii];
         WORD number_x;
@@ -385,6 +422,7 @@ static void clock_draw_numbers(WORD handle,
         number_y = (WORD) (number_y - bitblk->bi_hl / 2);
         clock_draw_number_bitmap(handle, bitblk, number_x, number_y);
     }
+#endif
 }
 
 /*
@@ -656,9 +694,7 @@ int clock_main(void)
 
     state.handle = wind_create(window_kind, 0, 0, 640, 400);
     if (state.handle <= 0) {
-        if (state.numbers_loaded != 0) {
-            rsrc_free();
-        }
+        clock_free_icons(&state);
         appl_exit();
         gem_os_shutdown();
         return 1;
@@ -684,8 +720,10 @@ int clock_main(void)
             &mouse_x, &mouse_y, &mouse_buttons, &key_state,
             &key_code, &button_return);
 
-        if ((event_flags & MU_MESAG) != 0 && msg[3] == state.handle) {
-            if (msg[0] == WM_CLOSED) {
+        if ((event_flags & MU_MESAG) != 0) {
+            if (msg[3] != state.handle) {
+                continue;
+            } else if (msg[0] == WM_CLOSED) {
                 break;
             } else if (msg[0] == WM_REDRAW) {
                 GRECT redraw_rect;

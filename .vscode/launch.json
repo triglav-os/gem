@@ -38,7 +38,7 @@
             "miDebuggerArgs": "-iex \"set debuginfod enabled off\"",
             "MIMode": "gdb",
             "miDebuggerPath": "${workspaceFolder}/tools/gdb-no-debuginfod.sh",
-            "preLaunchTask": "Build Desktop + Start rasta",
+            "preLaunchTask": "Build Desktop Session",
             "setupCommands": [
                 {
                     "description": "Enable async MI so Pause/interrupt works while the target is running",

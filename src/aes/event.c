@@ -24,6 +24,12 @@ static void _aes_clamp_dragged_window_position(const aes_window_t *window,
 static void _aes_toggle_window_iconified(aes_window_t *window);
 static WORD _aes_track_window_interaction(const gem_hid_event_t *first_evt,
     WORD flags, WORD mepbuff[8], WORD *pmx, WORD *pmy, WORD *pmb, WORD *pks);
+static WORD _aes_input_event_owner(const gem_hid_event_t *evt);
+static void _aes_activate_input_target(const gem_hid_event_t *evt);
+static void _aes_queue_input_event(WORD app_id,
+    const gem_hid_event_t *evt);
+static int _aes_dequeue_input_event(WORD app_id,
+    gem_hid_event_t *evt);
 WORD evnt_keybd(void);
 WORD evnt_button(WORD clicks,
                  UWORD mask,
@@ -114,6 +120,93 @@ static void _aes_post_menu_selection(WORD mepbuff[8])
     (void) appl_write(_aes.menu_owner_app_id, 8, mepbuff);
 }
 
+/* Route work-area presses to their window owner and desktop presses to
+ * the application that owns the menu bar. */
+static WORD _aes_input_event_owner(const gem_hid_event_t *evt)
+{
+    aes_window_t *window;
+    WORD handle;
+
+    if (evt == NULL) {
+        return 0;
+    }
+    if (evt->type == GEM_HID_KEY) {
+        return (_aes.active_app_id != 0) ? _aes.active_app_id :
+            _aes.menu_owner_app_id;
+    }
+    if (evt->type != GEM_HID_MOUSE_BUTTON) {
+        return 0;
+    }
+
+    handle = wind_find((WORD) evt->x, (WORD) evt->y);
+    if (handle == 0) {
+        return _aes.desktop_owner_app_id;
+    }
+
+    window = _aes_find_window(handle);
+    return (window != NULL) ? window->owner : 0;
+}
+
+static void _aes_activate_input_target(const gem_hid_event_t *evt)
+{
+    aes_window_t *window;
+    GRECT desktop;
+    WORD handle;
+
+    if (evt == NULL || evt->type != GEM_HID_MOUSE_BUTTON ||
+        (evt->flags & evt->button) == 0u) {
+        return;
+    }
+
+    handle = wind_find((WORD) evt->x, (WORD) evt->y);
+    if (handle == 0) {
+        _aes_desktop_rect(&desktop);
+        if (_aes_point_in_rect((WORD) evt->x, (WORD) evt->y,
+                &desktop) != 0) {
+            _aes_menu_switch_to_app(_aes.desktop_owner_app_id);
+        }
+        return;
+    }
+
+    window = _aes_find_window(handle);
+    if (window != NULL) {
+        _aes_menu_switch_to_app(window->owner);
+    }
+}
+
+static void _aes_queue_input_event(WORD app_id,
+    const gem_hid_event_t *evt)
+{
+    aes_app_t *app = _aes_find_app_by_id(app_id);
+    WORD tail;
+
+    if (app == NULL || evt == NULL ||
+        app->input_event_count >= AES_APP_INPUT_QUEUE_SIZE) {
+        return;
+    }
+
+    tail = (WORD) ((app->input_event_head + app->input_event_count) %
+        AES_APP_INPUT_QUEUE_SIZE);
+    app->input_events[tail] = *evt;
+    ++app->input_event_count;
+}
+
+static int _aes_dequeue_input_event(WORD app_id,
+    gem_hid_event_t *evt)
+{
+    aes_app_t *app = _aes_find_app_by_id(app_id);
+
+    if (app == NULL || evt == NULL || app->input_event_count == 0) {
+        return 0;
+    }
+
+    *evt = app->input_events[app->input_event_head];
+    app->input_event_head = (WORD) ((app->input_event_head + 1) %
+        AES_APP_INPUT_QUEUE_SIZE);
+    --app->input_event_count;
+    return 1;
+}
+
 void _aes_dispatch_hid_event(const gem_hid_event_t *evt)
 {
     WORD mepbuff[8];
@@ -127,7 +220,9 @@ void _aes_dispatch_hid_event(const gem_hid_event_t *evt)
         if (_aes.menu_visible != 0 && _aes.menu_tree != NULL &&
             _aes_menu_key_event(_aes.menu_tree, evt, mepbuff) != 0) {
             _aes_post_menu_selection(mepbuff);
+            return;
         }
+        _aes_queue_input_event(_aes_input_event_owner(evt), evt);
         return;
     }
 
@@ -135,6 +230,7 @@ void _aes_dispatch_hid_event(const gem_hid_event_t *evt)
         evt->type == GEM_HID_MOUSE_BUTTON) {
         _aes_store_mouse_state(evt);
         if (evt->type == GEM_HID_MOUSE_BUTTON) {
+            _aes_activate_input_target(evt);
             if (_aes.menu_visible != 0 && _aes.menu_tree != NULL &&
                 _aes_menu_event(_aes.menu_tree, evt, mepbuff) != 0) {
                 _aes_post_menu_selection(mepbuff);
@@ -142,6 +238,10 @@ void _aes_dispatch_hid_event(const gem_hid_event_t *evt)
             }
             (void) _aes_track_window_interaction(evt, 0, NULL, NULL, NULL,
                 NULL, NULL);
+            if (evt->button == GEM_HID_BUTTON_LEFT ||
+                evt->button == GEM_HID_BUTTON_RIGHT) {
+                _aes_queue_input_event(_aes_input_event_owner(evt), evt);
+            }
         }
     }
 }
@@ -920,7 +1020,19 @@ WORD evnt_multi(UWORD flags,
             return MU_MESAG;
         }
 
-        if (gem_hid_poll(&evt) != 0) {
+        if (_aes_dequeue_input_event(_aes.current_app_id, &evt) != 0 ||
+            gem_hid_poll(&evt) != 0) {
+            WORD event_owner = _aes_input_event_owner(&evt);
+
+            _aes_activate_input_target(&evt);
+            event_owner = _aes_input_event_owner(&evt);
+
+            if ((evt.type == GEM_HID_KEY ||
+                evt.type == GEM_HID_MOUSE_BUTTON) &&
+                event_owner != 0 && event_owner != _aes.current_app_id) {
+                _aes_queue_input_event(event_owner, &evt);
+                continue;
+            }
             if (evt.type == GEM_HID_KEY) {
                 _aes_store_key_state(&evt);
             }

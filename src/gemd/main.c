@@ -183,6 +183,14 @@ static void gemd_cleanup_app(WORD app_id)
         return;
     }
 
+    if ((_aes.menu_owner_app_id == app_id || _aes.active_app_id == app_id) &&
+        _aes.desktop_owner_app_id != app_id) {
+        _aes_menu_switch_to_app(_aes.desktop_owner_app_id);
+    }
+    if (_aes.desktop_owner_app_id == app_id) {
+        _aes.desktop_owner_app_id = 0;
+    }
+
     _aes.current_app_id = app_id;
     global[2] = app_id;
 
@@ -387,7 +395,7 @@ static int32_t gemd_dispatch(gemd_session_t *session,
                 (gem_rpc_evnt_multi_rsp_t *) response;
             UWORD client_wants_timer = (UWORD) (req->flags & MU_TIMER);
             UWORD bounded_flags = (UWORD) (req->flags | MU_TIMER);
-            UWORD bounded_tlc = client_wants_timer != 0u ? req->tlc : 20u;
+            UWORD bounded_tlc = client_wants_timer != 0u ? req->tlc : 2u;
             UWORD bounded_thc = client_wants_timer != 0u ? req->thc : 0u;
 
             /*
@@ -575,6 +583,15 @@ static int32_t gemd_dispatch(gemd_session_t *session,
         }
         break;
 
+    case GEM_RPC_VST_FONT:
+        {
+            const gem_rpc_handle_word_req_t *req =
+                (const gem_rpc_handle_word_req_t *) payload;
+
+            status = vst_font(g_server_vdi_handle, req->value);
+        }
+        break;
+
     case GEM_RPC_VST_COLOR:
         {
             const gem_rpc_color_req_t *req =
@@ -655,6 +672,22 @@ static int32_t gemd_dispatch(gemd_session_t *session,
             _aes_trace("gemd v_gtext handle=%d pos=%d,%d text=\"%s\"",
                 g_server_vdi_handle, req->x, req->y, text);
             status = 1;
+        }
+        break;
+
+    case GEM_RPC_VQT_EXTENT:
+        {
+            const gem_rpc_vqt_extent_req_t *req =
+                (const gem_rpc_vqt_extent_req_t *) payload;
+            gem_rpc_vqt_extent_rsp_t *rsp =
+                (gem_rpc_vqt_extent_rsp_t *) response;
+            char text[GEM_RPC_TEXT_MAX];
+
+            memset(rsp, 0, sizeof(*rsp));
+            memcpy(text, req->text, sizeof(text));
+            text[sizeof(text) - 1u] = '\0';
+            status = vqt_extent(g_server_vdi_handle, text, rsp->extent);
+            *response_size = (uint32_t) sizeof(*rsp);
         }
         break;
 
@@ -822,6 +855,29 @@ static int32_t gemd_dispatch(gemd_session_t *session,
                     ? (const char *) (intptr_t) objects[req->strings[0].object].ob_spec
                     : "(none)",
                 req->show, (int) status);
+        }
+        break;
+
+    case GEM_RPC_MENU_TNORMAL:
+        {
+            const gem_rpc_menu_tnormal_req_t *req =
+                (const gem_rpc_menu_tnormal_req_t *) payload;
+
+            if (session->menu_objects == NULL) {
+                status = 0;
+            } else {
+                status = menu_tnormal(session->menu_objects, req->title,
+                    req->normal);
+            }
+        }
+        break;
+
+    case GEM_RPC_MENU_CLICK:
+        {
+            const gem_rpc_menu_click_req_t *req =
+                (const gem_rpc_menu_click_req_t *) payload;
+
+            status = menu_click(req->click, req->setit);
         }
         break;
 

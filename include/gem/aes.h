@@ -84,7 +84,8 @@ extern "C" {
 #define FIS_HATCH   3  /* Hatch fill interior. */
 #define FIS_USER    4  /* User-defined fill interior. */
 
-#define IBM   3  /* Historical IBM/system font id alias. */
+#define ATARI 1  /* Atari ST high-resolution system font. */
+#define IBM   3  /* Historical alias for the system font. */
 #define SMALL 5  /* Historical small font id alias. */
 
 /*

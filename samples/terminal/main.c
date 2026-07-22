@@ -24,27 +24,8 @@ enum {
     TERM_MAX_COLS = 512,
     TERM_MARGIN = 2,
     TERM_ROW_TIGHTEN = 4,
-    TERM_TIMER_MS = 50,
-    TERM_KEY_FLUSH_MS = 30,
+    TERM_TIMER_MS = 10,
     TERM_READ_BUF = 512
-};
-
-enum {
-    MENU_TITLE_FILE = 3,
-    MENU_ITEM_QUIT = 6
-};
-
-static char g_menu_title_text[] = " Terminal ";
-
-static OBJECT g_menu_tree[] = {
-    {-1, 1, 3, G_IBOX, NONE, NORMAL, 0L, 0, 0, 0, 0},
-    {0, 2, 2, G_BOX, NONE, NORMAL, 0x1100L, 0, 0, 80, 1},
-    {1, 3, 3, G_IBOX, NONE, NORMAL, 0L, 0, 0, 80, 1},
-    {2, -1, -1, G_TITLE, NONE, NORMAL, (LONG) (intptr_t) g_menu_title_text,
-        0, 0, 10, 1},
-    {0, 5, 5, G_IBOX, NONE, NORMAL, 0L, 0, 0, 0, 0},
-    {4, 6, 6, G_BOX, NONE, NORMAL, 0x1100L, 0, 0, 20, 1},
-    {5, -1, -1, G_STRING, LASTOB, NORMAL, (LONG) "  Quit \t^Q", 0, 0, 20, 1}
 };
 
 typedef struct term_state {
@@ -415,11 +396,13 @@ static void union_dirty(GRECT *target, const GRECT *add)
 static void draw_terminal(term_state_t *state, const GRECT *dirty)
 {
     GRECT box;
+    WORD previous_font;
 
     sync_layout(state);
     update_window_controls(state);
 
     wind_update(BEG_UPDATE);
+    previous_font = vst_font(vdi_handle, ATARI);
     wind_get(state->handle, WF_FIRSTXYWH,
         &box.g_x, &box.g_y, &box.g_w, &box.g_h);
     while (box.g_w > 0 && box.g_h > 0) {
@@ -456,6 +439,8 @@ static void draw_terminal(term_state_t *state, const GRECT *dirty)
             clip_xy[3] = y1;
             vs_clip(vdi_handle, 1, clip_xy);
             (void) vswr_mode(vdi_handle, MD_REPLACE);
+            (void) vsf_interior(vdi_handle, FIS_SOLID);
+            (void) vsf_style(vdi_handle, 1);
 
             fill_xy[0] = state->work.g_x;
             fill_xy[1] = state->work.g_y;
@@ -553,6 +538,7 @@ static void draw_terminal(term_state_t *state, const GRECT *dirty)
         wind_get(state->handle, WF_NEXTXYWH,
             &box.g_x, &box.g_y, &box.g_w, &box.g_h);
     }
+    (void) vst_font(vdi_handle, previous_font);
     wind_update(END_UPDATE);
 }
 
@@ -633,36 +619,6 @@ static int process_shell_output(term_state_t *state, GRECT *dirty)
         }
     }
     return 1;
-}
-
-static int process_shell_output_until_quiet(term_state_t *state,
-                                            uint32_t timeout_ms,
-                                            GRECT *dirty)
-{
-    uint32_t start = gem_os_ticks_ms();
-    int changed = 0;
-    GRECT chunk_dirty;
-
-    if (dirty != NULL) {
-        dirty->g_w = 0;
-        dirty->g_h = 0;
-    }
-
-    for (;;) {
-        if (process_shell_output(state, &chunk_dirty) != 0) {
-            changed = 1;
-            if (dirty != NULL) {
-                union_dirty(dirty, &chunk_dirty);
-            }
-            continue;
-        }
-        if ((uint32_t) (gem_os_ticks_ms() - start) >= timeout_ms) {
-            break;
-        }
-        gem_os_sleep_ms(1u);
-    }
-
-    return changed;
 }
 
 static void send_key(term_state_t *state, WORD key)
@@ -746,6 +702,7 @@ static void handle_arrow(term_state_t *state, WORD arrow_code)
 static int init_terminal(term_state_t *state)
 {
     char cwd[GEM_OS_PATH_MAX];
+    WORD extent[8];
 
     memset(state, 0, sizeof(*state));
     state->cells = gem_os_alloc((size_t) TERM_MAX_LINES *
@@ -758,22 +715,22 @@ static int init_terminal(term_state_t *state)
 
     vdi_handle = graf_handle(&state->char_w, &state->char_h, NULL, NULL);
     v_opnvwk(work_in, &vdi_handle, work_out);
-    if (state->char_w <= 0) {
-        state->char_w = 8;
+    (void) vst_font(vdi_handle, ATARI);
+    if (vqt_extent(vdi_handle, "M", extent) != 0) {
+        state->cell_w = (WORD) (extent[2] - extent[0] + 1);
+        state->cell_h = (WORD) (extent[5] - extent[1] + 1);
     }
-    if (state->char_h <= 0) {
-        state->char_h = 16;
+    if (state->cell_w <= 0) {
+        state->cell_w = (state->char_w > 0) ? state->char_w : 8;
     }
-
-    /*
-     * vqt_fontinfo() isn't in gemd's RPC surface, so cell metrics fall
-     * straight through to the char_w/char_h fallback below -- same
-     * defaults demo31 uses whenever the query comes back empty.
-     */
-    state->cell_w = state->char_w;
-    state->cell_h = state->char_h;
-    state->text_ascent = state->char_h;
-    state->row_h = (WORD) (state->cell_h - TERM_ROW_TIGHTEN);
+    if (state->cell_h <= 0) {
+        state->cell_h = (state->char_h > 0) ? state->char_h : 16;
+    }
+    state->text_ascent = (WORD) (state->cell_h - 2);
+    if (state->text_ascent <= 0) {
+        state->text_ascent = state->cell_h;
+    }
+    state->row_h = (WORD) (state->cell_h + 2);
     if (state->row_h < state->text_ascent) {
         state->row_h = state->text_ascent;
     }
@@ -807,9 +764,14 @@ int main(void)
 {
     term_state_t state;
     GRECT desk;
+    GRECT outer;
     GRECT dirty;
     WORD msg[8];
     WORD done = 0;
+    WORD work_x;
+    WORD work_y;
+    WORD work_w = 560;
+    WORD work_h = 320;
 
     appl_id = appl_init();
     if (appl_id <= 0) {
@@ -822,9 +784,15 @@ int main(void)
     }
 
     wind_get(0, WF_WORKXYWH, &desk.g_x, &desk.g_y, &desk.g_w, &desk.g_h);
+    work_x = (WORD) (desk.g_x + 36);
+    work_y = (WORD) (desk.g_y + 28);
+    (void) wind_calc(WC_BORDER, NAME | CLOSER | MOVER | SIZER |
+        UPARROW | DNARROW | VSLIDE | LFARROW | RTARROW | HSLIDE,
+        work_x, work_y, work_w, work_h,
+        &outer.g_x, &outer.g_y, &outer.g_w, &outer.g_h);
     state.handle = wind_create(NAME | CLOSER | MOVER | SIZER |
         UPARROW | DNARROW | VSLIDE | LFARROW | RTARROW | HSLIDE,
-        (WORD) (desk.g_x + 36), (WORD) (desk.g_y + 28), 560, 320);
+        0, 0, desk.g_w, desk.g_h);
     if (state.handle <= 0) {
         shutdown_terminal(&state);
         v_clsvwk(vdi_handle);
@@ -832,16 +800,14 @@ int main(void)
         return 1;
     }
 
-    wind_open(state.handle,
-        (WORD) (desk.g_x + 36), (WORD) (desk.g_y + 28), 560, 320);
-    (void) menu_bar(g_menu_tree, 1);
+    wind_open(state.handle, outer.g_x, outer.g_y, outer.g_w, outer.g_h);
     (void) process_shell_output(&state, NULL);
     sync_layout(&state);
     (void) gem_os_pty_resize(&state.pty, (uint16_t) state.visible_cols,
         (uint16_t) state.visible_rows);
     draw_terminal(&state, NULL);
 
-    printf("terminal: window %d open, shell spawned, menu installed.\n",
+    printf("terminal: window %d open, shell spawned.\n",
         state.handle);
     fflush(stdout);
 
@@ -878,8 +844,7 @@ int main(void)
                 done = 1;
             } else {
                 send_key(&state, kr);
-                if (process_shell_output_until_quiet(&state,
-                        TERM_KEY_FLUSH_MS, &dirty) != 0) {
+                if (process_shell_output(&state, &dirty) != 0) {
                     draw_terminal(&state, &dirty);
                 }
             }
@@ -932,11 +897,6 @@ int main(void)
                     state.max_line_len, state.visible_cols);
                 state.auto_follow = 0;
                 redraw_full = 1;
-                break;
-            case MN_SELECTED:
-                if (msg[3] == MENU_TITLE_FILE && msg[4] == MENU_ITEM_QUIT) {
-                    done = 1;
-                }
                 break;
             default:
                 break;

@@ -217,9 +217,13 @@ WORD evnt_multi(UWORD flags,
                 WORD *pkr,
                 WORD *pbr)
 {
+    enum { GEM_EVENT_RPC_SLICE_MS = 2 };
     int32_t status = 0;
     gem_rpc_evnt_multi_req_t req;
     gem_rpc_evnt_multi_rsp_t rsp;
+    uint32_t requested_timeout = (uint32_t) tlc |
+        ((uint32_t) thc << 16);
+    uint32_t timer_start = gem_os_ticks_ms();
 
     memset(&req, 0, sizeof(req));
     memset(&rsp, 0, sizeof(rsp));
@@ -237,12 +241,31 @@ WORD evnt_multi(UWORD flags,
     req.m2y = m2y;
     req.m2w = m2w;
     req.m2h = m2h;
-    req.tlc = tlc;
-    req.thc = thc;
+    for (;;) {
+        if ((flags & MU_TIMER) != 0u) {
+            uint32_t elapsed = gem_os_ticks_ms() - timer_start;
+            uint32_t remaining = (elapsed < requested_timeout) ?
+                requested_timeout - elapsed : 0u;
+            uint32_t slice = (remaining < GEM_EVENT_RPC_SLICE_MS) ?
+                remaining : GEM_EVENT_RPC_SLICE_MS;
 
-    if (!gem_rpc_call(GEM_RPC_EVNT_MULTI, &req, sizeof(req), &status, &rsp,
-            sizeof(rsp))) {
-        return 0;
+            req.tlc = (UWORD) slice;
+            req.thc = 0;
+        } else {
+            req.tlc = tlc;
+            req.thc = thc;
+        }
+
+        memset(&rsp, 0, sizeof(rsp));
+        if (!gem_rpc_call(GEM_RPC_EVNT_MULTI, &req, sizeof(req), &status,
+                &rsp, sizeof(rsp))) {
+            return 0;
+        }
+        if ((flags & MU_TIMER) == 0u || rsp.event != MU_TIMER ||
+            (uint32_t) (gem_os_ticks_ms() - timer_start) >=
+                requested_timeout) {
+            break;
+        }
     }
 
     if (mepbuff != NULL) {
@@ -490,6 +513,20 @@ WORD vswr_mode(WORD handle, WORD mode)
     return (WORD) status;
 }
 
+WORD vst_font(WORD handle, WORD font)
+{
+    int32_t status = 0;
+    gem_rpc_handle_word_req_t req;
+
+    req.handle = handle;
+    req.value = font;
+    if (!gem_rpc_call(GEM_RPC_VST_FONT, &req, sizeof(req), &status,
+            NULL, 0u)) {
+        return 0;
+    }
+    return (WORD) status;
+}
+
 VOID vst_color(WORD handle, WORD color)
 {
     int32_t status = 0;
@@ -595,6 +632,49 @@ VOID v_gtext(VDI_HANDLE handle, WORD x, WORD y, CONST BYTE *text)
         strncpy(req.text, (const char *) text, sizeof(req.text) - 1u);
     }
     (void) gem_rpc_call(GEM_RPC_V_GTEXT, &req, sizeof(req), &status, NULL, 0u);
+}
+
+WORD vqt_extent(WORD handle, char *string, WORD extent[8])
+{
+    int32_t status = 0;
+    gem_rpc_vqt_extent_req_t req;
+    gem_rpc_vqt_extent_rsp_t rsp;
+
+    memset(&req, 0, sizeof(req));
+    memset(&rsp, 0, sizeof(rsp));
+    req.handle = handle;
+    if (string != NULL) {
+        strncpy(req.text, string, sizeof(req.text) - 1u);
+    }
+    if (!gem_rpc_call(GEM_RPC_VQT_EXTENT, &req, sizeof(req), &status, &rsp,
+            sizeof(rsp))) {
+        return 0;
+    }
+    if (extent != NULL) {
+        memcpy(extent, rsp.extent, sizeof(rsp.extent));
+    }
+    return (WORD) status;
+}
+
+VOID v_rbox(WORD handle, WORD xy[4])
+{
+    WORD pts[10];
+
+    if (xy == NULL) {
+        return;
+    }
+
+    pts[0] = xy[0];
+    pts[1] = xy[1];
+    pts[2] = xy[2];
+    pts[3] = xy[1];
+    pts[4] = xy[2];
+    pts[5] = xy[3];
+    pts[6] = xy[0];
+    pts[7] = xy[3];
+    pts[8] = xy[0];
+    pts[9] = xy[1];
+    v_pline(handle, 5, pts);
 }
 
 WORD wind_create(UWORD kind, WORD x, WORD y, WORD w, WORD h)
@@ -781,22 +861,41 @@ WORD wind_calc(WORD type, UWORD kind, WORD inx, WORD iny, WORD inw, WORD inh,
     return (WORD) status;
 }
 
+static void gem_menu_tree_extent_visit(const OBJECT *tree, WORD object,
+    uint8_t visited[GEM_RPC_MENU_MAX_OBJECTS], WORD *extent)
+{
+    if (tree == NULL || visited == NULL || extent == NULL ||
+        object < ROOT || object >= (WORD) GEM_RPC_MENU_MAX_OBJECTS) {
+        return;
+    }
+    if (visited[object] != 0u) {
+        return;
+    }
+
+    visited[object] = 1u;
+    if (object > *extent) {
+        *extent = object;
+    }
+
+    gem_menu_tree_extent_visit(tree, tree[object].ob_head, visited, extent);
+    gem_menu_tree_extent_visit(tree, tree[object].ob_tail, visited, extent);
+    gem_menu_tree_extent_visit(tree, tree[object].ob_next, visited, extent);
+}
+
 /*
- * Mirrors the hosted AES engine's own _aes_menu_last_object: this
- * codebase's convention is a flat array where exactly one object (the
- * physically last one) carries LASTOB, rather than per-level sibling
- * termination. Scan for it instead of walking ob_head/ob_next.
+ * Menu trees are small graphs, not flat arrays with a reliable global
+ * terminator. Some trees place LASTOB on several sibling chains, while
+ * others are short static arrays that would be overrun by a blind scan.
+ * Walk the references reachable from ROOT and use the highest visited
+ * slot as the serialization extent.
  */
 static WORD gem_menu_tree_extent(const OBJECT *tree)
 {
-    WORD i;
+    uint8_t visited[GEM_RPC_MENU_MAX_OBJECTS] = {0};
+    WORD extent = ROOT;
 
-    for (i = 0; i < (WORD) GEM_RPC_MENU_MAX_OBJECTS; ++i) {
-        if ((tree[i].ob_flags & LASTOB) != 0u) {
-            return i;
-        }
-    }
-    return 0;
+    gem_menu_tree_extent_visit(tree, ROOT, visited, &extent);
+    return extent;
 }
 
 WORD menu_bar(OBJECT *tree, WORD show)
@@ -838,6 +937,35 @@ WORD menu_bar(OBJECT *tree, WORD show)
     }
 
     if (!gem_rpc_call(GEM_RPC_MENU_BAR, &req, sizeof(req), &status,
+            NULL, 0u)) {
+        return 0;
+    }
+    return (WORD) status;
+}
+
+WORD menu_tnormal(OBJECT *tree, WORD title, WORD normal)
+{
+    int32_t status = 0;
+    gem_rpc_menu_tnormal_req_t req;
+
+    (void) tree;
+    req.title = title;
+    req.normal = normal;
+    if (!gem_rpc_call(GEM_RPC_MENU_TNORMAL, &req, sizeof(req), &status,
+            NULL, 0u)) {
+        return 0;
+    }
+    return (WORD) status;
+}
+
+WORD menu_click(WORD click, WORD setit)
+{
+    int32_t status = 0;
+    gem_rpc_menu_click_req_t req;
+
+    req.click = click;
+    req.setit = setit;
+    if (!gem_rpc_call(GEM_RPC_MENU_CLICK, &req, sizeof(req), &status,
             NULL, 0u)) {
         return 0;
     }

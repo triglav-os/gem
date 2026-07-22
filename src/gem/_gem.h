@@ -45,6 +45,8 @@ typedef enum gem_rpc_opcode {
     GEM_RPC_VSF_STYLE,
     GEM_RPC_VSF_PERIMETER,
     GEM_RPC_VSWR_MODE,
+    GEM_RPC_VST_FONT,
+    GEM_RPC_VQT_EXTENT,
     GEM_RPC_VS_CLIP,
     GEM_RPC_V_PLINE,
     GEM_RPC_V_FILLAREA,
@@ -61,7 +63,9 @@ typedef enum gem_rpc_opcode {
     GEM_RPC_WIND_FIND,
     GEM_RPC_WIND_UPDATE,
     GEM_RPC_WIND_CALC,
-    GEM_RPC_MENU_BAR
+    GEM_RPC_MENU_BAR,
+    GEM_RPC_MENU_TNORMAL,
+    GEM_RPC_MENU_CLICK
 } gem_rpc_opcode_t;
 
 typedef struct gem_rpc_header {
@@ -171,6 +175,15 @@ typedef struct gem_rpc_gtext_req {
     char text[GEM_RPC_TEXT_MAX];
 } gem_rpc_gtext_req_t;
 
+typedef struct gem_rpc_vqt_extent_req {
+    WORD handle;
+    char text[GEM_RPC_TEXT_MAX];
+} gem_rpc_vqt_extent_req_t;
+
+typedef struct gem_rpc_vqt_extent_rsp {
+    WORD extent[8];
+} gem_rpc_vqt_extent_rsp_t;
+
 typedef struct gem_rpc_wind_create_req {
     UWORD kind;
     WORD x;
@@ -257,6 +270,16 @@ typedef struct gem_rpc_menu_bar_req {
     OBJECT objects[GEM_RPC_MENU_MAX_OBJECTS];
     gem_rpc_menu_string_t strings[GEM_RPC_MENU_MAX_STRINGS];
 } gem_rpc_menu_bar_req_t;
+
+typedef struct gem_rpc_menu_tnormal_req {
+    WORD title;
+    WORD normal;
+} gem_rpc_menu_tnormal_req_t;
+
+typedef struct gem_rpc_menu_click_req {
+    WORD click;
+    WORD setit;
+} gem_rpc_menu_click_req_t;
 
 int gem_rpc_call(gem_rpc_opcode_t opcode,
                  const void *request,

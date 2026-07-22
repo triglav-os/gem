@@ -51,6 +51,7 @@ static void _aes_window_draw_cover_rect(const aes_window_t *window, GRECT *out);
 void _aes_redraw_region(const GRECT *dirty);
 static void _aes_queue_window_redraw(const aes_window_t *window,
                                      const GRECT *dirty);
+static void _aes_queue_desktop_redraw(const GRECT *dirty);
 void _aes_redraw_window_change(const GRECT *before, const GRECT *after);
 void _aes_redraw_window_title_states(const aes_window_t *previous_top,
                                      const aes_window_t *new_top);
@@ -795,9 +796,37 @@ void _aes_redraw_region(const GRECT *dirty)
     --_aes.update_depth;
     _vdi_end_update();
 
+    _aes_queue_desktop_redraw(dirty);
+
     if (redraw_menu != 0) {
         _aes_menu_redraw_tree(_aes.menu_tree);
     }
+}
+
+static void _aes_queue_desktop_redraw(const GRECT *dirty)
+{
+    GRECT desktop;
+    GRECT redraw;
+    WORD msg[8];
+
+    if (dirty == NULL || _aes.desktop_owner_app_id == 0) {
+        return;
+    }
+
+    _aes_desktop_rect_local(&desktop);
+    if (_aes_intersect_rects(&desktop, dirty, &redraw) == 0) {
+        return;
+    }
+
+    msg[0] = WM_REDRAW;
+    msg[1] = _aes.current_app_id;
+    msg[2] = 0;
+    msg[3] = 0;
+    msg[4] = redraw.g_x;
+    msg[5] = redraw.g_y;
+    msg[6] = redraw.g_w;
+    msg[7] = redraw.g_h;
+    (void) appl_write(_aes.desktop_owner_app_id, 8, msg);
 }
 
 static void _aes_queue_window_redraw(const aes_window_t *window,

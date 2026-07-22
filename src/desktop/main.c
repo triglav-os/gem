@@ -20,6 +20,7 @@
 #include <dirent.h>
 #include <mntent.h>
 #include <stddef.h>
+#include <errno.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -27,6 +28,8 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/statvfs.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 enum {
@@ -80,7 +83,7 @@ enum {
 
 enum {
     DESKTOP_MAX_DISKS = 12,
-    DESKTOP_MAX_ICONS = DESKTOP_MAX_DISKS + 1,
+    DESKTOP_MAX_ICONS = DESKTOP_MAX_DISKS + 2,
     DESKTOP_OBJECT_COUNT = DESKTOP_ICON_BASE + DESKTOP_MAX_ICONS,
     DESKTOP_ICON_OBJECT_W = 72,
     DESKTOP_ICON_OBJECT_H = 58,
@@ -92,10 +95,7 @@ enum {
     DESKTOP_BROWSER_MAX_WINDOWS = 4,
     DESKTOP_BROWSER_MAX_ENTRIES = 256,
     DESKTOP_BROWSER_ROW_H = 18,
-    DESKTOP_BROWSER_ICON_CELL_W = 88,
-    DESKTOP_BROWSER_ICON_CELL_H = 64,
-    DESKTOP_BROWSER_ICON_TEXT_Y = 44,
-    DESKTOP_DOUBLE_CLICK_MS = 350
+    DESKTOP_DOUBLE_CLICK_MS = 700
 };
 
 enum {
@@ -118,14 +118,17 @@ typedef struct desktop_icon_entry {
     desktop_icon_draw_t draw_info;
     WORD object_id;
     WORD is_trash;
+    WORD is_folder;
 } desktop_icon_entry_t;
 
 typedef struct desktop_browser_entry {
     char name[GEM_OS_PATH_MAX];
     char path[GEM_OS_PATH_MAX];
     uint64_t size_bytes;
+    mode_t mode;
     WORD is_dir;
     WORD is_app;
+    WORD is_executable;
     WORD is_parent;
 } desktop_browser_entry_t;
 
@@ -168,6 +171,8 @@ typedef struct desktop_state {
 static desktop_state_t g_desktop;
 
 static WORD desktop_user_draw(LONG parm_block);
+static void desktop_draw_icon_object(const desktop_icon_asset_t *asset,
+    const char *label, const GRECT *rect, UWORD state);
 static void desktop_set_status(const char *text);
 static void desktop_redraw(const GRECT *dirty);
 static void desktop_layout_icons(void);
@@ -176,6 +181,7 @@ static void desktop_handle_icon_click(WORD object_id);
 static void desktop_refresh_icon_bindings(void);
 static void desktop_draw_background_pattern(const GRECT *dirty);
 static void desktop_object_rect(WORD object_id, GRECT *rect);
+static void desktop_expand_icon_damage_rect(GRECT *rect);
 static void desktop_open_selected_icon(void);
 static void desktop_open_disk_path(const char *path, const char *label);
 static desktop_browser_window_t *desktop_find_browser_by_handle(WORD handle);
@@ -187,6 +193,9 @@ static int desktop_browser_row_rect(const desktop_browser_window_t *browser,
     WORD index, GRECT *rect);
 static int desktop_browser_icon_rect(const desktop_browser_window_t *browser,
     WORD index, GRECT *rect);
+static WORD desktop_find_icon_at(WORD mx, WORD my);
+static desktop_browser_window_t *desktop_browser_for_desk_slot(WORD slot);
+static int desktop_launch_hosted_app(const char *path, const char *name);
 static void desktop_update_desk_menu_labels(void);
 
 static void desktop_init_object(OBJECT *object,
@@ -386,8 +395,9 @@ static int desktop_browser_entry_cmp(const void *left, const void *right)
 static int desktop_browser_name_is_app(const char *name, mode_t mode)
 {
     const char *ext;
+    int executable;
 
-    if (name == NULL) {
+    if (name == NULL || S_ISREG(mode) == 0) {
         return 0;
     }
 
@@ -396,8 +406,101 @@ static int desktop_browser_name_is_app(const char *name, mode_t mode)
         (strcasecmp(ext, ".app") == 0 || strcasecmp(ext, ".prg") == 0)) {
         return 1;
     }
+    if (ext != NULL &&
+        (strcasecmp(ext, ".so") == 0 || strcasecmp(ext, ".a") == 0 ||
+         strcasecmp(ext, ".o") == 0)) {
+        return 0;
+    }
+    if (ext != NULL && strcasecmp(ext, "_hosted") == 0) {
+        return 0;
+    }
+    if (strstr(name, "_hosted") != NULL) {
+        return 0;
+    }
 
-    return (mode & S_IXUSR) != 0;
+    executable = ((mode & S_IXUSR) != 0) || ((mode & S_IXGRP) != 0) ||
+        ((mode & S_IXOTH) != 0);
+    if (executable == 0) {
+        return 0;
+    }
+    if (strcmp(name, "gemd") == 0) {
+        return 0;
+    }
+    if (strncmp(name, "lib", 3) == 0 && ext == NULL) {
+        return 0;
+    }
+
+    return 1;
+}
+
+static int desktop_browser_entry_path(const desktop_browser_window_t *browser,
+    const desktop_browser_entry_t *entry, char *path, size_t path_size)
+{
+    if (browser == NULL || entry == NULL || path == NULL || path_size == 0u) {
+        return 0;
+    }
+    if (entry->is_parent != 0) {
+        strncpy(path, browser->path, path_size - 1u);
+        path[path_size - 1u] = '\0';
+        return 1;
+    }
+
+    return desktop_path_join(browser->path, entry->name, path, path_size);
+}
+
+static int desktop_browser_entry_is_launchable(
+    const desktop_browser_window_t *browser,
+    const desktop_browser_entry_t *entry)
+{
+    if (browser == NULL || entry == NULL || entry->is_dir != 0 ||
+        entry->is_parent != 0) {
+        return 0;
+    }
+    return entry->is_app != 0;
+}
+
+static int desktop_browser_entry_has_prg_icon(
+    const desktop_browser_window_t *browser,
+    const desktop_browser_entry_t *entry)
+{
+    if (browser == NULL || entry == NULL || entry->is_dir != 0 ||
+        entry->is_parent != 0) {
+        return 0;
+    }
+    return entry->is_executable != 0;
+}
+
+static int desktop_launch_hosted_app(const char *path, const char *name)
+{
+    pid_t pid;
+    char status[128];
+
+    if (path == NULL || path[0] == '\0') {
+        return 0;
+    }
+
+    pid = fork();
+    if (pid < 0) {
+        (void) snprintf(status, sizeof(status), "Launch failed: %s",
+            strerror(errno));
+        desktop_set_status(status);
+        desktop_redraw(NULL);
+        return 0;
+    }
+
+    if (pid == 0) {
+        char *const argv[] = {(char *) path, NULL};
+
+        (void) setsid();
+        execv(path, argv);
+        _exit(127);
+    }
+
+    (void) snprintf(status, sizeof(status), "Launched %.*s",
+        (int) sizeof(status) - 10, (name != NULL) ? name : path);
+    desktop_set_status(status);
+    desktop_redraw(NULL);
+    return 1;
 }
 
 static int desktop_browser_load_path(desktop_browser_window_t *browser,
@@ -455,7 +558,11 @@ static int desktop_browser_load_path(desktop_browser_window_t *browser,
             continue;
         }
         if (stat(item->path, &st) == 0) {
+            item->mode = st.st_mode;
             item->is_dir = S_ISDIR(st.st_mode) ? 1 : 0;
+            item->is_executable =
+                ((st.st_mode & S_IXUSR) != 0 || (st.st_mode & S_IXGRP) != 0 ||
+                 (st.st_mode & S_IXOTH) != 0) ? 1 : 0;
             item->is_app = desktop_browser_name_is_app(item->name,
                 st.st_mode) ? 1 : 0;
             item->size_bytes = (uint64_t) st.st_size;
@@ -534,12 +641,12 @@ static int desktop_browser_icon_rect(const desktop_browser_window_t *browser,
 
     column = (WORD) (visible_index % browser->columns_visible);
     row = (WORD) (visible_index / browser->columns_visible);
-    rect->g_x = (WORD) (browser->work.g_x +
-        column * DESKTOP_BROWSER_ICON_CELL_W);
-    rect->g_y = (WORD) (browser->work.g_y +
-        row * DESKTOP_BROWSER_ICON_CELL_H);
-    rect->g_w = DESKTOP_BROWSER_ICON_CELL_W;
-    rect->g_h = DESKTOP_BROWSER_ICON_CELL_H;
+    rect->g_x = (WORD) (browser->work.g_x + DESKTOP_ICON_MARGIN_X +
+        column * DESKTOP_ICON_STEP_X);
+    rect->g_y = (WORD) (browser->work.g_y + DESKTOP_ICON_MARGIN_Y +
+        row * DESKTOP_ICON_STEP_Y);
+    rect->g_w = DESKTOP_ICON_OBJECT_W;
+    rect->g_h = DESKTOP_ICON_OBJECT_H;
     return 1;
 }
 
@@ -592,13 +699,13 @@ static void desktop_browser_sync_work(desktop_browser_window_t *browser)
     if (browser->rows_visible < 1) {
         browser->rows_visible = 1;
     }
-    browser->columns_visible = (WORD) (browser->work.g_w /
-        DESKTOP_BROWSER_ICON_CELL_W);
+    browser->columns_visible = (WORD) ((browser->work.g_w -
+        DESKTOP_ICON_MARGIN_X) / DESKTOP_ICON_STEP_X);
     if (browser->columns_visible < 1) {
         browser->columns_visible = 1;
     }
-    browser->rows_per_page = (WORD) (browser->work.g_h /
-        DESKTOP_BROWSER_ICON_CELL_H);
+    browser->rows_per_page = (WORD) ((browser->work.g_h -
+        DESKTOP_ICON_MARGIN_Y) / DESKTOP_ICON_STEP_Y);
     if (browser->rows_per_page < 1) {
         browser->rows_per_page = 1;
     }
@@ -608,6 +715,7 @@ static void desktop_browser_sync_work(desktop_browser_window_t *browser)
 }
 
 static const char *desktop_browser_entry_prefix(
+    const desktop_browser_window_t *browser,
     const desktop_browser_entry_t *entry)
 {
     if (entry == NULL) {
@@ -619,13 +727,14 @@ static const char *desktop_browser_entry_prefix(
     if (entry->is_dir != 0) {
         return "/";
     }
-    if (entry->is_app != 0) {
+    if (desktop_browser_entry_has_prg_icon(browser, entry) != 0) {
         return "*";
     }
     return " ";
 }
 
 static const desktop_icon_asset_t *desktop_browser_entry_asset(
+    const desktop_browser_window_t *browser,
     const desktop_browser_entry_t *entry)
 {
     if (entry == NULL) {
@@ -634,7 +743,7 @@ static const desktop_icon_asset_t *desktop_browser_entry_asset(
     if (entry->is_parent != 0 || entry->is_dir != 0) {
         return &desktop_folder_icon_asset;
     }
-    if (entry->is_app != 0) {
+    if (desktop_browser_entry_has_prg_icon(browser, entry) != 0) {
         return &desktop_prg_icon_asset;
     }
     return &desktop_doc_icon_asset;
@@ -652,7 +761,6 @@ static void desktop_browser_redraw(desktop_browser_window_t *browser,
         return;
     }
 
-    desktop_browser_sync_work(browser);
     wind_update(BEG_UPDATE);
     wind_get(browser->handle, WF_FIRSTXYWH, &visible.g_x, &visible.g_y,
         &visible.g_w, &visible.g_h);
@@ -717,50 +825,12 @@ static void desktop_browser_redraw(desktop_browser_window_t *browser,
                         const desktop_browser_entry_t *entry =
                             &browser->entries[index];
                         const desktop_icon_asset_t *asset =
-                            desktop_browser_entry_asset(entry);
-                        WORD icon_x = (WORD) (icon_rect.g_x +
-                            (icon_rect.g_w - asset->width) / 2);
-                        WORD icon_y = icon_rect.g_y;
-                        WORD extent[8];
-                        WORD text_width;
-                        WORD text_x;
-                        WORD label_y;
-                        WORD label_box[4];
+                            desktop_browser_entry_asset(browser, entry);
+                        UWORD state = (browser->selected_index == index) ?
+                            SELECTED : NORMAL;
 
-                        if (browser->selected_index == index) {
-                            WORD select_fill[4] = {
-                                icon_rect.g_x,
-                                icon_rect.g_y,
-                                (WORD) (icon_rect.g_x + icon_rect.g_w - 1),
-                                (WORD) (icon_rect.g_y + icon_rect.g_h - 1)
-                            };
-
-                            vsf_color(g_desktop.vdi_handle, WHITE);
-                            vr_recfl(g_desktop.vdi_handle, select_fill);
-                        }
-
-                        desktop_draw_masked_icon(asset, icon_x, icon_y);
-                        vqt_extent(g_desktop.vdi_handle, (char *) entry->name,
-                            extent);
-                        text_width = (WORD) (extent[2] - extent[0] + 1);
-                        text_x = (WORD) (icon_rect.g_x +
-                            (icon_rect.g_w - text_width) / 2);
-                        label_y = (WORD) (icon_rect.g_y +
-                            DESKTOP_BROWSER_ICON_TEXT_Y);
-                        label_box[0] = (WORD) (text_x - 4);
-                        label_box[1] = (WORD) (label_y - 11);
-                        label_box[2] = (WORD) (text_x + text_width + 3);
-                        label_box[3] = (WORD) (label_y + 2);
-
-                        if (browser->selected_index == index) {
-                            vsf_color(g_desktop.vdi_handle, WHITE);
-                            vr_recfl(g_desktop.vdi_handle, label_box);
-                            vst_color(g_desktop.vdi_handle, BLACK);
-                        } else {
-                            vst_color(g_desktop.vdi_handle, WHITE);
-                        }
-                        v_gtext(g_desktop.vdi_handle, text_x, label_y,
-                            (const BYTE *) entry->name);
+                        desktop_draw_icon_object(asset, entry->name,
+                            &icon_rect, state);
                     }
                 }
             } else {
@@ -793,7 +863,7 @@ static void desktop_browser_redraw(desktop_browser_window_t *browser,
                         }
 
                         (void) snprintf(line, sizeof(line), "%s %.*s",
-                            desktop_browser_entry_prefix(entry),
+                            desktop_browser_entry_prefix(browser, entry),
                             (int) sizeof(line) - 3, entry->name);
                         v_gtext(g_desktop.vdi_handle,
                             (WORD) (browser->work.g_x + 8),
@@ -872,6 +942,7 @@ static void desktop_browser_open_entry(desktop_browser_window_t *browser,
 {
     const desktop_browser_entry_t *entry;
     char parent[GEM_OS_PATH_MAX];
+    char path[GEM_OS_PATH_MAX];
     char *slash;
 
     if (browser == NULL || index < 0 || index >= browser->entry_count) {
@@ -892,26 +963,26 @@ static void desktop_browser_open_entry(desktop_browser_window_t *browser,
         if (desktop_browser_load_path(browser, parent) != 0) {
             wind_set_str(browser->handle, WF_NAME, browser->title);
             desktop_browser_sync_work(browser);
+            desktop_update_desk_menu_labels();
             desktop_browser_redraw(browser, NULL);
         }
         return;
     }
 
     if (entry->is_dir != 0) {
-        if (desktop_browser_load_path(browser, entry->path) != 0) {
+        if (desktop_browser_entry_path(browser, entry, path, sizeof(path)) != 0 &&
+            desktop_browser_load_path(browser, path) != 0) {
             wind_set_str(browser->handle, WF_NAME, browser->title);
             desktop_browser_sync_work(browser);
+            desktop_update_desk_menu_labels();
             desktop_browser_redraw(browser, NULL);
         }
         return;
     }
 
-    if (entry->is_app != 0) {
-        char text[128];
-
-        (void) snprintf(text, sizeof(text), "Application selected: %.*s",
-            (int) sizeof(text) - 24, entry->name);
-        desktop_set_status(text);
+    if (desktop_browser_entry_is_launchable(browser, entry) != 0 &&
+        desktop_browser_entry_path(browser, entry, path, sizeof(path)) != 0) {
+        (void) desktop_launch_hosted_app(path, entry->name);
     } else {
         char text[128];
 
@@ -999,6 +1070,7 @@ static void desktop_open_disk_path(const char *path, const char *label)
     }
 
     desktop_browser_sync_work(browser);
+    desktop_update_desk_menu_labels();
     desktop_browser_redraw(browser, NULL);
 }
 
@@ -1029,6 +1101,7 @@ static void desktop_browser_close(desktop_browser_window_t *browser)
     (void) wind_delete(browser->handle);
     desktop_redraw(&outer);
     memset(browser, 0, sizeof(*browser));
+    desktop_update_desk_menu_labels();
 }
 
 static void desktop_browser_handle_click(WORD handle, WORD mx, WORD my)
@@ -1040,6 +1113,7 @@ static void desktop_browser_handle_click(WORD handle, WORD mx, WORD my)
     GRECT dirty;
     GRECT rect;
     int dirty_set = 0;
+    int is_repeat_click = 0;
 
     if (browser == NULL) {
         return;
@@ -1053,13 +1127,30 @@ static void desktop_browser_handle_click(WORD handle, WORD mx, WORD my)
     }
 
     if (browser->view_mode == DESKTOP_BROWSER_VIEW_ICONS) {
-        WORD column = (WORD) ((mx - browser->work.g_x) /
-            DESKTOP_BROWSER_ICON_CELL_W);
-        WORD row = (WORD) ((my - browser->work.g_y) /
-            DESKTOP_BROWSER_ICON_CELL_H);
+        WORD relative_x = (WORD) (mx - browser->work.g_x -
+            DESKTOP_ICON_MARGIN_X);
+        WORD relative_y = (WORD) (my - browser->work.g_y -
+            DESKTOP_ICON_MARGIN_Y);
+        WORD column;
+        WORD row;
+
+        if (relative_x < 0 || relative_y < 0) {
+            return;
+        }
+        column = (WORD) (relative_x / DESKTOP_ICON_STEP_X);
+        row = (WORD) (relative_y / DESKTOP_ICON_STEP_Y);
 
         index = (WORD) (browser->top_index +
             row * browser->columns_visible + column);
+        if (index >= 0 && index < browser->entry_count) {
+            GRECT hit_rect;
+
+            if (desktop_browser_icon_rect(browser, index, &hit_rect) == 0 ||
+                mx >= hit_rect.g_x + hit_rect.g_w ||
+                my >= hit_rect.g_y + hit_rect.g_h) {
+                return;
+            }
+        }
     } else {
         index = (WORD) (browser->top_index +
             (my - browser->work.g_y) / DESKTOP_BROWSER_ROW_H);
@@ -1070,15 +1161,24 @@ static void desktop_browser_handle_click(WORD handle, WORD mx, WORD my)
 
     now = gem_os_ticks_ms();
     previous_index = browser->selected_index;
+    if (previous_index == index) {
+        is_repeat_click = 1;
+    }
     browser->selected_index = index;
     if (((browser->view_mode == DESKTOP_BROWSER_VIEW_ICONS) ?
             desktop_browser_icon_rect(browser, previous_index, &dirty) :
             desktop_browser_row_rect(browser, previous_index, &dirty)) != 0) {
+        if (browser->view_mode == DESKTOP_BROWSER_VIEW_ICONS) {
+            desktop_expand_icon_damage_rect(&dirty);
+        }
         dirty_set = 1;
     }
     if (((browser->view_mode == DESKTOP_BROWSER_VIEW_ICONS) ?
             desktop_browser_icon_rect(browser, index, &rect) :
             desktop_browser_row_rect(browser, index, &rect)) != 0) {
+        if (browser->view_mode == DESKTOP_BROWSER_VIEW_ICONS) {
+            desktop_expand_icon_damage_rect(&rect);
+        }
         if (dirty_set == 0) {
             dirty = rect;
             dirty_set = 1;
@@ -1102,8 +1202,10 @@ static void desktop_browser_handle_click(WORD handle, WORD mx, WORD my)
     }
     desktop_browser_redraw(browser, dirty_set != 0 ? &dirty : NULL);
 
-    if (browser->last_click_index == index &&
-        (uint32_t) (now - browser->last_click_ms) <= DESKTOP_DOUBLE_CLICK_MS) {
+    if ((browser->last_click_index == index &&
+         (uint32_t) (now - browser->last_click_ms) <=
+            DESKTOP_DOUBLE_CLICK_MS) ||
+        is_repeat_click != 0) {
         browser->last_click_index = NIL;
         browser->last_click_ms = 0u;
         desktop_browser_open_entry(browser, index);
@@ -1128,6 +1230,7 @@ static void desktop_browser_handle_message(WORD msg[8])
 
     switch (msg[0]) {
     case WM_REDRAW:
+        desktop_browser_sync_work(browser);
         desktop_browser_redraw(browser, NULL);
         break;
     case WM_MOVED:
@@ -1401,12 +1504,50 @@ static void desktop_add_disk_icon(const char *path)
     ++g_desktop.icon_count;
 }
 
+static void desktop_add_folder_icon(const char *path, const char *label)
+{
+    desktop_icon_entry_t *entry;
+
+    if (g_desktop.icon_count >= DESKTOP_MAX_ICONS || path == NULL ||
+        desktop_has_path(path) != 0) {
+        return;
+    }
+
+    entry = &g_desktop.icons[g_desktop.icon_count];
+    memset(entry, 0, sizeof(*entry));
+    strncpy(entry->path, path, sizeof(entry->path) - 1u);
+    entry->path[sizeof(entry->path) - 1u] = '\0';
+    if (label != NULL && label[0] != '\0') {
+        strncpy(entry->label, label, sizeof(entry->label) - 1u);
+        entry->label[sizeof(entry->label) - 1u] = '\0';
+    } else {
+        desktop_label_from_path(path, entry->label, sizeof(entry->label));
+    }
+    entry->asset = &desktop_folder_icon_asset;
+    entry->draw_info.asset = entry->asset;
+    entry->draw_info.label = entry->label;
+    entry->userblk.ab_code = (LONG) (intptr_t) desktop_user_draw;
+    entry->userblk.ab_parm = (LONG) (intptr_t) &entry->draw_info;
+    entry->object_id = (WORD) (DESKTOP_ICON_BASE + g_desktop.icon_count);
+    entry->is_folder = 1;
+    if (desktop_path_space(path, &entry->total_bytes, &entry->avail_bytes) == 0) {
+        entry->total_bytes = 0;
+        entry->avail_bytes = 0;
+    }
+    ++g_desktop.icon_count;
+}
+
 static void desktop_probe_disks(void)
 {
     FILE *mounts;
     struct mntent *mount;
+    char cwd[GEM_OS_PATH_MAX];
 
     g_desktop.icon_count = 0;
+
+    if (getcwd(cwd, sizeof(cwd)) != NULL) {
+        desktop_add_folder_icon(cwd, "Workspace");
+    }
 
     mounts = setmntent("/proc/mounts", "r");
     if (mounts != NULL) {
@@ -1465,28 +1606,24 @@ static void desktop_update_desk_menu_labels(void)
         MENU_DESK_4, MENU_DESK_5, MENU_DESK_6
     };
     OBJECT *tree = g_desktop.menu_tree;
-    WORD disk_index = 0;
     WORD item_index;
     WORD used_count = 0;
 
     for (item_index = 0; item_index < 6; ++item_index) {
         OBJECT *item = &tree[menu_items[item_index]];
+        desktop_browser_window_t *browser =
+            desktop_browser_for_desk_slot(item_index);
 
         g_desktop.desk_menu_labels[item_index][0] = '\0';
-        while (disk_index < g_desktop.icon_count &&
-               g_desktop.icons[disk_index].is_trash != 0) {
-            ++disk_index;
-        }
-        if (disk_index < g_desktop.icon_count) {
+        if (browser != NULL) {
             (void) snprintf(g_desktop.desk_menu_labels[item_index],
                 sizeof(g_desktop.desk_menu_labels[item_index]), "  %.*s",
                 (int) sizeof(g_desktop.desk_menu_labels[item_index]) - 3,
-                g_desktop.icons[disk_index].label);
+                browser->title);
             item->ob_spec = (LONG) (intptr_t)
                 g_desktop.desk_menu_labels[item_index];
             item->ob_state &= (UWORD) ~DISABLED;
             ++used_count;
-            ++disk_index;
         } else {
             item->ob_spec = (LONG) (intptr_t) "";
             item->ob_state |= DISABLED;
@@ -1504,6 +1641,28 @@ static void desktop_update_desk_menu_labels(void)
         tree[MENU_DESK_SEPARATOR].ob_next = MENU_DESK_BOX;
         tree[MENU_DESK_BOX].ob_height = 2;
     }
+}
+
+static desktop_browser_window_t *desktop_browser_for_desk_slot(WORD slot)
+{
+    WORD i;
+    WORD seen = 0;
+
+    if (slot < 0) {
+        return NULL;
+    }
+
+    for (i = 0; i < DESKTOP_BROWSER_MAX_WINDOWS; ++i) {
+        if (g_desktop.browsers[i].used == 0) {
+            continue;
+        }
+        if (seen == slot) {
+            return &g_desktop.browsers[i];
+        }
+        ++seen;
+    }
+
+    return NULL;
 }
 
 static void desktop_refresh_icon_bindings(void)
@@ -1638,6 +1797,7 @@ static void desktop_init_menu_tree(void)
 static void desktop_init_desktop_tree(void)
 {
     WORD i;
+    WORD last_object = DESKTOP_ROOT;
 
     desktop_reset_tree_links();
     desktop_init_object(&g_desktop.desktop_tree[DESKTOP_ROOT], NIL,
@@ -1653,7 +1813,10 @@ static void desktop_init_desktop_tree(void)
             (LONG) (intptr_t) &entry->userblk, 0, 0,
             DESKTOP_ICON_OBJECT_W, DESKTOP_ICON_OBJECT_H);
         objc_add(g_desktop.desktop_tree, DESKTOP_ROOT, entry->object_id);
+        last_object = entry->object_id;
     }
+
+    g_desktop.desktop_tree[last_object].ob_flags |= LASTOB;
 }
 
 static void desktop_layout_icons(void)
@@ -1702,11 +1865,12 @@ static void desktop_layout_icons(void)
     }
 }
 
-static WORD desktop_user_draw(LONG parm_block)
+static void desktop_draw_icon_object(const desktop_icon_asset_t *asset,
+                                     const char *label,
+                                     const GRECT *rect,
+                                     UWORD state)
 {
-    const PARMBLK *pb = (const PARMBLK *) (intptr_t) parm_block;
-    const desktop_icon_entry_t *entry;
-    const desktop_icon_draw_t *draw_info;
+    char display_label[GEM_OS_PATH_MAX];
     WORD extent[8];
     WORD label_box[4];
     WORD text_x;
@@ -1716,42 +1880,60 @@ static WORD desktop_user_draw(LONG parm_block)
     WORD previous_font;
     WORD text_height;
     WORD text_width;
+    WORD max_text_width;
+    WORD label_left;
+    WORD label_right;
+    size_t label_len;
 
-    if (pb == NULL) {
-        return 0;
+    if (asset == NULL || label == NULL || rect == NULL) {
+        return;
     }
 
-    entry = desktop_find_icon(pb->pb_obj);
-    if (entry == NULL) {
-        return 0;
-    }
+    strncpy(display_label, label, sizeof(display_label) - 1u);
+    display_label[sizeof(display_label) - 1u] = '\0';
 
-    draw_info = &entry->draw_info;
-    if (draw_info->asset == NULL || draw_info->label == NULL) {
-        return 0;
-    }
-
-    icon_x = (WORD) (pb->pb_x + (pb->pb_w - draw_info->asset->width) / 2);
-    icon_y = pb->pb_y;
-    desktop_draw_masked_icon(draw_info->asset, icon_x, icon_y);
+    icon_x = (WORD) (rect->g_x + (rect->g_w - asset->width) / 2);
+    icon_y = rect->g_y;
+    desktop_draw_masked_icon(asset, icon_x, icon_y);
 
     previous_font = vst_font(g_desktop.vdi_handle, SMALL);
-    vqt_extent(g_desktop.vdi_handle, (char *) draw_info->label, extent);
+    vqt_extent(g_desktop.vdi_handle, display_label, extent);
     text_width = (WORD) (extent[2] - extent[0] + 1);
+    max_text_width = (WORD) (DESKTOP_ICON_STEP_X - 4);
+    label_len = strlen(display_label);
+    if (text_width > max_text_width && label_len > 0u) {
+        size_t visible_len = (size_t) (((LONG) label_len * max_text_width) /
+            text_width);
+
+        if (visible_len < 1u) {
+            visible_len = 1u;
+        }
+        display_label[visible_len] = '\0';
+        vqt_extent(g_desktop.vdi_handle, display_label, extent);
+        text_width = (WORD) (extent[2] - extent[0] + 1);
+        while (text_width > max_text_width && visible_len > 1u) {
+            display_label[--visible_len] = '\0';
+            vqt_extent(g_desktop.vdi_handle, display_label, extent);
+            text_width = (WORD) (extent[2] - extent[0] + 1);
+        }
+    }
     text_height = (WORD) (extent[5] - extent[1] + 1);
-    text_x = (WORD) (pb->pb_x + (pb->pb_w - text_width) / 2);
-    label_y = (WORD) (pb->pb_y + DESKTOP_ICON_TEXT_Y + 14);
-    label_box[0] = (WORD) (text_x - 7);
+    text_x = (WORD) (rect->g_x + (rect->g_w - text_width) / 2);
+    label_y = (WORD) (rect->g_y + DESKTOP_ICON_TEXT_Y + 14);
+    label_box[0] = (WORD) (text_x - 2);
     label_box[1] = (WORD) (label_y - text_height - 2);
-    label_box[2] = (WORD) (text_x + text_width + 6);
+    label_box[2] = (WORD) (text_x + text_width + 1);
     label_box[3] = (WORD) (label_y + 2);
-    if (label_box[0] < pb->pb_x) {
-        label_box[0] = pb->pb_x;
+    label_left = (WORD) (rect->g_x -
+        (DESKTOP_ICON_STEP_X - rect->g_w) / 2);
+    label_right = (WORD) (label_left + DESKTOP_ICON_STEP_X - 1);
+    if (label_box[0] < label_left) {
+        label_box[0] = label_left;
     }
-    if (label_box[2] > pb->pb_x + pb->pb_w - 1) {
-        label_box[2] = (WORD) (pb->pb_x + pb->pb_w - 1);
+    if (label_box[2] > label_right) {
+        label_box[2] = label_right;
     }
-    if ((pb->pb_currstate & SELECTED) != 0u) {
+    if ((state & SELECTED) != 0u) {
         vsf_color(g_desktop.vdi_handle, WHITE);
         v_bar(g_desktop.vdi_handle, label_box);
         vst_color(g_desktop.vdi_handle, BLACK);
@@ -1763,8 +1945,31 @@ static WORD desktop_user_draw(LONG parm_block)
         vst_color(g_desktop.vdi_handle, WHITE);
     }
     v_gtext(g_desktop.vdi_handle, text_x, label_y,
-        (const BYTE *) draw_info->label);
+        (const BYTE *) display_label);
     (void) vst_font(g_desktop.vdi_handle, previous_font);
+}
+
+static WORD desktop_user_draw(LONG parm_block)
+{
+    const PARMBLK *pb = (const PARMBLK *) (intptr_t) parm_block;
+    const desktop_icon_entry_t *entry;
+    GRECT rect;
+
+    if (pb == NULL) {
+        return 0;
+    }
+
+    entry = desktop_find_icon(pb->pb_obj);
+    if (entry == NULL) {
+        return 0;
+    }
+
+    rect.g_x = pb->pb_x;
+    rect.g_y = pb->pb_y;
+    rect.g_w = pb->pb_w;
+    rect.g_h = pb->pb_h;
+    desktop_draw_icon_object(entry->draw_info.asset,
+        entry->draw_info.label, &rect, pb->pb_currstate);
     return 0;
 }
 
@@ -1781,8 +1986,6 @@ static void desktop_set_status(const char *text)
 static void desktop_draw_background_pattern(const GRECT *dirty)
 {
     WORD fill[4];
-    WORD x;
-    WORD y;
     WORD x0;
     WORD y0;
     WORD x1;
@@ -1820,31 +2023,12 @@ static void desktop_draw_background_pattern(const GRECT *dirty)
     fill[2] = x1;
     fill[3] = y1;
 
+    (void) vsf_interior(g_desktop.vdi_handle, FIS_PATTERN);
+    (void) vsf_style(g_desktop.vdi_handle, 2);
     vsf_color(g_desktop.vdi_handle, BLACK);
     v_bar(g_desktop.vdi_handle, fill);
-
-    vsf_color(g_desktop.vdi_handle, WHITE);
-    for (y = y0;
-         y <= y1;
-         ++y) {
-        WORD start_x = x0;
-
-        if ((((start_x - g_desktop.work.g_x) +
-              (y - g_desktop.work.g_y)) & 1) != 0) {
-            ++start_x;
-        }
-        for (x = start_x;
-             x <= x1;
-             x = (WORD) (x + 2)) {
-            WORD dot[4];
-
-            dot[0] = x;
-            dot[1] = y;
-            dot[2] = x;
-            dot[3] = y;
-            v_bar(g_desktop.vdi_handle, dot);
-        }
-    }
+    (void) vsf_interior(g_desktop.vdi_handle, FIS_SOLID);
+    (void) vsf_style(g_desktop.vdi_handle, 1);
 }
 
 static void desktop_redraw(const GRECT *dirty)
@@ -1980,18 +2164,56 @@ static void desktop_redraw_window_change(const GRECT *before,
 
 static void desktop_object_rect(WORD object_id, GRECT *rect)
 {
-    WORD x;
-    WORD y;
-
     if (rect == NULL) {
         return;
     }
 
-    objc_offset(g_desktop.desktop_tree, object_id, &x, &y);
-    rect->g_x = x;
-    rect->g_y = y;
+    if (object_id == DESKTOP_ROOT) {
+        rect->g_x = g_desktop.desktop_tree[DESKTOP_ROOT].ob_x;
+        rect->g_y = g_desktop.desktop_tree[DESKTOP_ROOT].ob_y;
+    } else {
+        rect->g_x = (WORD) (g_desktop.desktop_tree[DESKTOP_ROOT].ob_x +
+            g_desktop.desktop_tree[object_id].ob_x);
+        rect->g_y = (WORD) (g_desktop.desktop_tree[DESKTOP_ROOT].ob_y +
+            g_desktop.desktop_tree[object_id].ob_y);
+    }
     rect->g_w = g_desktop.desktop_tree[object_id].ob_width;
     rect->g_h = g_desktop.desktop_tree[object_id].ob_height;
+}
+
+static void desktop_expand_icon_damage_rect(GRECT *rect)
+{
+    WORD extra;
+
+    if (rect == NULL || rect->g_w >= DESKTOP_ICON_STEP_X) {
+        return;
+    }
+
+    extra = (WORD) (DESKTOP_ICON_STEP_X - rect->g_w);
+    rect->g_x = (WORD) (rect->g_x - extra / 2);
+    rect->g_w = DESKTOP_ICON_STEP_X;
+}
+
+static WORD desktop_find_icon_at(WORD mx, WORD my)
+{
+    WORD i;
+
+    for (i = (WORD) (g_desktop.icon_count - 1); i >= 0; --i) {
+        const desktop_icon_entry_t *entry = &g_desktop.icons[i];
+        GRECT rect;
+
+        desktop_object_rect(entry->object_id, &rect);
+        if (mx >= rect.g_x && my >= rect.g_y &&
+            mx < rect.g_x + rect.g_w &&
+            my < rect.g_y + rect.g_h) {
+            return entry->object_id;
+        }
+        if (i == 0) {
+            break;
+        }
+    }
+
+    return NIL;
 }
 
 static void desktop_select_icon(WORD object_id)
@@ -2038,20 +2260,26 @@ static void desktop_handle_icon_click(WORD object_id)
     int dirty_set = 0;
     uint32_t now = gem_os_ticks_ms();
     int is_double_click = 0;
+    int is_repeat_click = 0;
 
     if (g_desktop.last_desktop_click_object == object_id &&
         (uint32_t) (now - g_desktop.last_desktop_click_ms) <=
             DESKTOP_DOUBLE_CLICK_MS) {
         is_double_click = 1;
     }
+    if (previous == object_id) {
+        is_repeat_click = 1;
+    }
 
     desktop_select_icon(object_id);
     desktop_status_for_icon(entry);
     if (previous != NIL) {
         desktop_object_rect(previous, &dirty);
+        desktop_expand_icon_damage_rect(&dirty);
         dirty_set = 1;
     }
     desktop_object_rect(object_id, &rect);
+    desktop_expand_icon_damage_rect(&rect);
     if (dirty_set == 0) {
         dirty = rect;
     } else {
@@ -2075,7 +2303,8 @@ static void desktop_handle_icon_click(WORD object_id)
 
     g_desktop.last_desktop_click_object = object_id;
     g_desktop.last_desktop_click_ms = now;
-    if (is_double_click != 0 && entry != NULL && entry->is_trash == 0) {
+    if ((is_double_click != 0 || is_repeat_click != 0) &&
+        entry != NULL && entry->is_trash == 0) {
         desktop_open_disk_path(entry->path, entry->label);
     }
 }
@@ -2113,10 +2342,20 @@ static void desktop_handle_menu_item(WORD item)
     case MENU_DESK_4:
     case MENU_DESK_5:
     case MENU_DESK_6:
-        (void) snprintf(text, sizeof(text), "Desktop slot %d selected.",
-            (int) (item - MENU_DESK_1 + 1));
-        desktop_set_status(text);
+    {
+        desktop_browser_window_t *browser =
+            desktop_browser_for_desk_slot((WORD) (item - MENU_DESK_1));
+
+        if (browser != NULL) {
+            (void) wind_set(browser->handle, WF_TOP, 0, 0, 0, 0);
+            (void) snprintf(text, sizeof(text), "Window selected: %.*s",
+                (int) sizeof(text) - 18, browser->title);
+            desktop_set_status(text);
+        } else {
+            desktop_set_status("No window in that Desk slot.");
+        }
         break;
+    }
     case MENU_FILE_OPEN:
         if (selected != NULL && selected->is_trash == 0) {
             desktop_open_selected_icon();
@@ -2306,6 +2545,14 @@ int main(void)
             if (msg[0] == MN_SELECTED) {
                 desktop_handle_menu_item(msg[4]);
                 menu_tnormal(g_desktop.menu_tree, msg[3], 1);
+            } else if (msg[0] == WM_REDRAW && msg[3] == 0) {
+                GRECT dirty;
+
+                dirty.g_x = msg[4];
+                dirty.g_y = msg[5];
+                dirty.g_w = msg[6];
+                dirty.g_h = msg[7];
+                desktop_redraw(&dirty);
             } else {
                 desktop_browser_handle_message(msg);
             }
@@ -2313,7 +2560,7 @@ int main(void)
 
         if ((event & MU_BUTTON) != 0) {
             WORD handle = wind_find(mx, my);
-            WORD object = objc_find(g_desktop.desktop_tree, ROOT, MAX_DEPTH, mx, my);
+            WORD object = desktop_find_icon_at(mx, my);
 
             if (my < g_desktop.work.g_y) {
                 continue;
@@ -2334,6 +2581,7 @@ int main(void)
                     continue;
                 }
                 desktop_object_rect(g_desktop.selected_icon, &dirty);
+                desktop_expand_icon_damage_rect(&dirty);
                 desktop_select_icon(NIL);
                 desktop_set_status("Select a disk or the trash can.");
                 desktop_redraw(&dirty);

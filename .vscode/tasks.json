@@ -39,6 +39,28 @@
             }
         },
         {
+            "label": "Build Desktop Stack",
+            "type": "shell",
+            "command": "cmake",
+            "args": [
+                "--build",
+                "build",
+                "--target",
+                "gemd",
+                "desktop",
+                "terminal",
+                "calc",
+                "clock_gemd"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "dependsOn": "Configure CMake",
+            "problemMatcher": [
+                "$gcc"
+            ]
+        },
+        {
             "label": "Build Menu Demo",
             "type": "shell",
             "command": "cmake",
@@ -104,10 +126,11 @@
             "problemMatcher": []
         },
         {
-            "label": "Build Desktop + Start rasta",
+            "label": "Build Desktop Session",
             "dependsOn": [
-                "Build Desktop",
-                "Start rasta viewer"
+                "Build Desktop Stack",
+                "Start rasta viewer",
+                "Start gemd"
             ],
             "dependsOrder": "sequence",
             "problemMatcher": []

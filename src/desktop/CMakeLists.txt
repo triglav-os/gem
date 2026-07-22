@@ -10,7 +10,7 @@ target_include_directories(desktop
         ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
-target_link_libraries(desktop PRIVATE aes vdi)
+target_link_libraries(desktop PRIVATE gem)
 
 set_target_properties(desktop PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/bin

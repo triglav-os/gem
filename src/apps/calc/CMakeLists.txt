@@ -9,6 +9,7 @@ target_link_libraries(calc PRIVATE aes vdi)
 
 set_target_properties(calc PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/bin
+    OUTPUT_NAME calc_hosted
 )
 
 target_compile_features(calc PRIVATE c_std_11)
@@ -45,6 +46,7 @@ target_link_libraries(calc_gemd PRIVATE gem)
 
 set_target_properties(calc_gemd PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/bin
+    OUTPUT_NAME calc
 )
 
 target_compile_features(calc_gemd PRIVATE c_std_11)

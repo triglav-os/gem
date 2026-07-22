@@ -38,8 +38,8 @@ enum {
 static char g_title_text[32];
 
 static OBJECT g_tree[] = {
-    {-1, 1, 3, G_IBOX, NONE, NORMAL, 0L, 0, 0, 0, 0},
-    {0, 2, 2, G_BOX, NONE, NORMAL, 0x1100L, 0, 0, 80, 1},
+    {-1, 1, 4, G_IBOX, NONE, NORMAL, 0L, 0, 0, 0, 0},
+    {4, 2, 2, G_BOX, NONE, NORMAL, 0x1100L, 0, 0, 80, 1},
     {1, 3, 3, G_IBOX, NONE, NORMAL, 0L, 0, 0, 80, 1},
     {2, -1, -1, G_TITLE, NONE, NORMAL, 0L, 0, 0, 8, 1},
     {0, 5, 5, G_IBOX, NONE, NORMAL, 0L, 0, 0, 0, 0},

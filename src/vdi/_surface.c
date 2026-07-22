@@ -14,6 +14,14 @@
 #include <stdlib.h>
 #include <string.h>
 
+enum {
+    VDI_FILL_HOLLOW = 0,
+    VDI_FILL_SOLID = 1,
+    VDI_FILL_PATTERN = 2,
+    VDI_FILL_HATCH = 3,
+    VDI_FILL_USER = 4
+};
+
 static WORD _vdi_clamp_word(WORD value, WORD low, WORD high)
 {
     if (value < low) {
@@ -84,6 +92,92 @@ static void _vdi_apply_mask(uint8_t *byte, uint8_t mask, WORD color)
         }
         break;
     }
+}
+
+static WORD _vdi_fill_pattern_bit(WORD x, WORD y, WORD color)
+{
+    static const UWORD builtin_patterns[8][16] = {
+        {
+            0xffffu, 0xffffu, 0xffffu, 0xffffu,
+            0xffffu, 0xffffu, 0xffffu, 0xffffu,
+            0xffffu, 0xffffu, 0xffffu, 0xffffu,
+            0xffffu, 0xffffu, 0xffffu, 0xffffu
+        },
+        {
+            0xaaaau, 0x5555u, 0xaaaau, 0x5555u,
+            0xaaaau, 0x5555u, 0xaaaau, 0x5555u,
+            0xaaaau, 0x5555u, 0xaaaau, 0x5555u,
+            0xaaaau, 0x5555u, 0xaaaau, 0x5555u
+        },
+        {
+            0x8888u, 0x2222u, 0x8888u, 0x2222u,
+            0x8888u, 0x2222u, 0x8888u, 0x2222u,
+            0x8888u, 0x2222u, 0x8888u, 0x2222u,
+            0x8888u, 0x2222u, 0x8888u, 0x2222u
+        },
+        {
+            0xccccu, 0x3333u, 0xccccu, 0x3333u,
+            0xccccu, 0x3333u, 0xccccu, 0x3333u,
+            0xccccu, 0x3333u, 0xccccu, 0x3333u,
+            0xccccu, 0x3333u, 0xccccu, 0x3333u
+        },
+        {
+            0xf0f0u, 0x0f0fu, 0xf0f0u, 0x0f0fu,
+            0xf0f0u, 0x0f0fu, 0xf0f0u, 0x0f0fu,
+            0xf0f0u, 0x0f0fu, 0xf0f0u, 0x0f0fu,
+            0xf0f0u, 0x0f0fu, 0xf0f0u, 0x0f0fu
+        },
+        {
+            0xff00u, 0x0000u, 0xff00u, 0x0000u,
+            0xff00u, 0x0000u, 0xff00u, 0x0000u,
+            0xff00u, 0x0000u, 0xff00u, 0x0000u,
+            0xff00u, 0x0000u, 0xff00u, 0x0000u
+        },
+        {
+            0xffffu, 0x0000u, 0xffffu, 0x0000u,
+            0xffffu, 0x0000u, 0xffffu, 0x0000u,
+            0xffffu, 0x0000u, 0xffffu, 0x0000u,
+            0xffffu, 0x0000u, 0xffffu, 0x0000u
+        },
+        {
+            0x8080u, 0x0808u, 0x8080u, 0x0808u,
+            0x8080u, 0x0808u, 0x8080u, 0x0808u,
+            0x8080u, 0x0808u, 0x8080u, 0x0808u,
+            0x8080u, 0x0808u, 0x8080u, 0x0808u
+        }
+    };
+    const UWORD *pattern = NULL;
+    WORD row_index;
+    WORD bit_on;
+
+    if (_vdi_compat.fill_interior == VDI_FILL_HOLLOW) {
+        return 0;
+    }
+
+    if (_vdi_compat.fill_interior == VDI_FILL_SOLID) {
+        return color;
+    }
+
+    if (_vdi_compat.fill_interior == VDI_FILL_USER) {
+        pattern = (const UWORD *) _vdi_compat.fill_pattern;
+    } else {
+        WORD style = _vdi_compat.fill_style;
+
+        if (style < 1 || style > 8) {
+            style = 2;
+        }
+        pattern = builtin_patterns[style - 1];
+    }
+
+    row_index = (WORD) ((unsigned int) y & 15u);
+    bit_on = (pattern[row_index] &
+        (UWORD) (0x8000u >> ((unsigned int) x & 15u))) != 0u;
+
+    if (bit_on != 0) {
+        return color;
+    }
+
+    return (color != 0) ? 0 : 1;
 }
 
 static uint8_t _vdi_mfdb_sample_direct(const MFDB *mfdb, WORD x, WORD y)
@@ -461,6 +555,7 @@ void _vdi_fill_rect(WORD x0, WORD y0, WORD x1, WORD y1, WORD color)
     uint8_t left_mask;
     uint8_t right_mask;
     WORD row;
+    WORD fill_mode;
 
     rect.x0 = (x0 < x1) ? x0 : x1;
     rect.x1 = (x0 < x1) ? x1 : x0;
@@ -475,6 +570,7 @@ void _vdi_fill_rect(WORD x0, WORD y0, WORD x1, WORD y1, WORD color)
     _vdi_prepare_screen_write();
 
     mode = _vdi_write_mode();
+    fill_mode = _vdi_compat.fill_interior;
     pitch = _vdi.surface->pitch;
     height = (WORD) (rect.y1 - rect.y0 + 1);
     base = (uint8_t *) _vdi.surface->pixels + (size_t) rect.y0 * pitch;
@@ -483,7 +579,7 @@ void _vdi_fill_rect(WORD x0, WORD y0, WORD x1, WORD y1, WORD color)
     start_bit = (unsigned int) rect.x0 & 7u;
     end_bit = (unsigned int) rect.x1 & 7u;
 
-    if (mode == 1 || mode == 4) {
+    if ((mode == 1 || mode == 4) && fill_mode == VDI_FILL_SOLID) {
         fill_byte = (mode == 1 && color != 0) ? 0xffu : 0x00u;
 
         if (start_byte == 0 && end_byte == pitch - 1 &&
@@ -528,7 +624,15 @@ void _vdi_fill_rect(WORD x0, WORD y0, WORD x1, WORD y1, WORD color)
     }
 
     for (row = 0; row < height; ++row, base += pitch) {
-        _vdi_hline_to_row(base, rect.x0, rect.x1, color);
+        WORD y = (WORD) (rect.y0 + row);
+        WORD x;
+
+        for (x = rect.x0; x <= rect.x1; ++x) {
+            WORD pixel = _vdi_fill_pattern_bit(x, y, color);
+
+            _vdi_apply_mask(&base[(size_t) x / 8u],
+                _vdi_screen_mask_for_x(x), pixel);
+        }
     }
 }
 

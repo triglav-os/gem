@@ -461,8 +461,17 @@ void _aes_menu_clear_saved_region(void)
 void _aes_menu_switch_to_app(WORD app_id)
 {
     aes_app_t *app = _aes_find_app_by_id(app_id);
-    OBJECT *tree = (app != NULL) ? app->menu_tree : NULL;
-    WORD visible = (app != NULL) ? app->menu_visible : 0;
+    aes_app_t *menu_app = app;
+    OBJECT *tree;
+    WORD visible;
+
+    _aes.active_app_id = (app != NULL) ? app_id : 0;
+    if (menu_app == NULL || menu_app->menu_tree == NULL ||
+        menu_app->menu_visible == 0) {
+        menu_app = _aes_find_app_by_id(_aes.desktop_owner_app_id);
+    }
+    tree = (menu_app != NULL) ? menu_app->menu_tree : NULL;
+    visible = (menu_app != NULL) ? menu_app->menu_visible : 0;
 
     if (tree == _aes.menu_tree && visible == _aes.menu_visible) {
         return;
@@ -474,7 +483,7 @@ void _aes_menu_switch_to_app(WORD app_id)
 
     _aes.menu_tree = tree;
     _aes.menu_visible = visible;
-    _aes.menu_owner_app_id = (app != NULL) ? app_id : 0;
+    _aes.menu_owner_app_id = (menu_app != NULL) ? menu_app->id : 0;
 
     if (visible != 0 && tree != NULL) {
         /*

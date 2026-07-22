@@ -18,6 +18,7 @@
 
 enum {
     AES_MAX_APPS = 16,
+    AES_APP_INPUT_QUEUE_SIZE = 16,
     /*
      * Shared across every app and message type (WM_REDRAW, WM_TOPPED,
      * WM_MOVED/SIZED, MN_SELECTED, ...) with no per-app reservation --
@@ -67,6 +68,9 @@ typedef struct aes_app {
     WORD enum_count;
     WORD enum_index;
     GRECT enum_rects[64];
+    gem_hid_event_t input_events[AES_APP_INPUT_QUEUE_SIZE];
+    WORD input_event_head;
+    WORD input_event_count;
 } aes_app_t;
 
 typedef struct aes_window {
@@ -107,6 +111,8 @@ typedef struct aes_state {
     OBJECT *menu_tree;
     WORD menu_visible;
     WORD menu_owner_app_id;
+    WORD desktop_owner_app_id;
+    WORD active_app_id;
     WORD menu_popup_root_direct;
     OBJECT *hover_tree;
     OBJECT *edit_tree;
