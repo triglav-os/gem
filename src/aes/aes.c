@@ -367,7 +367,7 @@ WORD shel_put(char *buf, WORD length)
     _aes.shell_buf[length] = '\0';
     _aes.shell_buf_len = length;
 
-    fd = gem_os_open_write("bin/desktop.inf");
+    fd = gem_os_open_write("bin/resources/desktop.inf");
     if (fd >= 0) {
         (void) gem_os_write(fd, _aes.shell_buf,
             (uint32_t) _aes.shell_buf_len);

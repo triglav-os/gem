@@ -14,9 +14,3 @@ file(GLOB gemix_libraries "${GEMIX_ROOT}/lib/*.so")
 foreach(library IN LISTS gemix_libraries)
     file(RPATH_SET FILE "${library}" NEW_RPATH "$ORIGIN")
 endforeach()
-
-file(CHMOD "${GEMIX_ROOT}/bin/gemix-session"
-    PERMISSIONS
-        OWNER_READ OWNER_WRITE OWNER_EXECUTE
-        GROUP_READ GROUP_EXECUTE
-        WORLD_READ WORLD_EXECUTE)

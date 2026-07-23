@@ -8,7 +8,7 @@ target_include_directories(terminal
 target_link_libraries(terminal PRIVATE gem)
 
 set_target_properties(terminal PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/bin
+    RUNTIME_OUTPUT_DIRECTORY ${GEM_APPS_DIR}
 )
 
 target_compile_features(terminal PRIVATE c_std_11)

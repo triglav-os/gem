@@ -14,7 +14,7 @@ target_include_directories(demo3
 target_link_libraries(demo3 PRIVATE vdi)
 
 set_target_properties(demo3 PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/bin
+    RUNTIME_OUTPUT_DIRECTORY ${GEM_DEMOS_DIR}
 )
 
 target_compile_features(demo3 PRIVATE c_std_11)

@@ -44,7 +44,7 @@ add_custom_target(gem_runtime_cursors ALL
         ${PROJECT_SOURCE_DIR}/docs/orig/cursors/THICKCROSS.PNG
         ${PROJECT_SOURCE_DIR}/docs/orig/cursors/OUTLINECROSS.PNG
         -o ${PROJECT_BINARY_DIR}/cursors.rsc
-        -o ${PROJECT_SOURCE_DIR}/bin/cursors.rsc
+        -o ${GEM_RESOURCES_DIR}/cursors.rsc
     DEPENDS
         resgen
         ${PROJECT_SOURCE_DIR}/docs/orig/cursors/POINTER.PNG
@@ -64,7 +64,7 @@ add_custom_target(gem_runtime_desktop_icons ALL
         LSAN_OPTIONS=detect_leaks=0
         $<TARGET_FILE:resgen> icons
         -o ${PROJECT_BINARY_DIR}/desktop_icons.rsc
-        -o ${PROJECT_SOURCE_DIR}/bin/desktop_icons.rsc
+        -o ${GEM_RESOURCES_DIR}/desktop_icons.rsc
         ${PROJECT_SOURCE_DIR}/docs/orig/icons/DISK.PNG
         ${PROJECT_SOURCE_DIR}/docs/orig/icons/DOC.PNG
         ${PROJECT_SOURCE_DIR}/docs/orig/icons/FOLDER.PNG
@@ -80,7 +80,7 @@ add_custom_target(gem_runtime_alert_icons ALL
         LSAN_OPTIONS=detect_leaks=0
         $<TARGET_FILE:resgen> icons
         -o ${PROJECT_BINARY_DIR}/alert_icons.rsc
-        -o ${PROJECT_SOURCE_DIR}/bin/alert_icons.rsc
+        -o ${GEM_RESOURCES_DIR}/alert_icons.rsc
         ${PROJECT_SOURCE_DIR}/docs/orig/icons/EXCLAMATION.PNG
         ${PROJECT_SOURCE_DIR}/docs/orig/icons/QUESTION.PNG
         ${PROJECT_SOURCE_DIR}/docs/orig/icons/STOP.PNG
@@ -129,7 +129,7 @@ add_custom_target(gem_runtime_clock_numbers ALL
         LSAN_OPTIONS=detect_leaks=0
         $<TARGET_FILE:resgen> bitmaps
         -o ${PROJECT_BINARY_DIR}/clock_numbers.rsc
-        -o ${PROJECT_SOURCE_DIR}/bin/clock_numbers.rsc
+        -o ${GEM_RESOURCES_DIR}/clock_numbers.rsc
         ${clock_number_icons}
     DEPENDS resgen ${clock_number_icons}
     COMMENT "Generating GEM clock number resource"
@@ -169,7 +169,7 @@ add_custom_target(gem_runtime_gemscape_toolbar ALL
         LSAN_OPTIONS=detect_leaks=0
         $<TARGET_FILE:resgen> bitmaps
         -o ${PROJECT_BINARY_DIR}/gemscape_toolbar.rsc
-        -o ${PROJECT_SOURCE_DIR}/bin/gemscape_toolbar.rsc
+        -o ${GEM_RESOURCES_DIR}/gemscape_toolbar.rsc
         ${gemscape_toolbar_icons}
     DEPENDS resgen ${gemscape_toolbar_icons}
     COMMENT "Generating Gemscape toolbar resource"
@@ -208,7 +208,7 @@ add_custom_target(gem_runtime_maestro_tree ALL
         LSAN_OPTIONS=detect_leaks=0
         $<TARGET_FILE:resgen> bitmaps
         -o ${PROJECT_BINARY_DIR}/maestro_tree.rsc
-        -o ${PROJECT_SOURCE_DIR}/bin/maestro_tree.rsc
+        -o ${GEM_RESOURCES_DIR}/maestro_tree.rsc
         ${maestro_tree_icons}
     DEPENDS resgen ${maestro_tree_icons}
     COMMENT "Generating Maestro tree resource"

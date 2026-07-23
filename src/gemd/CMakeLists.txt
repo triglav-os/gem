@@ -12,7 +12,7 @@ target_include_directories(gemd
 target_link_libraries(gemd PRIVATE aes)
 
 set_target_properties(gemd PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/bin
+    RUNTIME_OUTPUT_DIRECTORY ${GEM_CORE_DIR}
 )
 
 target_compile_features(gemd PRIVATE c_std_11)

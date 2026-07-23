@@ -265,7 +265,7 @@ static int clock_load_numbers(clock_state_t *state)
     state->numbers_loaded = 0;
 #else
     state->numbers_loaded = clock_load_bitblks_from_resource(
-        "bin/clock_numbers.rsc", "clock_numbers.rsc",
+        "clock_numbers.rsc", "clock_numbers.rsc",
         state->numbers, clock_number_count);
 #endif
     return state->numbers_loaded;

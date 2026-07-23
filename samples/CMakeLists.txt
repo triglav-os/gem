@@ -34,7 +34,7 @@ function(add_manual_demo target_name source_file)
     target_link_libraries(${target_name} PRIVATE vdi)
 
     set_target_properties(${target_name} PROPERTIES
-        RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/bin
+        RUNTIME_OUTPUT_DIRECTORY ${GEM_DEMOS_DIR}
     )
 
     target_compile_features(${target_name} PRIVATE c_std_11)

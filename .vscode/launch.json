@@ -16,7 +16,7 @@
             "name": "Debug Desktop",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/bin/desktop",
+            "program": "${workspaceFolder}/bin/core/desktop",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
@@ -61,7 +61,7 @@
             "name": "Debug Menu Demo A",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/bin/menu_demo",
+            "program": "${workspaceFolder}/bin/demos/menu_demo",
             "args": [
                 "A"
             ],
@@ -93,7 +93,7 @@
             "name": "Debug Menu Demo B",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/bin/menu_demo",
+            "program": "${workspaceFolder}/bin/demos/menu_demo",
             "args": [
                 "B"
             ],

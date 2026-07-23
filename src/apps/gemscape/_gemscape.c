@@ -133,7 +133,7 @@ static int gemscape_load_toolbar_icons(gemscape_state_t *state)
     }
 
     state->toolbar_icons_loaded = gemscape_load_bitblks_from_resource(
-        "bin/gemscape_toolbar.rsc",
+        "bin/resources/gemscape_toolbar.rsc",
         "gemscape_toolbar.rsc",
         state->toolbar_icons,
         gemscape_toolbar_icon_count);

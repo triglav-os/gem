@@ -3,7 +3,7 @@ add_executable(stout
 )
 
 set_target_properties(stout PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/bin
+    RUNTIME_OUTPUT_DIRECTORY ${GEM_TOOLS_DIR}
 )
 
 target_include_directories(stout

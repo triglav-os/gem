@@ -2,26 +2,28 @@
 
 ## Build
 
-Configure a separate release build so the deployment does not depend on
-the AddressSanitizer and UndefinedBehaviorSanitizer runtimes:
+Configure a release build so the deployment does not depend on the
+AddressSanitizer and UndefinedBehaviorSanitizer runtimes:
 
 ```sh
-cmake -S . -B build-linux \
+cmake -S . -B build \
     -DCMAKE_BUILD_TYPE=Release \
     -DGEM_PLATFORM=linux
-cmake --build build-linux --target gemix_package -j"$(nproc)"
+cmake --build build --target gemix_package -j"$(nproc)"
 ```
 
 `bin/gemix` is relocatable and contains:
 
-- `bin/`: `gemd`, desktop, terminal, calculator, clock, and the session
-  launcher
+- `bin/`: `gemd`, desktop, terminal, calculator, and clock
 - `lib/`: AES, VDI, `libgem`, and the native Linux platform library
-- `include/`: public GEM and platform development headers
+- `include/`: the minimal public GEM application SDK
 - `share/gem/`: fonts and runtime resources
 
-Copy that directory into the target filesystem and run
-`bin/gemix/bin/gemix-session` from a Linux virtual terminal.
+Copy that directory into the target filesystem. Start `bin/gemd` from
+the distribution's service/session manager, wait for `/tmp/gemd.sock`,
+and then start `bin/desktop`. The service must set
+`GEM_RESOURCE_DIR=/opt/gemix/share/gem` (adjusted to its installation
+prefix).
 
 ## Devices
 
@@ -52,7 +54,10 @@ fbdev format.
 export GEM_LINUX_FB=/dev/fb0
 export GEM_LINUX_INPUT=/dev/input/event1,/dev/input/event4
 export GEM_LINUX_GRAB=1
-exec /opt/gemix/bin/gemix-session
+export GEM_RESOURCE_DIR=/opt/gemix/share/gem
+/opt/gemix/bin/gemd &
+while [ ! -S /tmp/gemd.sock ]; do sleep 0.02; done
+exec /opt/gemix/bin/desktop
 ```
 
 If the session starts without input, inspect device capabilities and

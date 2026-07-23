@@ -236,7 +236,7 @@ static int maestro_load_tree_icons(maestro_state_t *state)
     }
 
     state->tree_icons_loaded = maestro_load_bitblks_from_resource(
-        "bin/maestro_tree.rsc",
+        "bin/resources/maestro_tree.rsc",
         "maestro_tree.rsc",
         state->tree_icons,
         maestro_tree_icon_count);

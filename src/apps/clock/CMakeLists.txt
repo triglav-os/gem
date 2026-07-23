@@ -10,7 +10,7 @@ target_include_directories(clock
 target_link_libraries(clock PRIVATE aes vdi m)
 
 set_target_properties(clock PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/bin
+    RUNTIME_OUTPUT_DIRECTORY ${GEM_APPS_DIR}
     OUTPUT_NAME clock_hosted
 )
 
@@ -48,7 +48,7 @@ target_link_libraries(clock_gemd PRIVATE gem m)
 target_compile_definitions(clock_gemd PRIVATE CLOCK_GEMD_CLIENT=1)
 
 set_target_properties(clock_gemd PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/bin
+    RUNTIME_OUTPUT_DIRECTORY ${GEM_APPS_DIR}
     OUTPUT_NAME clock
 )
 

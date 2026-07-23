@@ -97,7 +97,7 @@ static const char *font_dir(void)
 #ifdef GEM_BUILD_FONT_DIR
     return GEM_BUILD_FONT_DIR;
 #else
-    return "bin/fonts";
+    return "bin/resources/fonts";
 #endif
 }
 

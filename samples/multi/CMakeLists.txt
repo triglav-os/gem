@@ -10,7 +10,7 @@ target_include_directories(multi
 target_link_libraries(multi PRIVATE gem)
 
 set_target_properties(multi PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/bin
+    RUNTIME_OUTPUT_DIRECTORY ${GEM_DEMOS_DIR}
 )
 
 target_compile_features(multi PRIVATE c_std_11)

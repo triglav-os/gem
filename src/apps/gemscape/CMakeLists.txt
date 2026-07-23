@@ -10,7 +10,7 @@ target_include_directories(gemscape
 target_link_libraries(gemscape PRIVATE aes vdi)
 
 set_target_properties(gemscape PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/bin
+    RUNTIME_OUTPUT_DIRECTORY ${GEM_APPS_DIR}
 )
 
 target_compile_features(gemscape PRIVATE c_std_11)

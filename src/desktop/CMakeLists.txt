@@ -13,7 +13,7 @@ target_include_directories(desktop
 target_link_libraries(desktop PRIVATE gem)
 
 set_target_properties(desktop PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/bin
+    RUNTIME_OUTPUT_DIRECTORY ${GEM_CORE_DIR}
 )
 
 target_compile_features(desktop PRIVATE c_std_11)
@@ -52,7 +52,7 @@ target_link_libraries(desktop_hosted PRIVATE aes vdi)
 
 set_target_properties(desktop_hosted PROPERTIES
     OUTPUT_NAME desktop_hosted
-    RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/bin
+    RUNTIME_OUTPUT_DIRECTORY ${GEM_CORE_DIR}
 )
 
 target_compile_features(desktop_hosted PRIVATE c_std_11)

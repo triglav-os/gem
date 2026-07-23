@@ -15,11 +15,11 @@ target_include_directories(demo27_rscgen
 target_link_libraries(demo27 PRIVATE aes vdi)
 
 set_target_properties(demo27 PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/bin
+    RUNTIME_OUTPUT_DIRECTORY ${GEM_DEMOS_DIR}
 )
 
 set_target_properties(demo27_rscgen PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/build
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
 )
 
 target_compile_features(demo27_rscgen PRIVATE c_std_11)
@@ -47,7 +47,7 @@ add_dependencies(demo27 demo27_rscgen)
 add_custom_target(demo27_resource
     COMMAND $<TARGET_FILE:demo27_rscgen>
         ${CMAKE_CURRENT_SOURCE_DIR}/demo27.rsc
-        ${PROJECT_SOURCE_DIR}/bin/demo27.rsc
+        ${GEM_RESOURCES_DIR}/demo27.rsc
     DEPENDS demo27_rscgen
 )
 

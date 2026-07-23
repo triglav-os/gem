@@ -7,7 +7,7 @@ set -uo pipefail
 # completes once gemd is actually ready to accept RPC connections.
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-GEMD="$ROOT/bin/gemd"
+GEMD="$ROOT/bin/core/gemd"
 SOCK="/tmp/gemd.sock"
 LOG="/tmp/gemd_task.log"
 
@@ -15,7 +15,7 @@ pkill -x gemd >/dev/null 2>&1
 # Applications launched by the desktop are detached sessions. Stop only
 # this workspace's hosted clients so an F5 restart cannot leave old event
 # loops connected to, or spinning after, the previous server instance.
-pkill -f "^${ROOT}/bin/(desktop|terminal|calc|clock|menu_demo)( |$)" \
+pkill -f "^${ROOT}/bin/(core/desktop|apps/(terminal|calc|clock)|demos/menu_demo)( |$)" \
     >/dev/null 2>&1
 sleep 0.2
 rm -f "$SOCK"

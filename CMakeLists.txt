@@ -17,26 +17,44 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS OFF)
 
+set(GEM_OUTPUT_ROOT ${PROJECT_SOURCE_DIR}/bin)
+set(GEM_CORE_DIR ${GEM_OUTPUT_ROOT}/core)
+set(GEM_LIBRARY_DIR ${GEM_OUTPUT_ROOT}/lib)
+set(GEM_APPS_DIR ${GEM_OUTPUT_ROOT}/apps)
+set(GEM_DEMOS_DIR ${GEM_OUTPUT_ROOT}/demos)
+set(GEM_RESOURCES_DIR ${GEM_OUTPUT_ROOT}/resources)
+set(GEM_TOOLS_DIR ${GEM_OUTPUT_ROOT}/tools)
+
+file(MAKE_DIRECTORY
+    ${GEM_CORE_DIR}
+    ${GEM_LIBRARY_DIR}
+    ${GEM_APPS_DIR}
+    ${GEM_DEMOS_DIR}
+    ${GEM_RESOURCES_DIR}
+    ${GEM_TOOLS_DIR}
+)
+
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Debug CACHE STRING "Build type" FORCE)
 endif()
 
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)
-set(CMAKE_BUILD_RPATH "$ORIGIN")
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${GEM_LIBRARY_DIR})
+set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
+set(CMAKE_INSTALL_RPATH "$ORIGIN/../lib")
 
 file(GLOB gem_runtime_font_files CONFIGURE_DEPENDS
     ${PROJECT_SOURCE_DIR}/src/resources/fonts/*.fnt)
 
 add_custom_target(gem_runtime_fonts ALL
     COMMAND ${CMAKE_COMMAND} -E remove_directory
-        ${PROJECT_SOURCE_DIR}/bin/fonts
+        ${GEM_RESOURCES_DIR}/fonts
     COMMAND ${CMAKE_COMMAND} -E make_directory
-        ${PROJECT_SOURCE_DIR}/bin/fonts
+        ${GEM_RESOURCES_DIR}/fonts
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         ${gem_runtime_font_files}
-        ${PROJECT_SOURCE_DIR}/bin/fonts
-    COMMENT "Copying GEM runtime fonts into bin/fonts"
+        ${GEM_RESOURCES_DIR}/fonts
+    COMMENT "Copying GEM runtime fonts into bin/resources/fonts"
 )
 
 add_subdirectory(lib/platform/rasta)
@@ -90,18 +108,25 @@ add_custom_target(gemix_package
         $<TARGET_FILE:aes> ${GEMIX_LIB}/
     COMMAND ${CMAKE_COMMAND} -E copy
         $<TARGET_FILE:vdi> ${GEMIX_LIB}/
+    COMMAND ${CMAKE_COMMAND} -E copy
+        ${PROJECT_SOURCE_DIR}/include/gem.h ${GEMIX_INCLUDE}/gem.h
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${GEMIX_INCLUDE}/gem
+    COMMAND ${CMAKE_COMMAND} -E copy
+        ${PROJECT_SOURCE_DIR}/include/gem/gem.h ${GEMIX_INCLUDE}/gem/
+    COMMAND ${CMAKE_COMMAND} -E copy
+        ${PROJECT_SOURCE_DIR}/include/gem/aes.h ${GEMIX_INCLUDE}/gem/
+    COMMAND ${CMAKE_COMMAND} -E copy
+        ${PROJECT_SOURCE_DIR}/include/gem/vdi.h ${GEMIX_INCLUDE}/gem/
+    COMMAND ${CMAKE_COMMAND} -E copy
+        ${PROJECT_SOURCE_DIR}/include/gem/portab.h ${GEMIX_INCLUDE}/gem/
     COMMAND ${CMAKE_COMMAND} -E copy_directory
-        ${PROJECT_SOURCE_DIR}/include ${GEMIX_INCLUDE}
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-        ${PROJECT_SOURCE_DIR}/bin/fonts ${GEMIX_SHARE}/fonts
+        ${GEM_RESOURCES_DIR}/fonts ${GEMIX_SHARE}/fonts
     COMMAND ${CMAKE_COMMAND} -E copy
-        ${PROJECT_SOURCE_DIR}/bin/cursors.rsc ${GEMIX_SHARE}/
+        ${GEM_RESOURCES_DIR}/cursors.rsc ${GEMIX_SHARE}/
     COMMAND ${CMAKE_COMMAND} -E copy
-        ${PROJECT_SOURCE_DIR}/bin/desktop_icons.rsc ${GEMIX_SHARE}/
+        ${GEM_RESOURCES_DIR}/desktop_icons.rsc ${GEMIX_SHARE}/
     COMMAND ${CMAKE_COMMAND} -E copy
-        ${PROJECT_SOURCE_DIR}/bin/clock_numbers.rsc ${GEMIX_SHARE}/
-    COMMAND ${CMAKE_COMMAND} -E copy
-        ${PROJECT_SOURCE_DIR}/tools/gemix-session.sh ${GEMIX_BIN}/gemix-session
+        ${GEM_RESOURCES_DIR}/clock_numbers.rsc ${GEMIX_SHARE}/
     COMMAND ${CMAKE_COMMAND}
         -DGEMIX_ROOT=${GEMIX_ROOT}
         -P ${PROJECT_SOURCE_DIR}/tools/package-gemix.cmake

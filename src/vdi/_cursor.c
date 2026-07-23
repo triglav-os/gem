@@ -130,7 +130,7 @@ static const char *cursor_resource_path(void)
 #ifdef GEM_BUILD_CURSOR_RSC
     return GEM_BUILD_CURSOR_RSC;
 #else
-    return "bin/cursors.rsc";
+    return "bin/resources/cursors.rsc";
 #endif
 }
 

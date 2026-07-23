@@ -8,7 +8,7 @@ target_include_directories(demo28
 target_link_libraries(demo28 PRIVATE aes vdi)
 
 set_target_properties(demo28 PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/bin
+    RUNTIME_OUTPUT_DIRECTORY ${GEM_DEMOS_DIR}
 )
 
 target_compile_features(demo28 PRIVATE c_std_11)

@@ -8,7 +8,7 @@ target_include_directories(calc
 target_link_libraries(calc PRIVATE aes vdi)
 
 set_target_properties(calc PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/bin
+    RUNTIME_OUTPUT_DIRECTORY ${GEM_APPS_DIR}
     OUTPUT_NAME calc_hosted
 )
 
@@ -45,7 +45,7 @@ target_include_directories(calc_gemd
 target_link_libraries(calc_gemd PRIVATE gem)
 
 set_target_properties(calc_gemd PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/bin
+    RUNTIME_OUTPUT_DIRECTORY ${GEM_APPS_DIR}
     OUTPUT_NAME calc
 )
 

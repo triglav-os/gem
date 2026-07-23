@@ -10,7 +10,7 @@ target_include_directories(menu_demo
 target_link_libraries(menu_demo PRIVATE gem)
 
 set_target_properties(menu_demo PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/bin
+    RUNTIME_OUTPUT_DIRECTORY ${GEM_DEMOS_DIR}
 )
 
 target_compile_features(menu_demo PRIVATE c_std_11)

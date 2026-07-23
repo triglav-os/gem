@@ -700,11 +700,14 @@ int _aes_try_resolve_path(const char *filename,
 {
     static const char *search_dirs[] = {
         "",
-        "bin/",
+        "bin/resources/",
+        "bin/apps/",
+        "bin/demos/",
         "src/desktop/",
         "src/desktop/resource/",
         "src/desktop/icons/"
     };
+    const char *resource_dir;
     char lowercase[260];
     size_t i;
 
@@ -713,6 +716,29 @@ int _aes_try_resolve_path(const char *filename,
     }
 
     _aes_ascii_lower(filename, lowercase, sizeof(lowercase));
+    resource_dir = getenv("GEM_RESOURCE_DIR");
+    if (resource_dir != NULL && resource_dir[0] != '\0') {
+        int rc = snprintf(resolved, resolved_size, "%s/%s",
+            resource_dir, filename);
+        int fd;
+
+        if (rc > 0 && (size_t) rc < resolved_size) {
+            fd = gem_os_open_read(resolved);
+            if (fd >= 0) {
+                (void) gem_os_close(fd);
+                return 1;
+            }
+        }
+        rc = snprintf(resolved, resolved_size, "%s/%s",
+            resource_dir, lowercase);
+        if (rc > 0 && (size_t) rc < resolved_size) {
+            fd = gem_os_open_read(resolved);
+            if (fd >= 0) {
+                (void) gem_os_close(fd);
+                return 1;
+            }
+        }
+    }
 
     for (i = 0; i < sizeof(search_dirs) / sizeof(search_dirs[0]); ++i) {
         const char *dir = search_dirs[i];

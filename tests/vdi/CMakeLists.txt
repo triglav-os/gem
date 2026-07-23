@@ -40,7 +40,7 @@ target_compile_options(test_vdi
 
 target_compile_definitions(test_vdi
     PRIVATE
-        GEM_BUILD_FONT_DIR="${PROJECT_SOURCE_DIR}/bin/fonts"
+        GEM_BUILD_FONT_DIR="${GEM_RESOURCES_DIR}/fonts"
 )
 
 target_link_options(test_vdi
