@@ -67,6 +67,16 @@ VOID v_opnvwk(WORD work_in[11], VDI_HANDLE *handle, WORD work_out[57])
 
         memset(&_vdi, 0, sizeof(_vdi));
         _vdi.surface = gem_raster_surface();
+        if (_vdi.surface == NULL) {
+            gem_hid_shutdown();
+            gem_raster_shutdown();
+            gem_os_shutdown();
+            _vdi_unload_fonts();
+            *handle = 0;
+            return;
+        }
+        width = (WORD) _vdi.surface->width;
+        height = (WORD) _vdi.surface->height;
         _vdi.width = width;
         _vdi.height = height;
         _vdi.line_color = _vdi_color_to_pixel(1);

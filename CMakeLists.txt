@@ -4,6 +4,15 @@ project(gem C)
 
 include(CTest)
 
+set(GEM_PLATFORM "rasta" CACHE STRING
+    "Display/input backend used by VDI (rasta or linux)")
+set_property(CACHE GEM_PLATFORM PROPERTY STRINGS rasta linux)
+if(NOT GEM_PLATFORM STREQUAL "rasta" AND
+   NOT GEM_PLATFORM STREQUAL "linux")
+    message(FATAL_ERROR
+        "GEM_PLATFORM must be either 'rasta' or 'linux'")
+endif()
+
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS OFF)
@@ -50,3 +59,52 @@ add_subdirectory(src/desktop)
 add_subdirectory(src/apps)
 add_subdirectory(samples)
 add_subdirectory(tests)
+
+set(GEMIX_ROOT ${PROJECT_SOURCE_DIR}/bin/gemix)
+set(GEMIX_BIN ${GEMIX_ROOT}/bin)
+set(GEMIX_LIB ${GEMIX_ROOT}/lib)
+set(GEMIX_INCLUDE ${GEMIX_ROOT}/include)
+set(GEMIX_SHARE ${GEMIX_ROOT}/share/gem)
+
+add_custom_target(gemix_package
+    COMMAND ${CMAKE_COMMAND} -E remove_directory ${GEMIX_ROOT}
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${GEMIX_BIN}
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${GEMIX_LIB}
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${GEMIX_INCLUDE}
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${GEMIX_SHARE}/fonts
+    COMMAND ${CMAKE_COMMAND} -E copy
+        $<TARGET_FILE:gemd> ${GEMIX_BIN}/
+    COMMAND ${CMAKE_COMMAND} -E copy
+        $<TARGET_FILE:desktop> ${GEMIX_BIN}/
+    COMMAND ${CMAKE_COMMAND} -E copy
+        $<TARGET_FILE:terminal> ${GEMIX_BIN}/
+    COMMAND ${CMAKE_COMMAND} -E copy
+        $<TARGET_FILE:calc_gemd> ${GEMIX_BIN}/
+    COMMAND ${CMAKE_COMMAND} -E copy
+        $<TARGET_FILE:clock_gemd> ${GEMIX_BIN}/
+    COMMAND ${CMAKE_COMMAND} -E copy
+        $<TARGET_FILE:gem> ${GEMIX_LIB}/
+    COMMAND ${CMAKE_COMMAND} -E copy
+        $<TARGET_FILE:platform_linux> ${GEMIX_LIB}/
+    COMMAND ${CMAKE_COMMAND} -E copy
+        $<TARGET_FILE:aes> ${GEMIX_LIB}/
+    COMMAND ${CMAKE_COMMAND} -E copy
+        $<TARGET_FILE:vdi> ${GEMIX_LIB}/
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${PROJECT_SOURCE_DIR}/include ${GEMIX_INCLUDE}
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${PROJECT_SOURCE_DIR}/bin/fonts ${GEMIX_SHARE}/fonts
+    COMMAND ${CMAKE_COMMAND} -E copy
+        ${PROJECT_SOURCE_DIR}/bin/cursors.rsc ${GEMIX_SHARE}/
+    COMMAND ${CMAKE_COMMAND} -E copy
+        ${PROJECT_SOURCE_DIR}/bin/desktop_icons.rsc ${GEMIX_SHARE}/
+    COMMAND ${CMAKE_COMMAND} -E copy
+        ${PROJECT_SOURCE_DIR}/bin/clock_numbers.rsc ${GEMIX_SHARE}/
+    COMMAND ${CMAKE_COMMAND} -E copy
+        ${PROJECT_SOURCE_DIR}/tools/gemix-session.sh ${GEMIX_BIN}/gemix-session
+    COMMAND ${CMAKE_COMMAND}
+        -DGEMIX_ROOT=${GEMIX_ROOT}
+        -P ${PROJECT_SOURCE_DIR}/tools/package-gemix.cmake
+    DEPENDS gemd desktop terminal calc_gemd clock_gemd
+    COMMENT "Assembling the Gemix Linux deployment tree"
+)

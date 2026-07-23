@@ -1,4 +1,6 @@
-add_library(platform_linux SHARED os.c)
+file(GLOB platform_linux_sources CONFIGURE_DEPENDS *.c)
+
+add_library(platform_linux SHARED ${platform_linux_sources})
 
 target_include_directories(platform_linux
     PUBLIC
@@ -19,4 +21,3 @@ target_compile_options(platform_linux
         $<$<CONFIG:Debug>:-g>
         $<$<CONFIG:Debug>:-fsanitize=address,undefined>
 )
-

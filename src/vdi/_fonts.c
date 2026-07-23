@@ -7,6 +7,8 @@
  * Copyright (C) 2026 tomaz stih
  */
 
+#define _POSIX_C_SOURCE 200809L
+
 #include "_internal.h"
 
 #include "_state.h"
@@ -15,6 +17,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 enum {
     _vdi_max_fonts = 16,
@@ -65,8 +68,34 @@ static uint32_t read_le32(const uint8_t *bytes)
 
 static const char *font_dir(void)
 {
-#ifdef GEM_FONT_DIR
-    return GEM_FONT_DIR;
+    static char path[4096];
+    const char *resource_dir = getenv("GEM_RESOURCE_DIR");
+    ssize_t length;
+    char *slash;
+
+    if (resource_dir != NULL && resource_dir[0] != '\0') {
+        if (snprintf(path, sizeof(path), "%s/fonts", resource_dir) <
+            (int) sizeof(path)) {
+            return path;
+        }
+    }
+    length = readlink("/proc/self/exe", path, sizeof(path) - 1u);
+    if (length > 0 && (size_t) length < sizeof(path)) {
+        path[length] = '\0';
+        slash = strrchr(path, '/');
+        if (slash != NULL) {
+            *slash = '\0';
+            if (strlen(path) + strlen("/../share/gem/fonts") <
+                sizeof(path)) {
+                strcat(path, "/../share/gem/fonts");
+                if (access(path, R_OK) == 0) {
+                    return path;
+                }
+            }
+        }
+    }
+#ifdef GEM_BUILD_FONT_DIR
+    return GEM_BUILD_FONT_DIR;
 #else
     return "bin/fonts";
 #endif

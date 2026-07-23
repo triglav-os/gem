@@ -9,7 +9,11 @@ target_include_directories(vdi
         ${PROJECT_SOURCE_DIR}/include
 )
 
-target_link_libraries(vdi PUBLIC rasta m)
+if(GEM_PLATFORM STREQUAL "linux")
+    target_link_libraries(vdi PUBLIC platform_linux m)
+else()
+    target_link_libraries(vdi PUBLIC rasta m)
+endif()
 
 target_compile_features(vdi PUBLIC c_std_11)
 
@@ -18,12 +22,6 @@ target_compile_options(vdi
         -Wall
         -Wextra
         -pedantic
-)
-
-target_compile_definitions(vdi
-    PRIVATE
-        GEM_FONT_DIR="${PROJECT_SOURCE_DIR}/bin/fonts"
-        GEM_CURSOR_RSC="${PROJECT_SOURCE_DIR}/bin/cursors.rsc"
 )
 
 target_compile_options(vdi
