@@ -1,5 +1,7 @@
 add_library(gem SHARED
     client.c
+    client_queries.c
+    protocol.c
     client_objc.c
 )
 

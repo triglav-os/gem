@@ -1296,9 +1296,6 @@ static void _aes_menu_restore_saved_region(void)
     }
 
     for (i = 0; i < _aes.menu_saved_count; ++i) {
-        WORD x;
-        WORD y;
-        size_t index = 0;
         GRECT rect = _aes.menu_saved_rects[i];
         uint8_t *pixels = _aes.menu_saved_pixels[i];
 
@@ -1306,12 +1303,7 @@ static void _aes_menu_restore_saved_region(void)
             continue;
         }
 
-        for (y = 0; y < rect.g_h; ++y) {
-            for (x = 0; x < rect.g_w; ++x) {
-                _vdi_set_screen_pixel((WORD) (rect.g_x + x),
-                    (WORD) (rect.g_y + y), (WORD) pixels[index++]);
-            }
-        }
+        _aes_restore_region_pixels(&rect, pixels);
     }
 
     _aes_menu_free_saved_pixels();

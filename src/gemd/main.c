@@ -183,6 +183,15 @@ static void gemd_cleanup_app(WORD app_id)
         return;
     }
 
+    _aes.current_app_id = app_id;
+    global[2] = app_id;
+    /* Detach while the session's relocated tree is still alive. In
+     * particular, the desktop owner has no fallback menu to switch to. */
+    if (_aes.menu_owner_app_id == app_id) {
+        (void) menu_bar(_aes.menu_tree, 0);
+        _aes.menu_owner_app_id = 0;
+    }
+
     if ((_aes.menu_owner_app_id == app_id || _aes.active_app_id == app_id) &&
         _aes.desktop_owner_app_id != app_id) {
         _aes_menu_switch_to_app(_aes.desktop_owner_app_id);
@@ -295,8 +304,9 @@ static int gemd_init_listener(void)
 
     memset(&addr, 0, sizeof(addr));
     addr.sun_family = AF_UNIX;
-    strncpy(addr.sun_path, GEMD_SOCKET_PATH, sizeof(addr.sun_path) - 1u);
-    (void) unlink(GEMD_SOCKET_PATH);
+    if (strlen(gem_rpc_socket_path()) >= sizeof(addr.sun_path)) return 0;
+    strcpy(addr.sun_path, gem_rpc_socket_path());
+    (void) unlink(gem_rpc_socket_path());
 
     if (bind(g_listen_fd, (const struct sockaddr *) &addr, sizeof(addr)) != 0) {
         perror("gemd: bind");
@@ -308,7 +318,7 @@ static int gemd_init_listener(void)
         perror("gemd: listen");
         (void) close(g_listen_fd);
         g_listen_fd = -1;
-        (void) unlink(GEMD_SOCKET_PATH);
+        (void) unlink(gem_rpc_socket_path());
         return 0;
     }
     return 1;
@@ -326,7 +336,7 @@ static void gemd_shutdown(void)
         (void) close(g_listen_fd);
         g_listen_fd = -1;
     }
-    (void) unlink(GEMD_SOCKET_PATH);
+    (void) unlink(gem_rpc_socket_path());
 }
 
 static int gemd_session_may_run(const gemd_session_t *session)
@@ -357,6 +367,63 @@ static int32_t gemd_dispatch(gemd_session_t *session,
     gemd_set_current_app(session);
 
     switch ((gem_rpc_opcode_t) header->opcode) {
+    case GEM_RPC_V_HIDE_C:
+        v_hide_c(g_server_vdi_handle);
+        status = 1;
+        break;
+    case GEM_RPC_V_SHOW_C:
+        v_show_c(g_server_vdi_handle,
+            ((const gem_rpc_handle_word_req_t *) payload)->value);
+        status = 1;
+        break;
+    case GEM_RPC_GRAF_MKSTATE:
+        {
+            gem_rpc_words8_t *rsp = (gem_rpc_words8_t *) response;
+            memset(rsp, 0, sizeof(*rsp));
+            graf_mkstate(&rsp->values[0], &rsp->values[1],
+                &rsp->values[2], &rsp->values[3]);
+            *response_size = sizeof(*rsp);
+            status = 1;
+        }
+        break;
+    case GEM_RPC_VQT_FONTINFO:
+        {
+            const gem_rpc_handle_req_t *req =
+                (const gem_rpc_handle_req_t *) payload;
+            gem_rpc_words16_t *rsp = (gem_rpc_words16_t *) response;
+            memset(rsp, 0, sizeof(*rsp));
+            status = vqt_fontinfo(req->handle, &rsp->values[0],
+                &rsp->values[1], &rsp->values[2], &rsp->values[7],
+                &rsp->values[8]);
+            *response_size = sizeof(*rsp);
+        }
+        break;
+    case GEM_RPC_SCRP_READ:
+        {
+            gem_rpc_path_t *rsp = (gem_rpc_path_t *) response;
+            memset(rsp, 0, sizeof(*rsp));
+            status = scrp_read(rsp->text);
+            *response_size = sizeof(*rsp);
+        }
+        break;
+    case GEM_RPC_SCRP_WRITE:
+        {
+            gem_rpc_path_t req;
+            memcpy(&req, payload, sizeof(req));
+            req.text[sizeof(req.text) - 1] = '\0';
+            status = scrp_write(req.text);
+        }
+        break;
+    case GEM_RPC_FSEL_INPUT:
+        {
+            gem_rpc_fsel_t *rsp = (gem_rpc_fsel_t *) response;
+            memcpy(rsp, payload, sizeof(*rsp));
+            rsp->path[sizeof(rsp->path) - 1] = '\0';
+            rsp->name[sizeof(rsp->name) - 1] = '\0';
+            status = fsel_input(rsp->path, rsp->name, &rsp->button);
+            *response_size = sizeof(*rsp);
+        }
+        break;
     case GEM_RPC_APPL_INIT:
         status = appl_init();
         session->app_id = (WORD) status;
@@ -810,6 +877,12 @@ static int32_t gemd_dispatch(gemd_session_t *session,
             OBJECT *objects;
             char *strings_blob = NULL;
 
+            if (req->show == 0) {
+                status = menu_bar(session->menu_objects, 0);
+                gemd_free_session_menu(session);
+                break;
+            }
+
             if (count <= 0 || count > (WORD) GEM_RPC_MENU_MAX_OBJECTS) {
                 status = 0;
                 break;
@@ -843,6 +916,9 @@ static int32_t gemd_dispatch(gemd_session_t *session,
                 }
             }
 
+            if (session->menu_objects != NULL) {
+                menu_bar(session->menu_objects, 0);
+            }
             gemd_free_session_menu(session);
             session->menu_objects = objects;
             session->menu_strings_blob = strings_blob;
@@ -892,8 +968,8 @@ static int32_t gemd_dispatch(gemd_session_t *session,
 static int gemd_handle_request(gemd_session_t *session)
 {
     gem_rpc_header_t header;
-    uint8_t payload[GEM_RPC_PAYLOAD_MAX];
-    uint8_t response[GEM_RPC_PAYLOAD_MAX];
+    _Alignas(max_align_t) uint8_t payload[GEM_RPC_PAYLOAD_MAX];
+    _Alignas(max_align_t) uint8_t response[GEM_RPC_PAYLOAD_MAX];
     uint32_t response_size = 0u;
     int32_t status;
 
@@ -910,6 +986,9 @@ static int gemd_handle_request(gemd_session_t *session)
         }
     }
 
+    if (!gem_rpc_valid_request(header.opcode, payload, header.size)) {
+        return gemd_send_reply(session->fd, -1, NULL, 0);
+    }
     status = gemd_dispatch(session, &header, payload, response,
         &response_size);
     return gemd_send_reply(session->fd, status, response, response_size);
@@ -937,7 +1016,7 @@ int main(void)
         return 1;
     }
 
-    printf("gemd listening on %s\n", GEMD_SOCKET_PATH);
+    printf("gemd listening on %s\n", gem_rpc_socket_path());
     fflush(stdout);
 
     for (;;) {

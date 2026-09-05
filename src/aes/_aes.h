@@ -175,6 +175,12 @@ void _vdi_begin_update(void);
 void _vdi_end_update(void);
 
 /*
+ * Ends a deferred VDI update batch without presenting (caller flushes
+ * a dirty rectangle via _vdi_flush_rect).
+ */
+void _vdi_end_update_no_present(void);
+
+/*
  * Presents the current VDI screen contents immediately.
  */
 void _vdi_present_screen(void);
@@ -217,6 +223,13 @@ WORD _vdi_font_text_height(void);
 WORD _vdi_write_mode(void);
 
 /*
+ * Push a rectangle (or the full surface) to the physical display even
+ * while begin_update has deferred normal presents.
+ */
+void _vdi_flush_rect(WORD x, WORD y, WORD w, WORD h);
+void _vdi_flush_display(void);
+
+/*
  * Restores any saved software cursor background before direct writes.
  */
 void _vdi_prepare_screen_write(void);
@@ -256,6 +269,9 @@ int _aes_point_in_rect(WORD x, WORD y, const GRECT *rect);
 int _aes_rects_intersect(const GRECT *left, const GRECT *right);
 int _aes_intersect_rects(const GRECT *left, const GRECT *right, GRECT *out);
 WORD _aes_subtract_rect(const GRECT *source, const GRECT *cover, GRECT out[4]);
+/* Clip a layer's damage against higher windows; NULL denotes the desktop. */
+WORD _aes_clip_visible_rects(const aes_window_t *target, const GRECT *base,
+    GRECT out[], WORD max_rects);
 int _aes_window_is_top(const aes_window_t *window);
 void _aes_reset_state(void);
 int _aes_ensure_vdi(void);
@@ -281,6 +297,8 @@ void _aes_redraw_region(const GRECT *dirty);
 void _aes_redraw_window_change(const GRECT *before, const GRECT *after);
 void _aes_redraw_window_title_states(const aes_window_t *previous_top,
                                      const aes_window_t *new_top);
+void _aes_top_window(aes_window_t *window);
+void _aes_refresh_raised_window(const aes_window_t *window);
 void _aes_raise_window(aes_window_t *window);
 WORD _aes_window_hit_part(const aes_window_t *window, WORD x, WORD y);
 int _aes_window_vtrack_rect(const aes_window_t *window, GRECT *rect);

@@ -109,6 +109,11 @@ static void _vdi_blit_bitmap(MFDB *src, MFDB *dst, CONST WORD pxy[8],
         return;
     }
 
+    if (_vdi_uses_screen(src) || _vdi_uses_screen(dst))
+        _vdi_prepare_screen_write();
+    if (_vdi_uses_screen(dst))
+        _vdi_mark_dirty(dst_rect.x0, dst_rect.y0, dst_rect.x1, dst_rect.y1);
+
     if (src_w == dst_w && src_h == dst_h &&
         transparent == 0 && mode == 1 && mode != 6 &&
         _vdi_uses_screen(src) && _vdi_uses_screen(dst) &&

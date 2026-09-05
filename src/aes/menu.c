@@ -1018,6 +1018,7 @@ static WORD _aes_run_alert(aes_alert_t *alert)
 WORD menu_bar(OBJECT *tree, WORD show)
 {
     aes_app_t *app = _aes_find_app_by_id(_aes.current_app_id);
+    const WORD previous_height = _aes_menu_bar_height();
 
     _aes.menu_tree = tree;
     _aes.menu_visible = (show != 0) ? 1 : 0;
@@ -1036,6 +1037,14 @@ WORD menu_bar(OBJECT *tree, WORD show)
         _aes_menu_redraw_tree(tree);
     } else {
         _aes_menu_clear_saved_region();
+        _aes.menu_tree = NULL;
+        if (app != NULL) app->menu_tree = NULL;
+        if (previous_height > 0) {
+            GRECT bar;
+            _aes_set_rect(&bar, 0, 0,
+                (WORD) (_aes.work_out[0] + 1), previous_height);
+            _aes_redraw_region(&bar);
+        }
     }
     _aes_trace("menu_bar tree=%p show=%d", (void *) tree, show);
     return 1;

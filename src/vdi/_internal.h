@@ -40,6 +40,12 @@ typedef struct vdi_state {
     WORD cursor_y;
     WORD update_depth;
     WORD present_pending;
+    /* Accumulated damage for partial FB presents (avoids full-screen blit). */
+    WORD dirty_valid;
+    WORD dirty_x0;
+    WORD dirty_y0;
+    WORD dirty_x1;
+    WORD dirty_y1;
     MFORM mouse_form;
     MFORM standard_mouse_forms[_vdi_standard_cursor_count];
     int open;
@@ -81,7 +87,11 @@ void _vdi_set_mouse_state(WORD x, WORD y, WORD status);
 void _vdi_prepare_screen_write(void);
 void _vdi_begin_update(void);
 void _vdi_end_update(void);
+void _vdi_end_update_no_present(void);
 void _vdi_present_screen(void);
+void _vdi_mark_dirty(WORD x0, WORD y0, WORD x1, WORD y1);
+void _vdi_flush_rect(WORD x, WORD y, WORD w, WORD h);
+void _vdi_flush_display(void);
 void _vdi_get_active_clip_rect(vdi_rect_t *rect);
 int _vdi_intersect_rects(const vdi_rect_t *left,
     const vdi_rect_t *right,

@@ -1,0 +1,1 @@
+/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/gcc -fPIC -O3 -DNDEBUG -shared -Wl,-soname,libfat12.so -o /home/tstih/data/triglav-os/gem/bin/lib/libfat12.so CMakeFiles/fat12.dir/fat12.c.o  -Wl,-rpath,"\$ORIGIN/../lib" 

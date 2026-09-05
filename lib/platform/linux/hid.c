@@ -50,6 +50,8 @@ static int16_t g_mouse_y;
 static uint16_t g_buttons;
 static uint16_t g_modifiers;
 static int g_caps_lock;
+static int g_rel_scale = 3;
+static int g_have_abs_pointer;
 
 static int bit_is_set(const unsigned long *bits, unsigned int bit)
 {
@@ -64,6 +66,22 @@ static int option_enabled(const char *name)
     return value != NULL &&
         (strcmp(value, "1") == 0 || strcmp(value, "on") == 0 ||
         strcmp(value, "true") == 0 || strcmp(value, "yes") == 0);
+}
+
+static int parse_positive_env(const char *name, int fallback)
+{
+    const char *value = getenv(name);
+    char *end = NULL;
+    long parsed;
+
+    if (value == NULL || value[0] == '\0') {
+        return fallback;
+    }
+    parsed = strtol(value, &end, 10);
+    if (end == value || *end != '\0' || parsed < 1L || parsed > 32L) {
+        return fallback;
+    }
+    return (int) parsed;
 }
 
 static void close_devices(void)
@@ -117,7 +135,8 @@ static int add_device(const char *path)
         bit_is_set(event_bits, EV_ABS)) &&
         bit_is_set(event_bits, EV_KEY) &&
         (bit_is_set(key_bits, BTN_LEFT) ||
-        bit_is_set(key_bits, BTN_TOUCH));
+        bit_is_set(key_bits, BTN_TOUCH) ||
+        bit_is_set(key_bits, BTN_MOUSE));
     if (!device->has_keyboard && !device->has_pointer) {
         (void) close(fd);
         return 0;
@@ -129,11 +148,26 @@ static int add_device(const char *path)
         device->has_abs_y =
             ioctl(fd, EVIOCGABS(ABS_Y), &device->abs_y) == 0;
     }
+
+    /*
+     * Prefer absolute pointers (USB tablet, touchscreen). Relative PS/2
+     * mice feel glacial on large framebuffers without acceleration, and
+     * fighting a tablet makes the cursor stutter.
+     */
+    if (device->has_pointer && !device->has_abs_x && !device->has_abs_y &&
+        g_have_abs_pointer && !option_enabled("GEM_LINUX_KEEP_REL_MOUSE")) {
+        (void) close(fd);
+        memset(device, 0, sizeof(*device));
+        return 0;
+    }
     if (option_enabled("GEM_LINUX_GRAB") &&
         ioctl(fd, EVIOCGRAB, 1) < 0) {
         (void) close(fd);
         memset(device, 0, sizeof(*device));
         return 0;
+    }
+    if (device->has_pointer && (device->has_abs_x || device->has_abs_y)) {
+        g_have_abs_pointer = 1;
     }
     ++g_device_count;
     return 1;
@@ -259,12 +293,51 @@ static uint8_t usb_scan_for_key(uint16_t code)
 static uint8_t ascii_for_key(uint16_t code)
 {
     int shifted = (g_modifiers & (gem_mod_lshift | gem_mod_rshift)) != 0u;
+    int upper = shifted != g_caps_lock;
+    char letter = 0;
 
-    if (code >= KEY_A && code <= KEY_Z) {
-        int upper = shifted != g_caps_lock;
-
-        return (uint8_t) ((upper ? 'A' : 'a') + code - KEY_A);
+    /*
+     * Linux KEY_* letter codes are NOT A..Z contiguous (they follow the
+     * physical QWERTY rows: Q..P, A..L, Z..M). Mapping with
+     * 'a' + (code - KEY_A) turns L into 'i' and S into 'b'.
+     */
+    switch (code) {
+    case KEY_A: letter = 'a'; break;
+    case KEY_B: letter = 'b'; break;
+    case KEY_C: letter = 'c'; break;
+    case KEY_D: letter = 'd'; break;
+    case KEY_E: letter = 'e'; break;
+    case KEY_F: letter = 'f'; break;
+    case KEY_G: letter = 'g'; break;
+    case KEY_H: letter = 'h'; break;
+    case KEY_I: letter = 'i'; break;
+    case KEY_J: letter = 'j'; break;
+    case KEY_K: letter = 'k'; break;
+    case KEY_L: letter = 'l'; break;
+    case KEY_M: letter = 'm'; break;
+    case KEY_N: letter = 'n'; break;
+    case KEY_O: letter = 'o'; break;
+    case KEY_P: letter = 'p'; break;
+    case KEY_Q: letter = 'q'; break;
+    case KEY_R: letter = 'r'; break;
+    case KEY_S: letter = 's'; break;
+    case KEY_T: letter = 't'; break;
+    case KEY_U: letter = 'u'; break;
+    case KEY_V: letter = 'v'; break;
+    case KEY_W: letter = 'w'; break;
+    case KEY_X: letter = 'x'; break;
+    case KEY_Y: letter = 'y'; break;
+    case KEY_Z: letter = 'z'; break;
+    default:
+        break;
     }
+    if (letter != 0) {
+        if (upper) {
+            letter = (char) (letter - 'a' + 'A');
+        }
+        return (uint8_t) letter;
+    }
+
     if (code >= KEY_1 && code <= KEY_9) {
         static const char normal[] = "123456789";
         static const char shifted_digits[] = "!@#$%^&*(";
@@ -407,9 +480,11 @@ static int translate_pointer(linux_hid_device_t *device,
     max_y = surface->height - 1;
 
     if (input->type == EV_REL && input->code == REL_X) {
-        g_mouse_x = clamp_coordinate(g_mouse_x + input->value, max_x);
+        g_mouse_x = clamp_coordinate(
+            g_mouse_x + input->value * g_rel_scale, max_x);
     } else if (input->type == EV_REL && input->code == REL_Y) {
-        g_mouse_y = clamp_coordinate(g_mouse_y + input->value, max_y);
+        g_mouse_y = clamp_coordinate(
+            g_mouse_y + input->value * g_rel_scale, max_y);
     } else if (input->type == EV_ABS && input->code == ABS_X &&
         device->has_abs_x &&
         device->abs_x.maximum != device->abs_x.minimum) {
@@ -459,12 +534,54 @@ int gem_hid_init(void)
     gem_raster_surface_t *surface = gem_raster_surface();
 
     close_devices();
+    g_have_abs_pointer = 0;
+    /* Relative mice need a large scale on 1280x+ desktops; tablets ignore it. */
+    g_rel_scale = parse_positive_env("GEM_LINUX_MOUSE_SCALE", 8);
+
+    /*
+     * Two-pass discovery: absolute pointers first (tablets), then the rest.
+     * That way relative mice can be skipped when a tablet is present.
+     */
     if (paths != NULL && paths[0] != '\0' &&
         strcmp(paths, "auto") != 0) {
         open_explicit_devices(paths);
     } else {
         discover_devices();
+        /* Second pass not needed if order was lucky; re-scan if empty. */
+        if (g_device_count == 0u) {
+            discover_devices();
+        }
     }
+
+    /* If we only opened relative mice first, drop them and prefer abs. */
+    if (!g_have_abs_pointer && g_device_count != 0u) {
+        /* keep relative devices; scale applied via g_rel_scale */
+    } else if (g_have_abs_pointer) {
+        size_t index;
+        size_t out = 0u;
+
+        for (index = 0u; index < g_device_count; ++index) {
+            linux_hid_device_t *device = &g_devices[index];
+            int is_rel_only_pointer = device->has_pointer &&
+                !device->has_abs_x && !device->has_abs_y &&
+                !device->has_keyboard;
+
+            if (is_rel_only_pointer &&
+                !option_enabled("GEM_LINUX_KEEP_REL_MOUSE")) {
+                if (option_enabled("GEM_LINUX_GRAB")) {
+                    (void) ioctl(device->fd, EVIOCGRAB, 0);
+                }
+                (void) close(device->fd);
+                continue;
+            }
+            if (out != index) {
+                g_devices[out] = *device;
+            }
+            ++out;
+        }
+        g_device_count = out;
+    }
+
     if (surface != NULL) {
         g_mouse_x = (int16_t) (surface->width / 2u);
         g_mouse_y = (int16_t) (surface->height / 2u);
@@ -490,10 +607,18 @@ void gem_hid_shutdown(void)
 int gem_hid_poll(gem_hid_event_t *event)
 {
     size_t checked;
+    gem_hid_event_t latest_move;
+    int have_move = 0;
 
     if (event == NULL || g_device_count == 0u) {
         return 0;
     }
+
+    /*
+     * Drain every device. Return keys/buttons immediately; coalesce all
+     * motion into a single latest-position event so the UI is not flooded
+     * with tiny steps (each of which used to full-screen blit).
+     */
     for (checked = 0u; checked < g_device_count; ++checked) {
         linux_hid_device_t *device = &g_devices[g_next_device];
         struct input_event input;
@@ -501,14 +626,27 @@ int gem_hid_poll(gem_hid_event_t *event)
 
         g_next_device = (g_next_device + 1u) % g_device_count;
         for (;;) {
+            gem_hid_event_t translated;
+
             count = read(device->fd, &input, sizeof(input));
             if (count != (ssize_t) sizeof(input)) {
                 break;
             }
-            if (translate_event(device, event, &input)) {
-                return 1;
+            if (!translate_event(device, &translated, &input)) {
+                continue;
             }
+            if (translated.type == GEM_HID_MOUSE_MOVE) {
+                latest_move = translated;
+                have_move = 1;
+                continue;
+            }
+            *event = translated;
+            return 1;
         }
+    }
+    if (have_move) {
+        *event = latest_move;
+        return 1;
     }
     return 0;
 }

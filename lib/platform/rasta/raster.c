@@ -1,9 +1,8 @@
 /*
  * Implements the GEM raster abstraction for the rasta emulator. The
- * backend maps rasta's packed 1-bit framebuffer file directly and
- * exposes that mapping as the GEM raster surface. VDI therefore draws
- * into the same bytes that rasta displays, without a shadow staging
- * buffer or frame repacking step.
+ * backend stages VDI drawing in a packed shadow surface and publishes
+ * completed updates to rasta's mapped framebuffer. The viewer never
+ * observes an intermediate clear while a window is being repainted.
  *
  * MIT License (see: LICENSE)
  * Copyright (C) 2026 tomaz stih
@@ -28,6 +27,7 @@ enum {
 };
 
 static gem_raster_surface_t g_surface;
+static uint8_t *g_present_pixels;
 static int g_framebuffer_fd = -1;
 static size_t g_framebuffer_size;
 static dev_t g_framebuffer_dev;
@@ -60,11 +60,11 @@ static int map_framebuffer(size_t size)
 {
     void *mapping;
 
-    if (g_surface.pixels != NULL) {
-        if (munmap(g_surface.pixels, g_framebuffer_size) != 0) {
+    if (g_present_pixels != NULL) {
+        if (munmap(g_present_pixels, g_framebuffer_size) != 0) {
             return 0;
         }
-        g_surface.pixels = NULL;
+        g_present_pixels = NULL;
     }
 
     mapping = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED,
@@ -73,7 +73,15 @@ static int map_framebuffer(size_t size)
         return 0;
     }
 
-    g_surface.pixels = mapping;
+    g_present_pixels = mapping;
+    if (g_surface.pixels == NULL) {
+        g_surface.pixels = calloc(size, 1);
+        if (g_surface.pixels == NULL) {
+            munmap(mapping, size);
+            g_present_pixels = NULL;
+            return 0;
+        }
+    }
     g_framebuffer_size = size;
     return 1;
 }
@@ -153,10 +161,11 @@ static int open_framebuffer(uint16_t width, uint16_t height)
 
 static void close_framebuffer(void)
 {
-    if (g_surface.pixels != NULL) {
-        munmap(g_surface.pixels, g_framebuffer_size);
-        g_surface.pixels = NULL;
-    }
+    if (g_present_pixels != NULL)
+        munmap(g_present_pixels, g_framebuffer_size);
+    g_present_pixels = NULL;
+    free(g_surface.pixels);
+    g_surface.pixels = NULL;
     if (g_framebuffer_fd >= 0) {
         close(g_framebuffer_fd);
         g_framebuffer_fd = -1;
@@ -225,6 +234,7 @@ int gem_raster_init(uint16_t width, uint16_t height,
         return 0;
     }
 
+    close_framebuffer();
     memset(&g_surface, 0, sizeof(g_surface));
     g_surface.width = width;
     g_surface.height = height;
@@ -273,7 +283,29 @@ void gem_raster_present(void)
     if (!ensure_framebuffer_target()) {
         return;
     }
-    (void) msync(g_surface.pixels, g_framebuffer_size, MS_SYNC);
+    memcpy(g_present_pixels, g_surface.pixels, g_framebuffer_size);
+}
+
+void gem_raster_present_rect(int x, int y, int width, int height)
+{
+    int row;
+    int right = x + width;
+    int bottom = y + height;
+    size_t first, last;
+    if (!g_surface.pixels || width <= 0 || height <= 0 ||
+        !ensure_framebuffer_target()) return;
+    if (x < 0) x = 0;
+    if (y < 0) y = 0;
+    if (right > g_surface.width) right = g_surface.width;
+    if (bottom > g_surface.height) bottom = g_surface.height;
+    if (right <= x || bottom <= y) return;
+    first = (size_t) x / 8u;
+    last = ((size_t) right + 7u) / 8u;
+    for (row = y; row < bottom; ++row) {
+        size_t offset = (size_t) row * rasta_row_bytes(g_surface.width) + first;
+        memcpy(g_present_pixels + offset,
+            (uint8_t *) g_surface.pixels + offset, last - first);
+    }
 }
 
 void gem_raster_set_palette(uint8_t index, uint8_t r, uint8_t g, uint8_t b)

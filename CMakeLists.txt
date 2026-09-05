@@ -17,7 +17,8 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS OFF)
 
-set(GEM_OUTPUT_ROOT ${PROJECT_SOURCE_DIR}/bin)
+set(GEM_OUTPUT_ROOT ${PROJECT_SOURCE_DIR}/bin CACHE PATH
+    "Runtime output root (use a separate tree for backend diagnostics)")
 set(GEM_CORE_DIR ${GEM_OUTPUT_ROOT}/core)
 set(GEM_LIBRARY_DIR ${GEM_OUTPUT_ROOT}/lib)
 set(GEM_APPS_DIR ${GEM_OUTPUT_ROOT}/apps)
@@ -130,6 +131,9 @@ add_custom_target(gemix_package
     COMMAND ${CMAKE_COMMAND}
         -DGEMIX_ROOT=${GEMIX_ROOT}
         -P ${PROJECT_SOURCE_DIR}/tools/package-gemix.cmake
-    DEPENDS gemd desktop terminal calc_gemd clock_gemd
+    DEPENDS
+        gemd desktop terminal calc_gemd clock_gemd
+        gem_runtime_fonts gem_runtime_cursors
+        gem_runtime_desktop_icons gem_runtime_clock_numbers
     COMMENT "Assembling the Gemix Linux deployment tree"
 )

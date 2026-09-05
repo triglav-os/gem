@@ -23,8 +23,8 @@ enum {
     AES_FSEL_LINE_LEN = AES_PATH_LEN,
     AES_FSEL_MARGIN = 6,
     AES_FSEL_HEADER_LINES = 3,
-    AES_FSEL_BUTTON_HEIGHT = 22,
-    AES_FSEL_BUTTON_WIDTH = 68
+    AES_FSEL_BUTTON_HEIGHT = 30,
+    AES_FSEL_BUTTON_WIDTH = 80
 };
 
 typedef struct aes_fsel_entry {
@@ -45,6 +45,9 @@ typedef struct aes_fsel_state {
     WORD done;
     WORD confirmed;
     GRECT work;
+    MFDB background;
+    WORD editing_name;
+    WORD pressed_button;
     char directory[AES_PATH_LEN];
     char pattern[AES_PATH_LEN];
     char selection[AES_PATH_LEN];
@@ -321,6 +324,7 @@ static int aes_fsel_entry_compare(const void *left, const void *right)
 
 static void aes_fsel_set_selection_from_index(aes_fsel_state_t *state)
 {
+    if (state != NULL) state->editing_name = 0;
     if (state == NULL || state->selected < 0 ||
         state->selected >= state->entry_count ||
         state->entries[state->selected].is_directory != 0) {
@@ -360,7 +364,7 @@ static void aes_fsel_reload_entries(aes_fsel_state_t *state)
 
     if (gem_os_dir_open(state->directory, &dir) != 0) {
         while (count < AES_FSEL_MAX_ENTRIES && gem_os_dir_read(&dir, &dent) != 0) {
-            if (strcmp(dent.name, ".") == 0) {
+            if (strcmp(dent.name, ".") == 0 || strcmp(dent.name, "..") == 0) {
                 continue;
             }
             if (dent.info.is_directory == 0 &&
@@ -394,11 +398,12 @@ static void aes_fsel_reload_entries(aes_fsel_state_t *state)
     }
 
     state->entry_count = count;
-    if (selected == NIL && count > 0) {
+    if (selected == NIL && count > 0 && state->selection[0] == '\0') {
         selected = 0;
     }
     state->selected = selected;
-    aes_fsel_set_selection_from_index(state);
+    if (selected != NIL)
+        aes_fsel_set_selection_from_index(state);
 }
 
 static void aes_fsel_sync_work(aes_fsel_state_t *state)
@@ -431,7 +436,7 @@ static void aes_fsel_draw_hline(WORD x0, WORD x1, WORD y)
     pts[1] = y;
     pts[2] = x1;
     pts[3] = y;
-    vsl_color(_aes.vdi_handle, BLACK);
+    vsl_color(_aes.vdi_handle, _aes_dark_color());
     v_pline(_aes.vdi_handle, 2, pts);
 }
 
@@ -443,7 +448,7 @@ static void aes_fsel_draw_vline(WORD x, WORD y0, WORD y1)
     pts[1] = y0;
     pts[2] = x;
     pts[3] = y1;
-    vsl_color(_aes.vdi_handle, BLACK);
+    vsl_color(_aes.vdi_handle, _aes_dark_color());
     v_pline(_aes.vdi_handle, 2, pts);
 }
 
@@ -583,9 +588,12 @@ static void aes_fsel_draw(const aes_fsel_state_t *state, const GRECT *dirty)
             fill[3] = (WORD) (state->work.g_y + state->work.g_h - 1);
 
             vs_clip(_aes.vdi_handle, 1, clip);
-            vsf_color(_aes.vdi_handle, WHITE);
+            vswr_mode(_aes.vdi_handle, MD_REPLACE);
+            vsf_interior(_aes.vdi_handle, FIS_SOLID);
+            vsl_width(_aes.vdi_handle, 1);
+            vsf_color(_aes.vdi_handle, _aes_light_color());
             vr_recfl(_aes.vdi_handle, fill);
-            vst_color(_aes.vdi_handle, BLACK);
+            vst_color(_aes.vdi_handle, _aes_dark_color());
 
             line_y = (WORD) (state->work.g_y + AES_FSEL_MARGIN +
                 state->text_ascent);
@@ -621,11 +629,11 @@ static void aes_fsel_draw(const aes_fsel_state_t *state, const GRECT *dirty)
                 rect_xy[3] = (WORD) (rect.g_y + rect.g_h - 1);
 
                 if (index < state->entry_count && index == state->selected) {
-                    vsf_color(_aes.vdi_handle, BLACK);
+                    vsf_color(_aes.vdi_handle, _aes_dark_color());
                     vr_recfl(_aes.vdi_handle, rect_xy);
-                    vst_color(_aes.vdi_handle, WHITE);
+                    vst_color(_aes.vdi_handle, _aes_light_color());
                 } else {
-                    vst_color(_aes.vdi_handle, BLACK);
+                    vst_color(_aes.vdi_handle, _aes_dark_color());
                 }
 
                 if (index < state->entry_count) {
@@ -643,28 +651,36 @@ static void aes_fsel_draw(const aes_fsel_state_t *state, const GRECT *dirty)
             fill[1] = ok_rect.g_y;
             fill[2] = (WORD) (ok_rect.g_x + ok_rect.g_w - 1);
             fill[3] = (WORD) (ok_rect.g_y + ok_rect.g_h - 1);
-            vsf_color(_aes.vdi_handle, WHITE);
+            vsf_color(_aes.vdi_handle, state->pressed_button == 1
+                ? _aes_dark_color() : _aes_light_color());
+            vst_color(_aes.vdi_handle, state->pressed_button == 1
+                ? _aes_light_color() : _aes_dark_color());
             vr_recfl(_aes.vdi_handle, fill);
             aes_fsel_draw_hline(fill[0], fill[2], fill[1]);
             aes_fsel_draw_hline(fill[0], fill[2], fill[3]);
             aes_fsel_draw_vline(fill[0], fill[1], fill[3]);
             aes_fsel_draw_vline(fill[2], fill[1], fill[3]);
-            v_gtext(_aes.vdi_handle, (WORD) (ok_rect.g_x + 20),
-                (WORD) (ok_rect.g_y + state->text_ascent + 6),
+            v_gtext(_aes.vdi_handle,
+                (WORD) (ok_rect.g_x + (ok_rect.g_w - state->char_w * 2) / 2),
+                (WORD) (ok_rect.g_y + (ok_rect.g_h - state->char_h) / 2 + state->text_ascent),
                 (CONST BYTE *) "OK");
 
             fill[0] = cancel_rect.g_x;
             fill[1] = cancel_rect.g_y;
             fill[2] = (WORD) (cancel_rect.g_x + cancel_rect.g_w - 1);
             fill[3] = (WORD) (cancel_rect.g_y + cancel_rect.g_h - 1);
-            vsf_color(_aes.vdi_handle, WHITE);
+            vsf_color(_aes.vdi_handle, state->pressed_button == 2
+                ? _aes_dark_color() : _aes_light_color());
+            vst_color(_aes.vdi_handle, state->pressed_button == 2
+                ? _aes_light_color() : _aes_dark_color());
             vr_recfl(_aes.vdi_handle, fill);
             aes_fsel_draw_hline(fill[0], fill[2], fill[1]);
             aes_fsel_draw_hline(fill[0], fill[2], fill[3]);
             aes_fsel_draw_vline(fill[0], fill[1], fill[3]);
             aes_fsel_draw_vline(fill[2], fill[1], fill[3]);
-            v_gtext(_aes.vdi_handle, (WORD) (cancel_rect.g_x + 8),
-                (WORD) (cancel_rect.g_y + state->text_ascent + 6),
+            v_gtext(_aes.vdi_handle,
+                (WORD) (cancel_rect.g_x + (cancel_rect.g_w - state->char_w * 6) / 2),
+                (WORD) (cancel_rect.g_y + (cancel_rect.g_h - state->char_h) / 2 + state->text_ascent),
                 (CONST BYTE *) "Cancel");
 
             vs_clip(_aes.vdi_handle, 0, clip);
@@ -701,10 +717,16 @@ static void aes_fsel_enter_directory(aes_fsel_state_t *state,
 
 static void aes_fsel_activate(aes_fsel_state_t *state)
 {
+    if (state != NULL && state->selected == NIL && state->selection[0] != '\0') {
+        state->confirmed = 1;
+        state->done = 1;
+        return;
+    }
     if (state == NULL || state->selected == NIL ||
         state->selected >= state->entry_count) {
         return;
     }
+    state->editing_name = 0;
     if (state->entries[state->selected].is_directory != 0) {
         aes_fsel_enter_directory(state, state->entries[state->selected].name);
         return;
@@ -771,6 +793,33 @@ static void aes_fsel_accept(aes_fsel_state_t *state,
     }
 }
 
+/* Restore an exposed owner from the pre-modal screen snapshot. The classic
+ * selector is synchronous, so its caller cannot process redraws until return.
+ * Visible rectangle enumeration keeps the selector and other windows intact.
+ */
+static void aes_fsel_restore_owner(const aes_fsel_state_t *state, WORD msg[8])
+{
+    GRECT box;
+    MFDB screen = {0};
+    if (state->background.fd_addr == NULL) return;
+    wind_update(BEG_UPDATE);
+    wind_get(msg[3], WF_FIRSTXYWH, &box.g_x, &box.g_y, &box.g_w, &box.g_h);
+    while (box.g_w > 0 && box.g_h > 0) {
+        WORD pxy[8];
+        GRECT dirty = {msg[4], msg[5], msg[6], msg[7]};
+        if (_aes_intersect_rects(&box, &dirty, &box)) {
+            pxy[0] = pxy[4] = box.g_x;
+            pxy[1] = pxy[5] = box.g_y;
+            pxy[2] = pxy[6] = (WORD) (box.g_x + box.g_w - 1);
+            pxy[3] = pxy[7] = (WORD) (box.g_y + box.g_h - 1);
+            vs_clip(_aes.vdi_handle, 0, NULL);
+            vro_cpyfm(_aes.vdi_handle, S_ONLY, pxy, (MFDB *) &state->background, &screen);
+        }
+        wind_get(msg[3], WF_NEXTXYWH, &box.g_x, &box.g_y, &box.g_w, &box.g_h);
+    }
+    wind_update(END_UPDATE);
+}
+
 WORD fsel_input(char *pipath, char *pisel, WORD *pbutton)
 {
     aes_fsel_state_t state;
@@ -797,13 +846,27 @@ WORD fsel_input(char *pipath, char *pisel, WORD *pbutton)
         return 0;
     }
 
-    state.char_w = AES_CHAR_WIDTH;
-    state.char_h = AES_CHAR_HEIGHT;
+    state.char_w = _vdi_string_width("M");
+    state.char_h = _vdi_font_text_height();
     state.text_ascent = _vdi_font_ascent();
     state.row_h = (WORD) (_vdi_font_text_height() + 4);
     aes_fsel_reload_entries(&state);
 
     wind_get(0, WF_CXYWH, &desk.g_x, &desk.g_y, &desk.g_w, &desk.g_h);
+    {
+        MFDB screen = {0};
+        WORD pxy[8] = {0};
+        state.background.fd_w = (WORD) (desk.g_x + desk.g_w);
+        state.background.fd_h = (WORD) (desk.g_y + desk.g_h);
+        state.background.fd_wdwidth = (WORD) ((state.background.fd_w + 15) / 16);
+        state.background.fd_nplanes = 1;
+        state.background.fd_addr = calloc((size_t) state.background.fd_wdwidth * 2,
+            (size_t) state.background.fd_h);
+        pxy[2] = pxy[6] = (WORD) (state.background.fd_w - 1);
+        pxy[3] = pxy[7] = (WORD) (state.background.fd_h - 1);
+        if (state.background.fd_addr != NULL)
+            vro_cpyfm(_aes.vdi_handle, S_ONLY, pxy, &screen, &state.background);
+    }
     wind_open(state.handle, (WORD) (desk.g_x + 36), (WORD) (desk.g_y + 30),
         520, 320);
     wind_set_str(state.handle, WF_NAME, "File Selector");
@@ -821,13 +884,16 @@ WORD fsel_input(char *pipath, char *pisel, WORD *pbutton)
         WORD br = 0;
 
         event = evnt_multi(MU_MESAG | MU_BUTTON | MU_KEYBD,
-            1, 1, 1,
+            1, 1, state.pressed_button != 0 ? 0 : 1,
             0, 0, 0, 0, 0,
             0, 0, 0, 0, 0,
             msg, 0, 0, &mx, &my, &mb, &ks, &kr, &br);
         (void) mb;
         (void) ks;
         (void) br;
+
+        if ((event & MU_MESAG) && msg[0] == WM_REDRAW && msg[3] != state.handle)
+            aes_fsel_restore_owner(&state, msg);
 
         if ((event & MU_MESAG) != 0 && msg[3] == state.handle) {
             switch (msg[0]) {
@@ -873,7 +939,9 @@ WORD fsel_input(char *pipath, char *pisel, WORD *pbutton)
                 aes_fsel_activate(&state);
                 aes_fsel_draw(&state, NULL);
             } else if (ascii == '\b' || scancode == 42 || scancode == 14) {
-                aes_fsel_enter_directory(&state, "..");
+                if (state.editing_name && state.selection[0] != '\0')
+                    state.selection[strlen(state.selection) - 1] = '\0';
+                else aes_fsel_enter_directory(&state, "..");
                 aes_fsel_draw(&state, NULL);
             } else if (scancode == 81 || scancode == 80) {
                 aes_fsel_move_selection(&state, 1);
@@ -887,9 +955,38 @@ WORD fsel_input(char *pipath, char *pisel, WORD *pbutton)
             } else if (scancode == 75) {
                 aes_fsel_page_selection(&state, -1);
                 aes_fsel_draw(&state, NULL);
+            } else if (ascii >= 32 && ascii < 127 && ascii != '/') {
+                size_t length;
+                if (!state.editing_name) state.selection[0] = '\0';
+                state.editing_name = 1;
+                state.selected = NIL;
+                length = strlen(state.selection);
+                if (length + 1 < sizeof(state.selection)) {
+                    state.selection[length] = (char) ascii;
+                    state.selection[length + 1] = '\0';
+                }
+                aes_fsel_draw(&state, NULL);
             }
         }
 
+        if ((event & MU_BUTTON) != 0 && state.pressed_button != 0) {
+            GRECT ok_rect;
+            GRECT cancel_rect;
+            const WORD pressed = state.pressed_button;
+            state.pressed_button = 0;
+            aes_fsel_button_rects(&state, &ok_rect, &cancel_rect);
+            aes_fsel_draw(&state, pressed == 1 ? &ok_rect : &cancel_rect);
+            if (wind_find(mx, my) == state.handle) {
+                if (pressed == 1 && _aes_point_in_rect(mx, my, &ok_rect)) {
+                    aes_fsel_activate(&state);
+                    if (!state.done) aes_fsel_draw(&state, NULL);
+                } else if (pressed == 2 && _aes_point_in_rect(mx, my, &cancel_rect)) {
+                    state.confirmed = 0;
+                    state.done = 1;
+                }
+            }
+            continue;
+        }
         if ((event & MU_BUTTON) != 0 && wind_find(mx, my) == state.handle) {
             GRECT ok_rect;
             GRECT cancel_rect;
@@ -897,12 +994,13 @@ WORD fsel_input(char *pipath, char *pisel, WORD *pbutton)
 
             aes_fsel_button_rects(&state, &ok_rect, &cancel_rect);
             if (_aes_point_in_rect(mx, my, &ok_rect) != 0) {
-                aes_fsel_activate(&state);
+                state.pressed_button = 1;
+                aes_fsel_draw(&state, &ok_rect);
                 continue;
             }
             if (_aes_point_in_rect(mx, my, &cancel_rect) != 0) {
-                state.confirmed = 0;
-                state.done = 1;
+                state.pressed_button = 2;
+                aes_fsel_draw(&state, &cancel_rect);
                 continue;
             }
 
@@ -913,6 +1011,7 @@ WORD fsel_input(char *pipath, char *pisel, WORD *pbutton)
                 if (index < state.entry_count) {
                     if (state.selected == index) {
                         aes_fsel_activate(&state);
+                        if (!state.done) aes_fsel_draw(&state, NULL);
                     } else {
                         state.selected = index;
                         aes_fsel_set_selection_from_index(&state);
@@ -927,5 +1026,6 @@ WORD fsel_input(char *pipath, char *pisel, WORD *pbutton)
     aes_fsel_accept(&state, pipath, pisel, pbutton);
     wind_close(state.handle);
     wind_delete(state.handle);
+    free(state.background.fd_addr);
     return 1;
 }

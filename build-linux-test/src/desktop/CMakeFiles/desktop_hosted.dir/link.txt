@@ -1,0 +1,1 @@
+/usr/bin/cc -O3 -DNDEBUG CMakeFiles/desktop_hosted.dir/desktop_assets.c.o CMakeFiles/desktop_hosted.dir/main.c.o -o /home/tstih/data/triglav-os/gem/bin/core/desktop_hosted  -Wl,-rpath,"\$ORIGIN/../lib" /home/tstih/data/triglav-os/gem/bin/lib/libaes.so /home/tstih/data/triglav-os/gem/bin/lib/libvdi.so /home/tstih/data/triglav-os/gem/bin/lib/libplatform_linux.so -lm 

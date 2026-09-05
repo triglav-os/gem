@@ -35,6 +35,8 @@ add_custom_target(gem_runtime_cursors ALL
         LSAN_OPTIONS=detect_leaks=0
         $<TARGET_FILE:resgen> cursors
         -t 01234567
+        -o ${PROJECT_BINARY_DIR}/cursors.rsc
+        -o ${GEM_RESOURCES_DIR}/cursors.rsc
         ${PROJECT_SOURCE_DIR}/docs/orig/cursors/POINTER.PNG
         ${PROJECT_SOURCE_DIR}/docs/orig/cursors/IBEAM.PNG
         ${PROJECT_SOURCE_DIR}/docs/orig/cursors/BEE.PNG
@@ -43,8 +45,6 @@ add_custom_target(gem_runtime_cursors ALL
         ${PROJECT_SOURCE_DIR}/docs/orig/cursors/THINCROSS.PNG
         ${PROJECT_SOURCE_DIR}/docs/orig/cursors/THICKCROSS.PNG
         ${PROJECT_SOURCE_DIR}/docs/orig/cursors/OUTLINECROSS.PNG
-        -o ${PROJECT_BINARY_DIR}/cursors.rsc
-        -o ${GEM_RESOURCES_DIR}/cursors.rsc
     DEPENDS
         resgen
         ${PROJECT_SOURCE_DIR}/docs/orig/cursors/POINTER.PNG

@@ -41,9 +41,9 @@ static int gem_rpc_send_all(int fd, const void *buf, size_t size)
     const uint8_t *cursor = (const uint8_t *) buf;
 
     while (size > 0u) {
-        ssize_t rc = send(fd, cursor, size, 0);
+        ssize_t rc = send(fd, cursor, size, MSG_NOSIGNAL);
 
-        if (rc < 0) {
+        if (rc <= 0) {
             if (errno == EINTR) {
                 continue;
             }
@@ -92,7 +92,11 @@ static int gem_rpc_connect(void)
 
     memset(&addr, 0, sizeof(addr));
     addr.sun_family = AF_UNIX;
-    strncpy(addr.sun_path, GEMD_SOCKET_PATH, sizeof(addr.sun_path) - 1u);
+    if (strlen(gem_rpc_socket_path()) >= sizeof(addr.sun_path)) {
+        (void) close(fd);
+        return 0;
+    }
+    strcpy(addr.sun_path, gem_rpc_socket_path());
     if (connect(fd, (const struct sockaddr *) &addr, sizeof(addr)) != 0) {
         (void) close(fd);
         return 0;
@@ -133,15 +137,17 @@ int gem_rpc_call(gem_rpc_opcode_t opcode,
         return 0;
     }
     if (reply.magic != GEM_RPC_MAGIC) {
+        gem_rpc_disconnect();
         return 0;
     }
     if (status != NULL) {
         *status = reply.status;
     }
+    if (reply.size != response_size) {
+        gem_rpc_disconnect();
+        return 0;
+    }
     if (reply.size > 0u) {
-        if (response == NULL || response_size < reply.size) {
-            return 0;
-        }
         if (!gem_rpc_recv_all(g_gem_socket, response, reply.size)) {
             return 0;
         }
@@ -905,12 +911,17 @@ WORD menu_bar(OBJECT *tree, WORD show)
     WORD extent;
     WORD i;
 
-    if (tree == NULL) {
+    if (tree == NULL && show != 0) {
         return 0;
     }
 
     memset(&req, 0, sizeof(req));
     req.show = show;
+    if (show == 0) {
+        if (!gem_rpc_call(GEM_RPC_MENU_BAR, &req, sizeof(req), &status,
+                NULL, 0)) return 0;
+        return (WORD) status;
+    }
     extent = gem_menu_tree_extent(tree);
     req.object_count = (WORD) (extent + 1);
     if (req.object_count > (WORD) GEM_RPC_MENU_MAX_OBJECTS) {

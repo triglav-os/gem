@@ -743,7 +743,8 @@ static int init_terminal(term_state_t *state)
     if (!gem_os_getcwd(cwd, sizeof(cwd))) {
         cwd[0] = '\0';
     }
-    if (!gem_os_pty_spawn_shell(&state->pty, NULL, cwd, 80, 25)) {
+    /* Interactive bash; platform falls back if the path is unusable. */
+    if (!gem_os_pty_spawn_shell(&state->pty, "/bin/bash", cwd, 80, 25)) {
         gem_os_free(state->cells);
         state->cells = NULL;
         return 0;

@@ -356,6 +356,9 @@ void _vdi_set_mouse_state(WORD x, WORD y, WORD status)
 {
     WORD hot_x = _vdi.mouse_form.mf_xhot;
     WORD hot_y = _vdi.mouse_form.mf_yhot;
+    WORD old_cursor_x = _vdi.cursor_x;
+    WORD old_cursor_y = _vdi.cursor_y;
+    WORD had_cursor = _vdi.cursor_drawn;
 
     _vdi_cursor_restore();
     _vdi.mouse_x = x;
@@ -364,10 +367,18 @@ void _vdi_set_mouse_state(WORD x, WORD y, WORD status)
     _vdi.cursor_x = (WORD) (x - hot_x);
     _vdi.cursor_y = (WORD) (y - hot_y);
     _vdi_cursor_draw();
-    if (_vdi.update_depth == 0) {
-        gem_raster_present();
-    } else {
-        _vdi.present_pending = 1;
+    /*
+     * Always push only the old/new 16x16 cursor boxes to the FB — even
+     * while begin_update is nested (window drag). A full-screen present
+     * on every motion event is what made the pointer feel glacial.
+     */
+    if (had_cursor != 0) {
+        gem_raster_present_rect((int) old_cursor_x, (int) old_cursor_y,
+            _vdi_cursor_width + 1, _vdi_cursor_height + 1);
+    }
+    if (_vdi.cursor_hidden == 0 && _vdi.cursor_drawn != 0) {
+        gem_raster_present_rect((int) _vdi.cursor_x, (int) _vdi.cursor_y,
+            _vdi_cursor_width + 1, _vdi_cursor_height + 1);
     }
 }
 
@@ -380,7 +391,18 @@ void _vdi_present_screen(void)
     }
 
     _vdi_cursor_draw();
-    gem_raster_present();
+    if (_vdi.cursor_hidden == 0 && _vdi.cursor_drawn != 0) {
+        _vdi_mark_dirty(_vdi.cursor_x, _vdi.cursor_y,
+            (WORD) (_vdi.cursor_x + 16), (WORD) (_vdi.cursor_y + 16));
+    }
+    if (_vdi.dirty_valid != 0) {
+        gem_raster_present_rect((int) _vdi.dirty_x0, (int) _vdi.dirty_y0,
+            (int) (_vdi.dirty_x1 - _vdi.dirty_x0 + 1),
+            (int) (_vdi.dirty_y1 - _vdi.dirty_y0 + 1));
+        _vdi.dirty_valid = 0;
+    } else {
+        gem_raster_present();
+    }
     _vdi_pump_events();
 }
 
@@ -460,6 +482,7 @@ static void _vdi_cursor_draw(void)
         return;
     }
 
+    /* Same as rasta path: WHITE→1, BLACK→0 in the mono shadow. */
     fg_color = (_vdi.mouse_form.mf_fg == WHITE) ? 1 : 0;
     bg_color = (_vdi.mouse_form.mf_bg == WHITE) ? 1 : 0;
 

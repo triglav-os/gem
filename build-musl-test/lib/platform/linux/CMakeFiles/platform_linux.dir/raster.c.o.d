@@ -1,0 +1,35 @@
+lib/platform/linux/CMakeFiles/platform_linux.dir/raster.c.o: \
+ /home/tstih/data/triglav-os/gem/lib/platform/linux/raster.c \
+ /home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/include/stdc-predef.h \
+ /home/tstih/data/triglav-os/gem/include/platform/raster.h \
+ /home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/lib/gcc/x86_64-linux-musl/11.2.1/include/stdint.h \
+ /home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/include/stdint.h \
+ /home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/include/bits/alltypes.h \
+ /home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/include/bits/stdint.h \
+ /home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/include/errno.h \
+ /home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/include/features.h \
+ /home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/include/bits/errno.h \
+ /home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/include/fcntl.h \
+ /home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/include/bits/fcntl.h \
+ /home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/include/linux/fb.h \
+ /home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/include/linux/types.h \
+ /home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/include/asm/types.h \
+ /home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/include/asm-generic/types.h \
+ /home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/include/asm-generic/int-ll64.h \
+ /home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/include/asm/bitsperlong.h \
+ /home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/include/asm-generic/bitsperlong.h \
+ /home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/include/linux/posix_types.h \
+ /home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/include/linux/stddef.h \
+ /home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/include/asm/posix_types.h \
+ /home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/include/asm/posix_types_64.h \
+ /home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/include/asm-generic/posix_types.h \
+ /home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/include/linux/i2c.h \
+ /home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/include/stdlib.h \
+ /home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/include/string.h \
+ /home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/include/sys/ioctl.h \
+ /home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/include/bits/ioctl.h \
+ /home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/include/bits/ioctl_fix.h \
+ /home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/include/sys/mman.h \
+ /home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/include/bits/mman.h \
+ /home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/include/unistd.h \
+ /home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/include/bits/posix.h

@@ -1,0 +1,1 @@
+/usr/bin/cc -O3 -DNDEBUG CMakeFiles/demo27_rscgen.dir/make_rsc.c.o -o demo27_rscgen  -Wl,-rpath,"\$ORIGIN/../lib" 

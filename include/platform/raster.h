@@ -63,6 +63,12 @@ gem_raster_surface_t *gem_raster_surface(void);
 void gem_raster_present(void);
 
 /*
+ * Presents only the rectangle (x, y, width, height) in surface coordinates.
+ * Used for cheap mouse-cursor updates; out-of-range edges are clamped.
+ */
+void gem_raster_present_rect(int x, int y, int width, int height);
+
+/*
  * Updates one palette entry for indexed-color raster formats.
  * `index` selects the entry and `r`, `g`, and `b` provide its color.
  */

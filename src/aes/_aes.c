@@ -265,13 +265,20 @@ int _aes_ensure_vdi(void)
         return 0;
     }
 
+    _aes.vdi_ready = 1;
+    /* Paint the desktop once when AES first acquires its workstation.
+     * Later window redraws repair only their damaged regions, so they
+     * cannot initialize the untouched background around the first window.
+     * Keep this in AES: a VDI-only application owns its entire surface.
+     */
+    _aes_redraw_open_windows();
+
     /*
      * AES applications expect the default arrow cursor to be visible
      * once the hosted workstation exists. Demos that only use basic
      * window messages never call graf_mouse(M_ON) themselves.
      */
     v_show_c(_aes.vdi_handle, 1);
-    _aes.vdi_ready = 1;
     _aes.mouse_cursor_hidden = 0;
     _aes.mouse_applied_cursor = ARROW;
     _aes_trace("ensure_vdi opened handle=%d size=%dx%d",
@@ -555,6 +562,11 @@ int _aes_menu_split_shortcut(const char *text,
 
 WORD _aes_light_color(void)
 {
+    /*
+     * Unchanged from the rasta-proven model: with
+     * _vdi_color_to_pixel(WHITE)→1 / BLACK→0 and set-bit = black ink
+     * on the display, BLACK as the "light" fill paints white paper.
+     */
     return BLACK;
 }
 
@@ -608,6 +620,10 @@ void _aes_restore_region_pixels(const GRECT *rect, uint8_t *pixels)
                 (WORD) (rect->g_y + y), (WORD) pixels[index++]);
         }
     }
+    _vdi_mark_dirty(rect->g_x, rect->g_y,
+        (WORD) (rect->g_x + rect->g_w - 1),
+        (WORD) (rect->g_y + rect->g_h - 1));
+    _vdi_present_screen();
 }
 
 int _aes_load_file(const char *filename, void **data_out, size_t *size_out)

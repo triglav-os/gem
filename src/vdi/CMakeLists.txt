@@ -11,6 +11,8 @@ target_include_directories(vdi
 
 if(GEM_PLATFORM STREQUAL "linux")
     target_link_libraries(vdi PUBLIC platform_linux m)
+    # Full-framebuffer defaults (width/height 0 → fill /dev/fb*).
+    target_compile_definitions(vdi PRIVATE GEM_PLATFORM_LINUX=1)
 else()
     target_link_libraries(vdi PUBLIC rasta m)
 endif()

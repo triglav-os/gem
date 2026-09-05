@@ -23,13 +23,13 @@ VOID v_hide_c(VDI_HANDLE handle)
     }
 
     if (_vdi.cursor_hidden == 0) {
+        WORD cx = _vdi.cursor_x;
+        WORD cy = _vdi.cursor_y;
+
         _vdi.cursor_hidden = 1;
         _vdi_prepare_screen_write();
-        if (_vdi.update_depth == 0) {
-            gem_raster_present();
-        } else {
-            _vdi.present_pending = 1;
-        }
+        /* Cheap cursor erase even under begin_update / wind_update. */
+        gem_raster_present_rect((int) cx, (int) cy, 17, 17);
     }
 }
 
@@ -43,11 +43,8 @@ VOID v_show_c(VDI_HANDLE handle, WORD reset)
 
     if (_vdi.cursor_hidden != 0) {
         _vdi.cursor_hidden = 0;
-        if (_vdi.update_depth == 0) {
-            _vdi_present_screen();
-        } else {
-            _vdi.present_pending = 1;
-        }
+        /* Redraw pointer via mouse-state path (cursor box present). */
+        _vdi_set_mouse_state(_vdi.mouse_x, _vdi.mouse_y, _vdi.mouse_status);
     }
 }
 

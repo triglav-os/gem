@@ -10,6 +10,8 @@
 
 #include "../vdi/_internal.h"
 
+#include "platform/raster.h"
+
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -44,7 +46,7 @@ int _aes_window_vthumb_rect(const aes_window_t *window, GRECT *rect);
 int _aes_window_hthumb_rect(const aes_window_t *window, GRECT *rect);
 void _aes_compute_work(aes_window_t *window);
 WORD _aes_wind_set_text(WORD handle, WORD field, const char *text);
-static void _aes_present_after_window_draw(void);
+static void _aes_present_window_frame(const aes_window_t *window);
 static void _aes_desktop_rect_local(GRECT *rect);
 static void _aes_expand_window_damage_rect(const GRECT *src, GRECT *out);
 static void _aes_window_draw_cover_rect(const aes_window_t *window, GRECT *out);
@@ -637,15 +639,17 @@ WORD _aes_wind_set_text(WORD handle, WORD field, const char *text)
     return 1;
 }
 
-static void _aes_present_after_window_draw(void)
+static void _aes_present_window_frame(const aes_window_t *window)
 {
-    if (_aes.update_depth > 0) {
+    GRECT cover;
+
+    if (_aes.update_depth > 0 || window == NULL) {
         return;
     }
-
-    _vdi_begin_update();
-    _vdi_present_screen();
-    _vdi_end_update();
+    _aes_window_draw_cover_rect(window, &cover);
+    if (cover.g_w > 0 && cover.g_h > 0) {
+        _vdi_flush_rect(cover.g_x, cover.g_y, cover.g_w, cover.g_h);
+    }
 }
 
 static void _aes_desktop_rect_local(GRECT *rect)
@@ -707,6 +711,10 @@ void _aes_redraw_region(const GRECT *dirty)
     GRECT desktop;
     GRECT menu_rect;
     WORD bar;
+    GRECT damage;
+    GRECT visible[64];
+    WORD visible_count;
+    WORD piece;
     int redraw_menu = 0;
 
     if (dirty == NULL || dirty->g_w <= 0 || dirty->g_h <= 0 ||
@@ -743,8 +751,21 @@ void _aes_redraw_region(const GRECT *dirty)
 
     ++_aes.update_depth;
     _vdi_begin_update();
-    vs_clip(_aes.vdi_handle, 1, clip);
-    _aes_fill_checker_rect(clip[0], clip[1], clip[2], clip[3]);
+    _aes_set_rect(&damage, clip[0], clip[1],
+        (WORD) (clip[2] - clip[0] + 1),
+        (WORD) (clip[3] - clip[1] + 1));
+    visible_count = _aes_clip_visible_rects(NULL, &damage, visible, 64);
+    for (piece = 0; piece < visible_count; ++piece) {
+        WORD desktop_clip[4] = {visible[piece].g_x, visible[piece].g_y,
+            (WORD) (visible[piece].g_x + visible[piece].g_w - 1),
+            (WORD) (visible[piece].g_y + visible[piece].g_h - 1)};
+        vs_clip(_aes.vdi_handle, 1, desktop_clip);
+        _aes_fill_checker_rect(desktop_clip[0], desktop_clip[1],
+            desktop_clip[2], desktop_clip[3]);
+    }
+    if (visible_count > 0) {
+        _aes_queue_desktop_redraw(&damage);
+    }
     /*
      * z_order only ever increases -- every window open and every
      * window topped hands out a fresh value that's never reused or
@@ -784,19 +805,51 @@ void _aes_redraw_region(const GRECT *dirty)
             painted[(size_t) b + 1] = key;
         }
         for (a = 0; a < painted_count; ++a) {
+            GRECT cover;
+            GRECT frame_damage;
+            int redraw_work = 0;
+
             _aes_trace("redraw_region draw handle=%d z=%lu outer=%d,%d %dx%d",
                 painted[a]->handle, (unsigned long) painted[a]->z_order,
                 painted[a]->outer.g_x, painted[a]->outer.g_y,
                 painted[a]->outer.g_w, painted[a]->outer.g_h);
-            _aes_draw_window_frame(painted[a]);
-            _aes_queue_window_redraw(painted[a], dirty);
+            _aes_window_draw_cover_rect(painted[a], &cover);
+            if (_aes_intersect_rects(&cover, &damage, &frame_damage) == 0) {
+                continue;
+            }
+            visible_count = _aes_clip_visible_rects(painted[a],
+                &frame_damage, visible, 64);
+            for (piece = 0; piece < visible_count; ++piece) {
+                WORD frame_clip[4] = {visible[piece].g_x, visible[piece].g_y,
+                    (WORD) (visible[piece].g_x + visible[piece].g_w - 1),
+                    (WORD) (visible[piece].g_y + visible[piece].g_h - 1)};
+                vs_clip(_aes.vdi_handle, 1, frame_clip);
+                /* Chrome only; never draw behind a higher window. */
+                _aes_draw_window_frame(painted[a]);
+                if (_aes_rects_intersect(&visible[piece],
+                    &painted[a]->work) != 0) {
+                    redraw_work = 1;
+                }
+            }
+            if (redraw_work != 0) {
+                _aes_queue_window_redraw(painted[a], &damage);
+            }
         }
     }
     vs_clip(_aes.vdi_handle, 0, clip);
+    _vdi_mark_dirty(clip[0], clip[1], clip[2], clip[3]);
+    _vdi_present_screen();
     --_aes.update_depth;
-    _vdi_end_update();
-
-    _aes_queue_desktop_redraw(dirty);
+    /*
+     * Do not full-screen present here. VDI primitives set present_pending
+     * during the batch; push only the dirty clip to the physical FB.
+     */
+    _vdi_end_update_no_present();
+    if (_aes.update_depth == 0) {
+        _vdi_flush_rect(clip[0], clip[1],
+            (WORD) (clip[2] - clip[0] + 1),
+            (WORD) (clip[3] - clip[1] + 1));
+    }
 
     if (redraw_menu != 0) {
         _aes_menu_redraw_tree(_aes.menu_tree);
@@ -911,13 +964,16 @@ void _aes_redraw_window_title_states(const aes_window_t *previous_top,
 {
     GRECT dirty;
 
+    /*
+     * Title strip only — do not extend into work (old +1 included the
+     * first work row, so checker fill punched a hole in client content).
+     */
     if (previous_top != NULL && previous_top->open != 0 &&
         previous_top->used != 0) {
         dirty.g_x = previous_top->outer.g_x;
         dirty.g_y = previous_top->outer.g_y;
         dirty.g_w = (WORD) (previous_top->outer.g_w + 1);
-        dirty.g_h = (WORD) (previous_top->work.g_y -
-            previous_top->outer.g_y + 1);
+        dirty.g_h = (WORD) (previous_top->work.g_y - previous_top->outer.g_y);
         if (dirty.g_w > 0 && dirty.g_h > 0) {
             _aes_redraw_region(&dirty);
         }
@@ -929,11 +985,132 @@ void _aes_redraw_window_title_states(const aes_window_t *previous_top,
         dirty.g_x = new_top->outer.g_x;
         dirty.g_y = new_top->outer.g_y;
         dirty.g_w = (WORD) (new_top->outer.g_w + 1);
-        dirty.g_h = (WORD) (new_top->work.g_y - new_top->outer.g_y + 1);
+        dirty.g_h = (WORD) (new_top->work.g_y - new_top->outer.g_y);
         if (dirty.g_w > 0 && dirty.g_h > 0) {
             _aes_redraw_region(&dirty);
         }
     }
+}
+
+/*
+ * True if any open window with a higher z-order intersects `rect`.
+ * Call BEFORE raising so z-order still reflects the old stacking.
+ */
+static int _aes_window_rect_is_obscured(const aes_window_t *window,
+                                        const GRECT *rect)
+{
+    size_t i;
+
+    if (window == NULL || rect == NULL || rect->g_w <= 0 || rect->g_h <= 0) {
+        return 0;
+    }
+
+    for (i = 0; i < AES_MAX_WINDOWS; ++i) {
+        const aes_window_t *other = &_aes.windows[i];
+
+        if (other == window || other->used == 0 || other->open == 0) {
+            continue;
+        }
+        if (other->z_order <= window->z_order) {
+            continue;
+        }
+        if (_aes_rects_intersect(&other->outer, rect) != 0) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+/*
+ * Bring `window` to the front visually and in z-order.
+ *
+ * Old bug #1: _aes_redraw_region(outer) wiped checker through every
+ * client area and queued WM_REDRAW for desktop + all overlapping apps.
+ * Old bug #2: partial raise drew chrome before raise and never forced
+ * a correct on-top paint, so previous-top pixels stayed visible
+ * ("windows overlap").
+ * Old bug #3: paper-filling work then client-painting = double draw.
+ *
+ * Correct path:
+ *  1. Note whether any higher window covers us (old z-order).
+ *  2. Raise z-order.
+ *  3. Title strips for previous/new top (active/inactive).
+ *  4. If we were covered: draw our frame on top (AES chrome only),
+ *     queue one WM_REDRAW for our full work so the client paints once
+ *     over whatever still shows from the old top. Siblings and desktop
+ *     are not wiped and not asked to repaint.
+ */
+void _aes_top_window(aes_window_t *window)
+{
+    aes_window_t *previous_top;
+    int was_obscured;
+    GRECT cover;
+
+    if (window == NULL || window->used == 0 || window->open == 0) {
+        return;
+    }
+
+    previous_top = _aes_find_top_window();
+    if (previous_top == window) {
+        return;
+    }
+
+    was_obscured =
+        (_aes_window_rect_is_obscured(window, &window->outer) != 0) ||
+        (_aes_window_rect_is_obscured(window, &window->work) != 0);
+
+    _aes_raise_window(window);
+    _aes_redraw_window_title_states(previous_top, window);
+
+    if (was_obscured == 0 || _aes.vdi_ready == 0) {
+        return;
+    }
+
+    /*
+     * Frame on top after title_states so active chrome wins stacking.
+     * Do not fill work — client owns it via the single WM_REDRAW below.
+     */
+    ++_aes.update_depth;
+    _vdi_begin_update();
+    _aes_draw_window_frame(window);
+    --_aes.update_depth;
+    _vdi_end_update_no_present();
+
+    _aes_window_draw_cover_rect(window, &cover);
+    if (_aes.update_depth == 0 && cover.g_w > 0 && cover.g_h > 0) {
+        _vdi_flush_rect(cover.g_x, cover.g_y, cover.g_w, cover.g_h);
+    }
+
+    _aes_queue_window_redraw(window, &window->work);
+}
+
+void _aes_refresh_raised_window(const aes_window_t *window)
+{
+    /* Legacy name: full top including z-order. */
+    _aes_top_window((aes_window_t *) window);
+}
+
+void _aes_finish_window_raise(aes_window_t *previous_top,
+                              aes_window_t *window,
+                              int was_obscured)
+{
+    /* Legacy; prefer _aes_top_window(). */
+    GRECT cover;
+
+    (void) previous_top;
+    if (window == NULL || was_obscured == 0 || _aes.vdi_ready == 0) {
+        return;
+    }
+    ++_aes.update_depth;
+    _vdi_begin_update();
+    _aes_draw_window_frame(window);
+    --_aes.update_depth;
+    _vdi_end_update_no_present();
+    _aes_window_draw_cover_rect(window, &cover);
+    if (_aes.update_depth == 0 && cover.g_w > 0 && cover.g_h > 0) {
+        _vdi_flush_rect(cover.g_x, cover.g_y, cover.g_w, cover.g_h);
+    }
+    _aes_queue_window_redraw(window, &window->work);
 }
 
 static void _aes_fill_rect(WORD x0, WORD y0, WORD x1, WORD y1, WORD color)
@@ -996,41 +1173,125 @@ static void _aes_draw_rect_edges(WORD x0, WORD y0, WORD x1, WORD y1,
 
 static void _aes_invert_rect(WORD x0, WORD y0, WORD x1, WORD y1)
 {
-    WORD x;
+    vdi_rect_t clip;
+    gem_raster_surface_t *surface;
+    size_t pitch;
+    size_t start_byte;
+    size_t end_byte;
+    uint8_t left_mask;
+    uint8_t right_mask;
     WORD y;
 
+    _vdi_get_active_clip_rect(&clip);
+    x0 = _aes_max_word(x0, clip.x0);
+    y0 = _aes_max_word(y0, clip.y0);
+    x1 = _aes_min_word(x1, clip.x1);
+    y1 = _aes_min_word(y1, clip.y1);
     if (x0 > x1 || y0 > y1) {
         return;
     }
 
+    surface = gem_raster_surface();
+    if (surface == NULL || surface->pixels == NULL ||
+        surface->format != GEM_RASTER_MONO1) {
+        return;
+    }
+
     _vdi_prepare_screen_write();
+    pitch = surface->pitch;
+    start_byte = (size_t) x0 / 8u;
+    end_byte = (size_t) x1 / 8u;
+    left_mask = (uint8_t) (0xffu >> ((unsigned int) x0 & 7u));
+    right_mask = (uint8_t) (0xffu << (7u - ((unsigned int) x1 & 7u)));
+
     for (y = y0; y <= y1; ++y) {
-        for (x = x0; x <= x1; ++x) {
-            _vdi_set_screen_pixel(x, y,
-                (WORD) (_vdi_get_screen_pixel(x, y) == 0 ? 1 : 0));
+        uint8_t *row = (uint8_t *) surface->pixels + (size_t) y * pitch;
+        size_t b;
+
+        if (start_byte == end_byte) {
+            row[start_byte] ^= (uint8_t) (left_mask & right_mask);
+            continue;
         }
+        row[start_byte] ^= left_mask;
+        for (b = start_byte + 1u; b < end_byte; ++b) {
+            row[b] ^= 0xffu;
+        }
+        row[end_byte] ^= right_mask;
     }
 }
 
 static void _aes_fill_pattern_rect(WORD x0, WORD y0, WORD x1, WORD y1,
                                    const uint8_t *rows, size_t row_count)
 {
-    WORD x;
+    vdi_rect_t clip;
     WORD y;
     WORD dark_pixel = (_aes_dark_color() == WHITE) ? 1 : 0;
-    uint8_t row_bits;
+    gem_raster_surface_t *surface;
+    size_t pitch;
+    size_t start_byte;
+    size_t end_byte;
+    uint8_t left_mask;
+    uint8_t right_mask;
 
+    _vdi_get_active_clip_rect(&clip);
+    x0 = _aes_max_word(x0, clip.x0);
+    y0 = _aes_max_word(y0, clip.y0);
+    x1 = _aes_min_word(x1, clip.x1);
+    y1 = _aes_min_word(y1, clip.y1);
     if (x0 > x1 || y0 > y1 || rows == NULL || row_count == 0u) {
         return;
     }
 
+    /* Paper fill (bulk). */
     _aes_fill_rect(x0, y0, x1, y1, _aes_light_color());
+
+    /*
+     * Pattern dots: write mono shadow bytes, not one plot_pixel per
+     * coordinate. Desktop checker (0xAA/0x55) and scrollbar stipples
+     * repeat every 8 columns, so each framebuffer byte uses the same
+     * pattern byte (aligned to absolute x).
+     */
+    surface = gem_raster_surface();
+    if (surface == NULL || surface->pixels == NULL ||
+        surface->format != GEM_RASTER_MONO1) {
+        return;
+    }
+
+    _vdi_prepare_screen_write();
+    pitch = surface->pitch;
+    start_byte = (size_t) x0 / 8u;
+    end_byte = (size_t) x1 / 8u;
+    left_mask = (uint8_t) (0xffu >> ((unsigned int) x0 & 7u));
+    right_mask = (uint8_t) (0xffu << (7u - ((unsigned int) x1 & 7u)));
+
     for (y = y0; y <= y1; ++y) {
-        row_bits = rows[(size_t) (y % (WORD) row_count)];
-        for (x = x0; x <= x1; ++x) {
-            if ((row_bits & (uint8_t) (0x80u >> (x & 7))) != 0u) {
-                _vdi_plot_pixel(x, y, dark_pixel);
+        uint8_t *row = (uint8_t *) surface->pixels + (size_t) y * pitch;
+        uint8_t pat = rows[(size_t) (y % (WORD) row_count)];
+        size_t b;
+
+        if (start_byte == end_byte) {
+            uint8_t mask = (uint8_t) (left_mask & right_mask & pat);
+
+            if (dark_pixel != 0) {
+                row[start_byte] |= mask;
+            } else {
+                row[start_byte] &= (uint8_t) ~mask;
             }
+            continue;
+        }
+
+        if (dark_pixel != 0) {
+            row[start_byte] |= (uint8_t) (left_mask & pat);
+            for (b = start_byte + 1u; b < end_byte; ++b) {
+                row[b] |= pat;
+            }
+            row[end_byte] |= (uint8_t) (right_mask & pat);
+        } else {
+            row[start_byte] &= (uint8_t) ~(left_mask & pat);
+            for (b = start_byte + 1u; b < end_byte; ++b) {
+                row[b] &= (uint8_t) ~pat;
+            }
+            row[end_byte] &= (uint8_t) ~(right_mask & pat);
         }
     }
 }
@@ -1539,7 +1800,7 @@ void _aes_draw_window_frame(const aes_window_t *window)
         }
     }
     _aes_draw_sizer_glyph(window);
-    _aes_present_after_window_draw();
+    _aes_present_window_frame(window);
 }
 
 void _aes_clear_window_frame(const aes_window_t *window)
@@ -1556,7 +1817,7 @@ void _aes_clear_window_frame(const aes_window_t *window)
     rect[3] = (WORD) (window->outer.g_y + window->outer.g_h - 1);
     vsf_color(_aes.vdi_handle, BLACK);
     v_bar(_aes.vdi_handle, rect);
-    _aes_present_after_window_draw();
+    _aes_present_window_frame(window);
 }
 
 void _aes_redraw_open_windows(void)
@@ -1697,8 +1958,18 @@ static void _aes_stipple_text_pixels(WORD x, WORD y, WORD foreground,
     WORD height;
     WORD top;
     WORD left;
-    WORD px;
+    WORD x1;
+    WORD y1;
+    gem_raster_surface_t *surface;
+    size_t pitch;
+    size_t start_byte;
+    size_t end_byte;
+    uint8_t left_mask;
+    uint8_t right_mask;
     WORD py;
+    /* Shadow packing matches rasta: WHITE→1 (set), BLACK→0 (clear). */
+    WORD fg_pixel = (foreground == WHITE) ? 1 : 0;
+    WORD bg_pixel = (background == WHITE) ? 1 : 0;
 
     if (text == NULL || *text == '\0') {
         return;
@@ -1712,12 +1983,56 @@ static void _aes_stipple_text_pixels(WORD x, WORD y, WORD foreground,
         return;
     }
 
+    surface = gem_raster_surface();
+    if (surface == NULL || surface->pixels == NULL ||
+        surface->format != GEM_RASTER_MONO1) {
+        return;
+    }
+
+    x1 = (WORD) (left + width - 1);
+    y1 = (WORD) (top + height - 1);
     _vdi_prepare_screen_write();
-    for (py = top; py < top + height; ++py) {
-        for (px = left; px < left + width; ++px) {
-            if (((px + py) & 1) != 0 &&
-                _vdi_get_screen_pixel(px, py) == foreground) {
-                _vdi_set_screen_pixel(px, py, background);
+    pitch = surface->pitch;
+    start_byte = (size_t) left / 8u;
+    end_byte = (size_t) x1 / 8u;
+    left_mask = (uint8_t) (0xffu >> ((unsigned int) left & 7u));
+    right_mask = (uint8_t) (0xffu << (7u - ((unsigned int) x1 & 7u)));
+
+    /*
+     * Checker stipple: where (x+y) is odd and the pixel is foreground,
+     * force background. Byte masks only — no per-pixel get/set.
+     */
+    for (py = top; py <= y1; ++py) {
+        uint8_t *row = (uint8_t *) surface->pixels + (size_t) py * pitch;
+        /* (x+y) odd: y even → odd x → 0x55; y odd → even x → 0xAA. */
+        uint8_t checker = ((py & 1) != 0) ? 0xaau : 0x55u;
+        size_t b;
+
+        for (b = start_byte; b <= end_byte; ++b) {
+            uint8_t span;
+            uint8_t mask;
+            uint8_t cur;
+            uint8_t is_fg;
+
+            if (start_byte == end_byte) {
+                span = (uint8_t) (left_mask & right_mask);
+            } else if (b == start_byte) {
+                span = left_mask;
+            } else if (b == end_byte) {
+                span = right_mask;
+            } else {
+                span = 0xffu;
+            }
+
+            mask = (uint8_t) (span & checker);
+            cur = row[b];
+            is_fg = (fg_pixel != 0) ?
+                (uint8_t) (cur & mask) :
+                (uint8_t) ((uint8_t) (~cur) & mask);
+            if (bg_pixel != 0) {
+                row[b] = (uint8_t) (cur | is_fg);
+            } else {
+                row[b] = (uint8_t) (cur & (uint8_t) ~is_fg);
             }
         }
     }

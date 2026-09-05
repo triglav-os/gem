@@ -289,9 +289,21 @@ static void _aes_draw_drag_outline(const GRECT *rect)
 
     previous_mode = _vdi_write_mode();
     (void) vswr_mode(_aes.vdi_handle, MD_XOR);
+    /*
+     * Line color is a VDI color *index* then mapped by _vdi_color_to_pixel:
+     * WHITE→1, BLACK→0. XOR only toggles when the pixel value is non-zero,
+     * so WHITE is required here (BLACK becomes 0 and is a no-op).
+     */
     vsl_color(_aes.vdi_handle, WHITE);
     v_pline(_aes.vdi_handle, 5, box);
     (void) vswr_mode(_aes.vdi_handle, previous_mode);
+    /*
+     * Rubber-band feedback is drawn under wind_update / begin_update, which
+     * defers normal presents. Flush this rect so the XOR box is visible
+     * during drag and scrollbar tracking.
+     */
+    _vdi_flush_rect((WORD) (rect->g_x - 1), (WORD) (rect->g_y - 1),
+        (WORD) (rect->g_w + 2), (WORD) (rect->g_h + 2));
 }
 
 static void _aes_begin_interaction_lock(void)
@@ -435,10 +447,7 @@ static WORD _aes_track_window_interaction(const gem_hid_event_t *first_evt,
     }
 
     if (raised != 0 && defer_raise == 0) {
-        aes_window_t *previous_top = _aes_find_top_window();
-        _aes_raise_window(window);
-        _aes_redraw_window_change(&window->outer, &window->outer);
-        _aes_redraw_window_title_states(previous_top, window);
+        _aes_top_window(window);
     }
 
     if (part == AES_WINDOW_PART_CLOSER) {
@@ -486,6 +495,7 @@ static WORD _aes_track_window_interaction(const gem_hid_event_t *first_evt,
         _aes_queue_window_message(window, WM_FULLED, 0, 0, 0, 0);
         if ((flags & MU_MESAG) != 0u && mepbuff != NULL &&
             _aes_dequeue_message(mepbuff) != 0) {
+            graf_mkstate(pmx, pmy, pmb, pks);
             return MU_MESAG;
         }
         return 0;
@@ -1017,6 +1027,7 @@ WORD evnt_multi(UWORD flags,
 
         if ((flags & MU_MESAG) != 0u && mepbuff != NULL &&
             _aes_dequeue_message(mepbuff) != 0) {
+            graf_mkstate(pmx, pmy, pmb, pks);
             return MU_MESAG;
         }
 

@@ -78,16 +78,8 @@ static void _aes_window_cover_rect(const aes_window_t *window, GRECT *rect)
 
 static WORD _aes_build_visible_rects(WORD handle, GRECT out[], WORD max_rects)
 {
-    GRECT pending[64];
-    GRECT next_pending[64];
     GRECT base;
     aes_window_t *target = NULL;
-    WORD pending_count = 0;
-    size_t i;
-
-    if (out == NULL || max_rects <= 0) {
-        return 0;
-    }
 
     if (handle == 0) {
         _aes_desktop_rect(&base);
@@ -102,16 +94,30 @@ static WORD _aes_build_visible_rects(WORD handle, GRECT out[], WORD max_rects)
         base = window->work;
     }
 
-    if (base.g_w <= 0 || base.g_h <= 0) {
+    return _aes_clip_visible_rects(target, &base, out, max_rects);
+}
+
+/* Share occlusion clipping between client enumeration and AES painting. */
+WORD _aes_clip_visible_rects(const aes_window_t *target, const GRECT *base,
+    GRECT out[], WORD max_rects)
+{
+    GRECT pending[64];
+    GRECT next_pending[64];
+    WORD pending_count = 1;
+    size_t i;
+    const WORD handle = target != NULL ? target->handle : 0;
+
+    if (out == NULL || max_rects <= 0 || base == NULL ||
+        base->g_w <= 0 || base->g_h <= 0) {
         return 0;
     }
+    max_rects = _aes_min_word(max_rects, 64);
 
     _aes_trace("visible_rects begin handle=%d base=%d,%d %dx%d target_z=%lu",
-        handle, base.g_x, base.g_y, base.g_w, base.g_h,
+        handle, base->g_x, base->g_y, base->g_w, base->g_h,
         (unsigned long) ((target != NULL) ? target->z_order : 0u));
 
-    pending[0] = base;
-    pending_count = 1;
+    pending[0] = *base;
 
     for (i = 0; i < AES_MAX_WINDOWS && pending_count > 0; ++i) {
         const aes_window_t *cover = &_aes.windows[i];
@@ -282,6 +288,7 @@ WORD wind_open(WORD handle, WORD x, WORD y, WORD w, WORD h)
 WORD wind_close(WORD handle)
 {
     aes_window_t *window = _aes_find_window(handle);
+    aes_window_t *previous_top = _aes_find_top_window();
     GRECT previous_outer;
 
     if (window == NULL) {
@@ -290,6 +297,9 @@ WORD wind_close(WORD handle)
     previous_outer = window->outer;
     window->open = 0;
     _aes_redraw_window_change(&previous_outer, NULL);
+    if (window == previous_top) {
+        _aes_redraw_window_title_states(NULL, _aes_find_top_window());
+    }
     return 1;
 }
 
@@ -503,18 +513,8 @@ WORD wind_set(WORD handle, WORD field, WORD w1, WORD w2, WORD w3, WORD w4)
         return _aes_wind_set_text(handle, field,
             (const char *) (intptr_t) w1);
     case WF_TOP:
-    {
-        aes_window_t *previous_top = _aes_find_top_window();
-
-        if (previous_top == window) {
-            break;
-        }
-
-        _aes_raise_window(window);
-        _aes_redraw_window_change(&window->outer, &window->outer);
-        _aes_redraw_window_title_states(previous_top, window);
+        _aes_top_window(window);
         break;
-    }
     case WF_WXYWH:
     case WF_CXYWH:
         window->previous_outer = window->outer;

@@ -94,69 +94,60 @@ static void _vdi_apply_mask(uint8_t *byte, uint8_t mask, WORD color)
     }
 }
 
-static WORD _vdi_fill_pattern_bit(WORD x, WORD y, WORD color)
+static const UWORD g_vdi_builtin_patterns[8][16] = {
+    {
+        0xffffu, 0xffffu, 0xffffu, 0xffffu,
+        0xffffu, 0xffffu, 0xffffu, 0xffffu,
+        0xffffu, 0xffffu, 0xffffu, 0xffffu,
+        0xffffu, 0xffffu, 0xffffu, 0xffffu
+    },
+    {
+        0xaaaau, 0x5555u, 0xaaaau, 0x5555u,
+        0xaaaau, 0x5555u, 0xaaaau, 0x5555u,
+        0xaaaau, 0x5555u, 0xaaaau, 0x5555u,
+        0xaaaau, 0x5555u, 0xaaaau, 0x5555u
+    },
+    {
+        0x8888u, 0x2222u, 0x8888u, 0x2222u,
+        0x8888u, 0x2222u, 0x8888u, 0x2222u,
+        0x8888u, 0x2222u, 0x8888u, 0x2222u,
+        0x8888u, 0x2222u, 0x8888u, 0x2222u
+    },
+    {
+        0xccccu, 0x3333u, 0xccccu, 0x3333u,
+        0xccccu, 0x3333u, 0xccccu, 0x3333u,
+        0xccccu, 0x3333u, 0xccccu, 0x3333u,
+        0xccccu, 0x3333u, 0xccccu, 0x3333u
+    },
+    {
+        0xf0f0u, 0x0f0fu, 0xf0f0u, 0x0f0fu,
+        0xf0f0u, 0x0f0fu, 0xf0f0u, 0x0f0fu,
+        0xf0f0u, 0x0f0fu, 0xf0f0u, 0x0f0fu,
+        0xf0f0u, 0x0f0fu, 0xf0f0u, 0x0f0fu
+    },
+    {
+        0xff00u, 0x0000u, 0xff00u, 0x0000u,
+        0xff00u, 0x0000u, 0xff00u, 0x0000u,
+        0xff00u, 0x0000u, 0xff00u, 0x0000u,
+        0xff00u, 0x0000u, 0xff00u, 0x0000u
+    },
+    {
+        0xffffu, 0x0000u, 0xffffu, 0x0000u,
+        0xffffu, 0x0000u, 0xffffu, 0x0000u,
+        0xffffu, 0x0000u, 0xffffu, 0x0000u,
+        0xffffu, 0x0000u, 0xffffu, 0x0000u
+    },
+    {
+        0x8080u, 0x0808u, 0x8080u, 0x0808u,
+        0x8080u, 0x0808u, 0x8080u, 0x0808u,
+        0x8080u, 0x0808u, 0x8080u, 0x0808u,
+        0x8080u, 0x0808u, 0x8080u, 0x0808u
+    }
+};
+
+static const UWORD *_vdi_fill_pattern_row(WORD y)
 {
-    static const UWORD builtin_patterns[8][16] = {
-        {
-            0xffffu, 0xffffu, 0xffffu, 0xffffu,
-            0xffffu, 0xffffu, 0xffffu, 0xffffu,
-            0xffffu, 0xffffu, 0xffffu, 0xffffu,
-            0xffffu, 0xffffu, 0xffffu, 0xffffu
-        },
-        {
-            0xaaaau, 0x5555u, 0xaaaau, 0x5555u,
-            0xaaaau, 0x5555u, 0xaaaau, 0x5555u,
-            0xaaaau, 0x5555u, 0xaaaau, 0x5555u,
-            0xaaaau, 0x5555u, 0xaaaau, 0x5555u
-        },
-        {
-            0x8888u, 0x2222u, 0x8888u, 0x2222u,
-            0x8888u, 0x2222u, 0x8888u, 0x2222u,
-            0x8888u, 0x2222u, 0x8888u, 0x2222u,
-            0x8888u, 0x2222u, 0x8888u, 0x2222u
-        },
-        {
-            0xccccu, 0x3333u, 0xccccu, 0x3333u,
-            0xccccu, 0x3333u, 0xccccu, 0x3333u,
-            0xccccu, 0x3333u, 0xccccu, 0x3333u,
-            0xccccu, 0x3333u, 0xccccu, 0x3333u
-        },
-        {
-            0xf0f0u, 0x0f0fu, 0xf0f0u, 0x0f0fu,
-            0xf0f0u, 0x0f0fu, 0xf0f0u, 0x0f0fu,
-            0xf0f0u, 0x0f0fu, 0xf0f0u, 0x0f0fu,
-            0xf0f0u, 0x0f0fu, 0xf0f0u, 0x0f0fu
-        },
-        {
-            0xff00u, 0x0000u, 0xff00u, 0x0000u,
-            0xff00u, 0x0000u, 0xff00u, 0x0000u,
-            0xff00u, 0x0000u, 0xff00u, 0x0000u,
-            0xff00u, 0x0000u, 0xff00u, 0x0000u
-        },
-        {
-            0xffffu, 0x0000u, 0xffffu, 0x0000u,
-            0xffffu, 0x0000u, 0xffffu, 0x0000u,
-            0xffffu, 0x0000u, 0xffffu, 0x0000u,
-            0xffffu, 0x0000u, 0xffffu, 0x0000u
-        },
-        {
-            0x8080u, 0x0808u, 0x8080u, 0x0808u,
-            0x8080u, 0x0808u, 0x8080u, 0x0808u,
-            0x8080u, 0x0808u, 0x8080u, 0x0808u,
-            0x8080u, 0x0808u, 0x8080u, 0x0808u
-        }
-    };
-    const UWORD *pattern = NULL;
-    WORD row_index;
-    WORD bit_on;
-
-    if (_vdi_compat.fill_interior == VDI_FILL_HOLLOW) {
-        return 0;
-    }
-
-    if (_vdi_compat.fill_interior == VDI_FILL_SOLID) {
-        return color;
-    }
+    const UWORD *pattern;
 
     if (_vdi_compat.fill_interior == VDI_FILL_USER) {
         pattern = (const UWORD *) _vdi_compat.fill_pattern;
@@ -166,18 +157,26 @@ static WORD _vdi_fill_pattern_bit(WORD x, WORD y, WORD color)
         if (style < 1 || style > 8) {
             style = 2;
         }
-        pattern = builtin_patterns[style - 1];
+        pattern = g_vdi_builtin_patterns[style - 1];
     }
+    return &pattern[(unsigned int) y & 15u];
+}
 
-    row_index = (WORD) ((unsigned int) y & 15u);
-    bit_on = (pattern[row_index] &
-        (UWORD) (0x8000u >> ((unsigned int) x & 15u))) != 0u;
+/* Expand a 16-bit GEM pattern word into two mono screen bytes (x&16). */
+static void _vdi_pattern_to_bytes(UWORD pat16, uint8_t out[2])
+{
+    int i;
 
-    if (bit_on != 0) {
-        return color;
+    out[0] = 0u;
+    out[1] = 0u;
+    for (i = 0; i < 8; ++i) {
+        if ((pat16 & (UWORD) (0x8000u >> i)) != 0u) {
+            out[0] |= (uint8_t) (0x80u >> i);
+        }
+        if ((pat16 & (UWORD) (0x8000u >> (i + 8))) != 0u) {
+            out[1] |= (uint8_t) (0x80u >> i);
+        }
     }
-
-    return (color != 0) ? 0 : 1;
 }
 
 static uint8_t _vdi_mfdb_sample_direct(const MFDB *mfdb, WORD x, WORD y)
@@ -421,6 +420,7 @@ void _vdi_draw_screen_hline_direct(WORD y, WORD left, WORD right, WORD color)
     if (row == NULL) {
         return;
     }
+    _vdi_mark_dirty(left, y, right, y);
     _vdi_hline_to_row(row, left, right, color);
 }
 
@@ -470,6 +470,7 @@ void _vdi_draw_line_segment(WORD x0, WORD y0, WORD x1, WORD y1, WORD color)
     }
 
     _vdi_prepare_screen_write();
+    _vdi_mark_dirty(x0, y0, x1, y1);
 
     if (y0 == y1) {
         _vdi_draw_screen_hline_direct(y0, x0, x1, color);
@@ -568,6 +569,7 @@ void _vdi_fill_rect(WORD x0, WORD y0, WORD x1, WORD y1, WORD color)
     }
 
     _vdi_prepare_screen_write();
+    _vdi_mark_dirty(rect.x0, rect.y0, rect.x1, rect.y1);
 
     mode = _vdi_write_mode();
     fill_mode = _vdi_compat.fill_interior;
@@ -579,7 +581,14 @@ void _vdi_fill_rect(WORD x0, WORD y0, WORD x1, WORD y1, WORD color)
     start_bit = (unsigned int) rect.x0 & 7u;
     end_bit = (unsigned int) rect.x1 & 7u;
 
-    if ((mode == 1 || mode == 4) && fill_mode == VDI_FILL_SOLID) {
+    left_mask = (uint8_t) (0xffu >> start_bit);
+    right_mask = (uint8_t) (0xffu << (7u - end_bit));
+
+    if (fill_mode == VDI_FILL_HOLLOW) {
+        return;
+    }
+
+    if (fill_mode == VDI_FILL_SOLID && (mode == 1 || mode == 4)) {
         fill_byte = (mode == 1 && color != 0) ? 0xffu : 0x00u;
 
         if (start_byte == 0 && end_byte == pitch - 1 &&
@@ -587,9 +596,6 @@ void _vdi_fill_rect(WORD x0, WORD y0, WORD x1, WORD y1, WORD color)
             memset(base, fill_byte, pitch * (size_t) height);
             return;
         }
-
-        left_mask = (uint8_t) (0xffu >> start_bit);
-        right_mask = (uint8_t) (0xffu << (7u - end_bit));
 
         if (start_byte == end_byte) {
             uint8_t mask = left_mask & right_mask;
@@ -623,15 +629,70 @@ void _vdi_fill_rect(WORD x0, WORD y0, WORD x1, WORD y1, WORD color)
         return;
     }
 
+    /*
+     * Patterned / XOR / OR fills: operate on mono shadow bytes. Never
+     * walk individual pixels for area fills.
+     */
     for (row = 0; row < height; ++row, base += pitch) {
         WORD y = (WORD) (rect.y0 + row);
-        WORD x;
+        UWORD pat16;
+        uint8_t pat_bytes[2];
+        size_t b;
 
-        for (x = rect.x0; x <= rect.x1; ++x) {
-            WORD pixel = _vdi_fill_pattern_bit(x, y, color);
+        if (fill_mode == VDI_FILL_SOLID) {
+            pat16 = 0xffffu;
+        } else {
+            pat16 = *_vdi_fill_pattern_row(y);
+        }
+        _vdi_pattern_to_bytes(pat16, pat_bytes);
 
-            _vdi_apply_mask(&base[(size_t) x / 8u],
-                _vdi_screen_mask_for_x(x), pixel);
+        for (b = start_byte; b <= end_byte; ++b) {
+            uint8_t span;
+            uint8_t pat;
+            uint8_t desired;
+
+            if (start_byte == end_byte) {
+                span = (uint8_t) (left_mask & right_mask);
+            } else if (b == start_byte) {
+                span = left_mask;
+            } else if (b == end_byte) {
+                span = right_mask;
+            } else {
+                span = 0xffu;
+            }
+
+            /* Pattern byte for absolute column group b*8 (16-bit period). */
+            pat = pat_bytes[(b & 1u) != 0u ? 1u : 0u];
+            /*
+             * Replace mode: pattern-on → color, pattern-off → opposite.
+             * That is desired = color ? pat : ~pat within span.
+             */
+            if (color != 0) {
+                desired = pat;
+            } else {
+                desired = (uint8_t) ~pat;
+            }
+
+            switch (mode) {
+            case 2: /* transparent / OR: only set where pattern wants ink */
+                if (color != 0) {
+                    base[b] |= (uint8_t) (pat & span);
+                }
+                break;
+            case 3: /* XOR */
+                if (color != 0) {
+                    base[b] ^= (uint8_t) (pat & span);
+                }
+                break;
+            case 4: /* erase */
+                base[b] &= (uint8_t) ~(span);
+                break;
+            case 1:
+            default: /* replace */
+                base[b] = (uint8_t) ((base[b] & (uint8_t) ~span) |
+                    (desired & span));
+                break;
+            }
         }
     }
 }

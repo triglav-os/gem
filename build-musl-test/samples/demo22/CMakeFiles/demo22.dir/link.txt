@@ -1,0 +1,1 @@
+/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/gcc -O3 -DNDEBUG CMakeFiles/demo22.dir/main.c.o -o /home/tstih/data/triglav-os/gem/bin/demos/demo22  -Wl,-rpath,"\$ORIGIN/../lib" /home/tstih/data/triglav-os/gem/bin/lib/libaes.so /home/tstih/data/triglav-os/gem/bin/lib/libvdi.so /home/tstih/data/triglav-os/gem/bin/lib/libplatform_linux.so -lm 

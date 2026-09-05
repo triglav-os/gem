@@ -1,0 +1,15 @@
+src/gem/CMakeFiles/gem.dir/client_objc.c.o: \
+ /home/tstih/data/triglav-os/gem/src/gem/client_objc.c \
+ /home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/include/stdc-predef.h \
+ /home/tstih/data/triglav-os/gem/src/gem/_gem.h \
+ /home/tstih/data/triglav-os/gem/include/gem/gem.h \
+ /home/tstih/data/triglav-os/gem/include/gem/aes.h \
+ /home/tstih/data/triglav-os/gem/include/gem/portab.h \
+ /home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/lib/gcc/x86_64-linux-musl/11.2.1/include/stdint.h \
+ /home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/include/stdint.h \
+ /home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/include/bits/alltypes.h \
+ /home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/include/bits/stdint.h \
+ /home/tstih/data/triglav-os/gem/include/gem/vdi.h \
+ /home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/lib/gcc/x86_64-linux-musl/11.2.1/include/stddef.h \
+ /home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/include/string.h \
+ /home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/include/features.h

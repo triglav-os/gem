@@ -558,8 +558,17 @@ int gem_os_pty_spawn_shell(gem_os_pty_t *pty,
         if (shell == NULL || shell[0] == '\0') {
             shell = getenv("SHELL");
         }
+        /*
+         * Prefer bash when nothing is requested: Gemix ships bash as
+         * the interactive shell, and a bare /bin/sh (dash/busybox)
+         * is a poor default for the GEM terminal.
+         */
         if (shell == NULL || shell[0] == '\0') {
-            shell = "/bin/sh";
+            if (access("/bin/bash", X_OK) == 0) {
+                shell = "/bin/bash";
+            } else {
+                shell = "/bin/sh";
+            }
         }
 
         (void) signal(SIGINT, SIG_DFL);

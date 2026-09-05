@@ -40,13 +40,22 @@ Configuration variables:
 - `GEM_LINUX_GRAB=1` exclusively grabs selected evdev devices. This is
   recommended for a dedicated distribution but inconvenient during
   development.
-- `GEM_VDI_WIDTH=640` and `GEM_VDI_HEIGHT=400` request a smaller GEM
-  desktop. Requests larger than the visible framebuffer are clamped.
+- `GEM_VDI_WIDTH` / `GEM_VDI_HEIGHT` request a desktop size. When unset
+  (or `0`), the desktop fills the visible framebuffer. Requests larger
+  than the framebuffer are clamped.
+- `GEM_LINUX_MOUSE_SCALE=8` multiplies relative (PS/2) mouse deltas.
+  Absolute devices (USB tablet) are preferred automatically when present.
+- `GEM_LINUX_KEEP_REL_MOUSE=1` keeps relative mice even when a tablet is
+  open (default is to drop them so they do not fight absolute input).
 - `GEM_RESOURCE_DIR=/opt/gemix/share/gem` overrides resource discovery.
 
 The framebuffer presenter accepts 1, 8, 16, 24, and 32 bits per pixel.
-VDI remains monochrome and converts black and white pixels to the native
-fbdev format.
+VDI remains monochrome and uses the **same shadow packing as rasta**.
+Only the Linux present step converts that buffer to fbdev pixels
+(set bit → black ink, clear → white paper — matching the rasta viewer).
+Do not change AES/VDI polarity for Linux; fix display only in
+`lib/platform/linux/raster.c`. Mouse motion re-blits the 16×16 cursor
+box; XOR rubber-band outlines flush their rectangle under `wind_update`.
 
 ## Example
 

@@ -65,7 +65,14 @@ typedef enum gem_rpc_opcode {
     GEM_RPC_WIND_CALC,
     GEM_RPC_MENU_BAR,
     GEM_RPC_MENU_TNORMAL,
-    GEM_RPC_MENU_CLICK
+    GEM_RPC_MENU_CLICK,
+    GEM_RPC_GRAF_MKSTATE,
+    GEM_RPC_VQT_FONTINFO,
+    GEM_RPC_SCRP_READ,
+    GEM_RPC_SCRP_WRITE,
+    GEM_RPC_FSEL_INPUT,
+    GEM_RPC_V_HIDE_C,
+    GEM_RPC_V_SHOW_C
 } gem_rpc_opcode_t;
 
 typedef struct gem_rpc_header {
@@ -136,6 +143,17 @@ typedef struct gem_rpc_opnvwk_rsp {
 typedef struct gem_rpc_handle_req {
     WORD handle;
 } gem_rpc_handle_req_t;
+
+/* Path buffers follow the hosted AES implementation's 1024-byte contract. */
+typedef struct gem_rpc_path {
+    char text[1024];
+} gem_rpc_path_t;
+
+typedef struct gem_rpc_fsel {
+    char path[1024];
+    char name[1024];
+    WORD button;
+} gem_rpc_fsel_t;
 
 typedef struct gem_rpc_color_req {
     WORD handle;
@@ -287,5 +305,11 @@ int gem_rpc_call(gem_rpc_opcode_t opcode,
                  int32_t *status,
                  void *response,
                  uint32_t response_size);
+
+/* Private transport configuration; defaults to the historical socket path. */
+const char *gem_rpc_socket_path(void);
+
+/* Reject incomplete, unknown or structurally unsafe requests before dispatch. */
+int gem_rpc_valid_request(uint16_t opcode, const void *payload, uint32_t size);
 
 #endif

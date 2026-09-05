@@ -1,0 +1,1 @@
+/usr/bin/cc -O3 -DNDEBUG CMakeFiles/clock.dir/clock.c.o CMakeFiles/clock.dir/_clock.c.o -o /home/tstih/data/triglav-os/gem/bin/apps/clock_hosted  -Wl,-rpath,"\$ORIGIN/../lib" /home/tstih/data/triglav-os/gem/bin/lib/libaes.so /home/tstih/data/triglav-os/gem/bin/lib/libvdi.so -lm /home/tstih/data/triglav-os/gem/bin/lib/libplatform_linux.so 

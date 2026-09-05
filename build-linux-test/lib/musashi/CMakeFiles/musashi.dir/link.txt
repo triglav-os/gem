@@ -1,0 +1,2 @@
+/usr/bin/ar qc ../../libmusashi.a CMakeFiles/musashi.dir/m68kcpu.c.o CMakeFiles/musashi.dir/m68kdasm.c.o CMakeFiles/musashi.dir/softfloat/softfloat.c.o CMakeFiles/musashi.dir/generated/m68kops.c.o
+/usr/bin/ranlib ../../libmusashi.a

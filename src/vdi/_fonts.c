@@ -723,6 +723,9 @@ void _vdi_draw_glyph(WORD x, WORD y, char ch, WORD color)
     }
 
     _vdi_prepare_screen_write();
+    _vdi_mark_dirty((WORD) (x + clip_col0), y,
+        (WORD) (x + clip_col1),
+        (WORD) (y + font->form_height - 1));
 
     for (row_index = 0; row_index < font->form_height; ++row_index) {
         WORD draw_y = (WORD) (y + row_index);

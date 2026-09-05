@@ -1,0 +1,1 @@
+/usr/bin/cc -O3 -DNDEBUG CMakeFiles/terminal.dir/main.c.o -o /home/tstih/data/triglav-os/gem/bin/apps/terminal  -Wl,-rpath,"\$ORIGIN/../lib" /home/tstih/data/triglav-os/gem/bin/lib/libgem.so /home/tstih/data/triglav-os/gem/bin/lib/libplatform_linux.so 

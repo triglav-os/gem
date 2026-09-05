@@ -41,6 +41,60 @@ void _vdi_pump_events(void)
 {
 }
 
+void _vdi_mark_dirty(WORD x0, WORD y0, WORD x1, WORD y1)
+{
+    WORD t;
+
+    if (!_vdi.open) {
+        return;
+    }
+    if (x0 > x1) {
+        t = x0;
+        x0 = x1;
+        x1 = t;
+    }
+    if (y0 > y1) {
+        t = y0;
+        y0 = y1;
+        y1 = t;
+    }
+    if (x0 < 0) {
+        x0 = 0;
+    }
+    if (y0 < 0) {
+        y0 = 0;
+    }
+    if (x1 >= _vdi.width) {
+        x1 = (WORD) (_vdi.width - 1);
+    }
+    if (y1 >= _vdi.height) {
+        y1 = (WORD) (_vdi.height - 1);
+    }
+    if (x0 > x1 || y0 > y1) {
+        return;
+    }
+    if (_vdi.dirty_valid == 0) {
+        _vdi.dirty_x0 = x0;
+        _vdi.dirty_y0 = y0;
+        _vdi.dirty_x1 = x1;
+        _vdi.dirty_y1 = y1;
+        _vdi.dirty_valid = 1;
+        return;
+    }
+    if (x0 < _vdi.dirty_x0) {
+        _vdi.dirty_x0 = x0;
+    }
+    if (y0 < _vdi.dirty_y0) {
+        _vdi.dirty_y0 = y0;
+    }
+    if (x1 > _vdi.dirty_x1) {
+        _vdi.dirty_x1 = x1;
+    }
+    if (y1 > _vdi.dirty_y1) {
+        _vdi.dirty_y1 = y1;
+    }
+}
+
 void _vdi_begin_update(void)
 {
     ++_vdi.update_depth;
@@ -58,6 +112,43 @@ void _vdi_end_update(void)
         _vdi_present_screen();
     }
     _vdi_pump_events();
+}
+
+void _vdi_end_update_no_present(void)
+{
+    if (_vdi.update_depth <= 0) {
+        return;
+    }
+    --_vdi.update_depth;
+    /* A partial inner flush must not cancel the outer batch's pending
+     * presentation (for example, restoring a popup then drawing its seam).
+     */
+    if (_vdi.update_depth == 0) {
+        _vdi.present_pending = 0;
+    }
+}
+
+void _vdi_flush_rect(WORD x, WORD y, WORD w, WORD h)
+{
+    /*
+     * Push a rectangle to the physical display even while wind_update /
+     * begin_update has deferred normal presents. Used for XOR rubber-band
+     * feedback (window drag, scrollers) and clipped region redraws.
+     */
+    if (!_vdi.open || w <= 0 || h <= 0) {
+        return;
+    }
+    gem_raster_present_rect((int) x, (int) y, (int) w, (int) h);
+}
+
+void _vdi_flush_display(void)
+{
+    if (!_vdi.open) {
+        return;
+    }
+    _vdi.present_pending = 0;
+    _vdi.dirty_valid = 0;
+    gem_raster_present();
 }
 
 void _vdi_fill_work_out(WORD work_out[57])

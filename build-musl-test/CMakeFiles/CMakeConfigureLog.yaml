@@ -1,0 +1,239 @@
+
+---
+events:
+  -
+    kind: "message-v1"
+    backtrace:
+      - "/usr/share/cmake-3.28/Modules/CMakeDetermineSystem.cmake:233 (message)"
+      - "CMakeLists.txt:3 (project)"
+    message: |
+      The system is: Linux - 7.0.0-28-generic - x86_64
+  -
+    kind: "message-v1"
+    backtrace:
+      - "/usr/share/cmake-3.28/Modules/CMakeDetermineCompilerId.cmake:17 (message)"
+      - "/usr/share/cmake-3.28/Modules/CMakeDetermineCompilerId.cmake:64 (__determine_compiler_id_test)"
+      - "/usr/share/cmake-3.28/Modules/CMakeDetermineCCompiler.cmake:123 (CMAKE_DETERMINE_COMPILER_ID)"
+      - "CMakeLists.txt:3 (project)"
+    message: |
+      Compiling the C compiler identification source file "CMakeCCompilerId.c" succeeded.
+      Compiler: /home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/gcc 
+      Build flags: 
+      Id flags:  
+      
+      The output was:
+      0
+      
+      
+      Compilation of the C compiler identification source "CMakeCCompilerId.c" produced "a.out"
+      
+      The C compiler identification is GNU, found in:
+        /home/tstih/data/triglav-os/gem/build-musl-test/CMakeFiles/3.28.3/CompilerIdC/a.out
+      
+  -
+    kind: "try_compile-v1"
+    backtrace:
+      - "/usr/share/cmake-3.28/Modules/CMakeDetermineCompilerABI.cmake:57 (try_compile)"
+      - "/usr/share/cmake-3.28/Modules/CMakeTestCCompiler.cmake:26 (CMAKE_DETERMINE_COMPILER_ABI)"
+      - "CMakeLists.txt:3 (project)"
+    checks:
+      - "Detecting C compiler ABI info"
+    directories:
+      source: "/home/tstih/data/triglav-os/gem/build-musl-test/CMakeFiles/CMakeScratch/TryCompile-G6o5q1"
+      binary: "/home/tstih/data/triglav-os/gem/build-musl-test/CMakeFiles/CMakeScratch/TryCompile-G6o5q1"
+    cmakeVariables:
+      CMAKE_C_FLAGS: ""
+      CMAKE_C_FLAGS_DEBUG: "-g"
+      CMAKE_EXE_LINKER_FLAGS: ""
+    buildResult:
+      variable: "CMAKE_C_ABI_COMPILED"
+      cached: true
+      stdout: |
+        Change Dir: '/home/tstih/data/triglav-os/gem/build-musl-test/CMakeFiles/CMakeScratch/TryCompile-G6o5q1'
+        
+        Run Build Command(s): /usr/bin/cmake -E env VERBOSE=1 /usr/bin/gmake -f Makefile cmTC_cbccb/fast
+        /usr/bin/gmake  -f CMakeFiles/cmTC_cbccb.dir/build.make CMakeFiles/cmTC_cbccb.dir/build
+        gmake[1]: Entering directory '/home/tstih/data/triglav-os/gem/build-musl-test/CMakeFiles/CMakeScratch/TryCompile-G6o5q1'
+        Building C object CMakeFiles/cmTC_cbccb.dir/CMakeCCompilerABI.c.o
+        /home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/gcc   -v -o CMakeFiles/cmTC_cbccb.dir/CMakeCCompilerABI.c.o -c /usr/share/cmake-3.28/Modules/CMakeCCompilerABI.c
+        Using built-in specs.
+        COLLECT_GCC=/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/gcc
+        Target: x86_64-linux-musl
+        Configured with: ../src_gcc/configure --enable-languages=c,c++,fortran CC='x86_64-linux-musl-gcc -static --static' CXX='x86_64-linux-musl-g++ -static --static' FC='x86_64-linux-musl-gfortran -static --static' CFLAGS='-g0 -O2 -fno-align-functions -fno-align-jumps -fno-align-loops -fno-align-labels -Wno-error' CXXFLAGS='-g0 -O2 -fno-align-functions -fno-align-jumps -fno-align-loops -fno-align-labels -Wno-error' FFLAGS='-g0 -O2 -fno-align-functions -fno-align-jumps -fno-align-loops -fno-align-labels -Wno-error' LDFLAGS='-s -static --static' --enable-default-pie --enable-static-pie --disable-cet --disable-bootstrap --disable-assembly --disable-werror --target=x86_64-linux-musl --prefix= --libdir=/lib --disable-multilib --with-sysroot=/ --enable-tls --disable-libmudflap --disable-libsanitizer --disable-gnu-indirect-function --disable-libmpx --enable-initfini-array --enable-libstdcxx-time=rt --enable-deterministic-archives --enable-libstdcxx-time --enable-libquadmath --enable-libquadmath-support --disable-decimal-float --build=x86_64-pc-linux-muslxx --host=x86_64-linux-musl
+        Thread model: posix
+        Supported LTO compression algorithms: zlib
+        gcc version 11.2.1 20211120 (GCC) 
+        COLLECT_GCC_OPTIONS='-v' '-o' 'CMakeFiles/cmTC_cbccb.dir/CMakeCCompilerABI.c.o' '-c' '-mtune=generic' '-march=x86-64' '-dumpdir' 'CMakeFiles/cmTC_cbccb.dir/'
+         /home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../libexec/gcc/x86_64-linux-musl/11.2.1/cc1 -quiet -v -iprefix /home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/gcc/x86_64-linux-musl/11.2.1/ -isysroot /home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../ /usr/share/cmake-3.28/Modules/CMakeCCompilerABI.c -quiet -dumpdir CMakeFiles/cmTC_cbccb.dir/ -dumpbase CMakeCCompilerABI.c.c -dumpbase-ext .c -mtune=generic -march=x86-64 -version -o /tmp/ccgHEnEM.s
+        GNU C17 (GCC) version 11.2.1 20211120 (x86_64-linux-musl)
+        	compiled by GNU C version 11.2.1 20211120, GMP version 6.2.1, MPFR version 4.1.0, MPC version 1.2.1, isl version none
+        GGC heuristics: --param ggc-min-expand=100 --param ggc-min-heapsize=131072
+        ignoring nonexistent directory "/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/gcc/x86_64-linux-musl/11.2.1/../../../../x86_64-linux-musl/include"
+        ignoring nonexistent directory "/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../usr/local/include"
+        ignoring nonexistent directory "/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/gcc/../../lib/gcc/x86_64-linux-musl/11.2.1/../../../../x86_64-linux-musl/include"
+        ignoring duplicate directory "/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/gcc/../../lib/gcc/x86_64-linux-musl/11.2.1/include"
+        #include "..." search starts here:
+        #include <...> search starts here:
+         /home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/gcc/x86_64-linux-musl/11.2.1/include
+         /home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../usr/include
+        End of search list.
+        GNU C17 (GCC) version 11.2.1 20211120 (x86_64-linux-musl)
+        	compiled by GNU C version 11.2.1 20211120, GMP version 6.2.1, MPFR version 4.1.0, MPC version 1.2.1, isl version none
+        GGC heuristics: --param ggc-min-expand=100 --param ggc-min-heapsize=131072
+        Compiler executable checksum: 6afd79366a7640c595f30555689aafce
+        COLLECT_GCC_OPTIONS='-v' '-o' 'CMakeFiles/cmTC_cbccb.dir/CMakeCCompilerABI.c.o' '-c' '-mtune=generic' '-march=x86-64' '-dumpdir' 'CMakeFiles/cmTC_cbccb.dir/'
+         /home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/gcc/x86_64-linux-musl/11.2.1/../../../../x86_64-linux-musl/bin/as -v --64 -o CMakeFiles/cmTC_cbccb.dir/CMakeCCompilerABI.c.o /tmp/ccgHEnEM.s
+        GNU assembler version 2.37 (x86_64-linux-musl) using BFD version (GNU Binutils) 2.37
+        COMPILER_PATH=/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../libexec/gcc/x86_64-linux-musl/11.2.1/:/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../libexec/gcc/:/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/gcc/x86_64-linux-musl/11.2.1/../../../../x86_64-linux-musl/bin/
+        LIBRARY_PATH=/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/gcc/x86_64-linux-musl/11.2.1/:/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/gcc/:/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/gcc/x86_64-linux-musl/11.2.1/../../../../x86_64-linux-musl/lib/:/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/gcc/x86_64-linux-musl/11.2.1/../../../:/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/:/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../usr/lib/
+        COLLECT_GCC_OPTIONS='-v' '-o' 'CMakeFiles/cmTC_cbccb.dir/CMakeCCompilerABI.c.o' '-c' '-mtune=generic' '-march=x86-64' '-dumpdir' 'CMakeFiles/cmTC_cbccb.dir/CMakeCCompilerABI.c.'
+        Linking C executable cmTC_cbccb
+        /usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_cbccb.dir/link.txt --verbose=1
+        /home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/gcc  -v CMakeFiles/cmTC_cbccb.dir/CMakeCCompilerABI.c.o -o cmTC_cbccb 
+        Using built-in specs.
+        COLLECT_GCC=/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/gcc
+        COLLECT_LTO_WRAPPER=/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../libexec/gcc/x86_64-linux-musl/11.2.1/lto-wrapper
+        Target: x86_64-linux-musl
+        Configured with: ../src_gcc/configure --enable-languages=c,c++,fortran CC='x86_64-linux-musl-gcc -static --static' CXX='x86_64-linux-musl-g++ -static --static' FC='x86_64-linux-musl-gfortran -static --static' CFLAGS='-g0 -O2 -fno-align-functions -fno-align-jumps -fno-align-loops -fno-align-labels -Wno-error' CXXFLAGS='-g0 -O2 -fno-align-functions -fno-align-jumps -fno-align-loops -fno-align-labels -Wno-error' FFLAGS='-g0 -O2 -fno-align-functions -fno-align-jumps -fno-align-loops -fno-align-labels -Wno-error' LDFLAGS='-s -static --static' --enable-default-pie --enable-static-pie --disable-cet --disable-bootstrap --disable-assembly --disable-werror --target=x86_64-linux-musl --prefix= --libdir=/lib --disable-multilib --with-sysroot=/ --enable-tls --disable-libmudflap --disable-libsanitizer --disable-gnu-indirect-function --disable-libmpx --enable-initfini-array --enable-libstdcxx-time=rt --enable-deterministic-archives --enable-libstdcxx-time --enable-libquadmath --enable-libquadmath-support --disable-decimal-float --build=x86_64-pc-linux-muslxx --host=x86_64-linux-musl
+        Thread model: posix
+        Supported LTO compression algorithms: zlib
+        gcc version 11.2.1 20211120 (GCC) 
+        COMPILER_PATH=/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../libexec/gcc/x86_64-linux-musl/11.2.1/:/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../libexec/gcc/:/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/gcc/x86_64-linux-musl/11.2.1/../../../../x86_64-linux-musl/bin/
+        LIBRARY_PATH=/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/gcc/x86_64-linux-musl/11.2.1/:/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/gcc/:/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/gcc/x86_64-linux-musl/11.2.1/../../../../x86_64-linux-musl/lib/:/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/gcc/x86_64-linux-musl/11.2.1/../../../:/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/:/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../usr/lib/
+        COLLECT_GCC_OPTIONS='-v' '-o' 'cmTC_cbccb' '-mtune=generic' '-march=x86-64' '-dumpdir' 'cmTC_cbccb.'
+         /home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../libexec/gcc/x86_64-linux-musl/11.2.1/collect2 --sysroot=/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../ --eh-frame-hdr -m elf_x86_64 -dynamic-linker /lib/ld-musl-x86_64.so.1 -pie -o cmTC_cbccb /home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/gcc/x86_64-linux-musl/11.2.1/../../../Scrt1.o /home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/gcc/x86_64-linux-musl/11.2.1/../../../crti.o /home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/gcc/x86_64-linux-musl/11.2.1/crtbeginS.o -L/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/gcc/x86_64-linux-musl/11.2.1 -L/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/gcc -L/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/gcc/x86_64-linux-musl/11.2.1/../../../../x86_64-linux-musl/lib -L/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/gcc/x86_64-linux-musl/11.2.1/../../.. -L/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib -L/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../usr/lib CMakeFiles/cmTC_cbccb.dir/CMakeCCompilerABI.c.o -lgcc --push-state --as-needed -lgcc_s --pop-state -lc -lgcc --push-state --as-needed -lgcc_s --pop-state /home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/gcc/x86_64-linux-musl/11.2.1/crtendS.o /home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/gcc/x86_64-linux-musl/11.2.1/../../../crtn.o
+        COLLECT_GCC_OPTIONS='-v' '-o' 'cmTC_cbccb' '-mtune=generic' '-march=x86-64' '-dumpdir' 'cmTC_cbccb.'
+        gmake[1]: Leaving directory '/home/tstih/data/triglav-os/gem/build-musl-test/CMakeFiles/CMakeScratch/TryCompile-G6o5q1'
+        
+      exitCode: 0
+  -
+    kind: "message-v1"
+    backtrace:
+      - "/usr/share/cmake-3.28/Modules/CMakeDetermineCompilerABI.cmake:127 (message)"
+      - "/usr/share/cmake-3.28/Modules/CMakeTestCCompiler.cmake:26 (CMAKE_DETERMINE_COMPILER_ABI)"
+      - "CMakeLists.txt:3 (project)"
+    message: |
+      Parsed C implicit include dir info: rv=done
+        found start of include info
+        found start of implicit include info
+          add: [/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/gcc/x86_64-linux-musl/11.2.1/include]
+          add: [/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../usr/include]
+        end of search list found
+        collapse include dir [/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/gcc/x86_64-linux-musl/11.2.1/include] ==> [/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/lib/gcc/x86_64-linux-musl/11.2.1/include]
+        collapse include dir [/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../usr/include] ==> [/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/usr/include]
+        implicit include dirs: [/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/lib/gcc/x86_64-linux-musl/11.2.1/include;/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/usr/include]
+      
+      
+  -
+    kind: "message-v1"
+    backtrace:
+      - "/usr/share/cmake-3.28/Modules/CMakeDetermineCompilerABI.cmake:159 (message)"
+      - "/usr/share/cmake-3.28/Modules/CMakeTestCCompiler.cmake:26 (CMAKE_DETERMINE_COMPILER_ABI)"
+      - "CMakeLists.txt:3 (project)"
+    message: |
+      Parsed C implicit link information:
+        link line regex: [^( *|.*[/\\])(ld|CMAKE_LINK_STARTFILE-NOTFOUND|([^/\\]+-)?ld|collect2)[^/\\]*( |$)]
+        ignore line: [Change Dir: '/home/tstih/data/triglav-os/gem/build-musl-test/CMakeFiles/CMakeScratch/TryCompile-G6o5q1']
+        ignore line: []
+        ignore line: [Run Build Command(s): /usr/bin/cmake -E env VERBOSE=1 /usr/bin/gmake -f Makefile cmTC_cbccb/fast]
+        ignore line: [/usr/bin/gmake  -f CMakeFiles/cmTC_cbccb.dir/build.make CMakeFiles/cmTC_cbccb.dir/build]
+        ignore line: [gmake[1]: Entering directory '/home/tstih/data/triglav-os/gem/build-musl-test/CMakeFiles/CMakeScratch/TryCompile-G6o5q1']
+        ignore line: [Building C object CMakeFiles/cmTC_cbccb.dir/CMakeCCompilerABI.c.o]
+        ignore line: [/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/gcc   -v -o CMakeFiles/cmTC_cbccb.dir/CMakeCCompilerABI.c.o -c /usr/share/cmake-3.28/Modules/CMakeCCompilerABI.c]
+        ignore line: [Using built-in specs.]
+        ignore line: [COLLECT_GCC=/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/gcc]
+        ignore line: [Target: x86_64-linux-musl]
+        ignore line: [Configured with: ../src_gcc/configure --enable-languages=c c++ fortran CC='x86_64-linux-musl-gcc -static --static' CXX='x86_64-linux-musl-g++ -static --static' FC='x86_64-linux-musl-gfortran -static --static' CFLAGS='-g0 -O2 -fno-align-functions -fno-align-jumps -fno-align-loops -fno-align-labels -Wno-error' CXXFLAGS='-g0 -O2 -fno-align-functions -fno-align-jumps -fno-align-loops -fno-align-labels -Wno-error' FFLAGS='-g0 -O2 -fno-align-functions -fno-align-jumps -fno-align-loops -fno-align-labels -Wno-error' LDFLAGS='-s -static --static' --enable-default-pie --enable-static-pie --disable-cet --disable-bootstrap --disable-assembly --disable-werror --target=x86_64-linux-musl --prefix= --libdir=/lib --disable-multilib --with-sysroot=/ --enable-tls --disable-libmudflap --disable-libsanitizer --disable-gnu-indirect-function --disable-libmpx --enable-initfini-array --enable-libstdcxx-time=rt --enable-deterministic-archives --enable-libstdcxx-time --enable-libquadmath --enable-libquadmath-support --disable-decimal-float --build=x86_64-pc-linux-muslxx --host=x86_64-linux-musl]
+        ignore line: [Thread model: posix]
+        ignore line: [Supported LTO compression algorithms: zlib]
+        ignore line: [gcc version 11.2.1 20211120 (GCC) ]
+        ignore line: [COLLECT_GCC_OPTIONS='-v' '-o' 'CMakeFiles/cmTC_cbccb.dir/CMakeCCompilerABI.c.o' '-c' '-mtune=generic' '-march=x86-64' '-dumpdir' 'CMakeFiles/cmTC_cbccb.dir/']
+        ignore line: [ /home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../libexec/gcc/x86_64-linux-musl/11.2.1/cc1 -quiet -v -iprefix /home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/gcc/x86_64-linux-musl/11.2.1/ -isysroot /home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../ /usr/share/cmake-3.28/Modules/CMakeCCompilerABI.c -quiet -dumpdir CMakeFiles/cmTC_cbccb.dir/ -dumpbase CMakeCCompilerABI.c.c -dumpbase-ext .c -mtune=generic -march=x86-64 -version -o /tmp/ccgHEnEM.s]
+        ignore line: [GNU C17 (GCC) version 11.2.1 20211120 (x86_64-linux-musl)]
+        ignore line: [	compiled by GNU C version 11.2.1 20211120  GMP version 6.2.1  MPFR version 4.1.0  MPC version 1.2.1  isl version none]
+        ignore line: [GGC heuristics: --param ggc-min-expand=100 --param ggc-min-heapsize=131072]
+        ignore line: [ignoring nonexistent directory "/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/gcc/x86_64-linux-musl/11.2.1/../../../../x86_64-linux-musl/include"]
+        ignore line: [ignoring nonexistent directory "/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../usr/local/include"]
+        ignore line: [ignoring nonexistent directory "/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/gcc/../../lib/gcc/x86_64-linux-musl/11.2.1/../../../../x86_64-linux-musl/include"]
+        ignore line: [ignoring duplicate directory "/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/gcc/../../lib/gcc/x86_64-linux-musl/11.2.1/include"]
+        ignore line: [#include "..." search starts here:]
+        ignore line: [#include <...> search starts here:]
+        ignore line: [ /home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/gcc/x86_64-linux-musl/11.2.1/include]
+        ignore line: [ /home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../usr/include]
+        ignore line: [End of search list.]
+        ignore line: [GNU C17 (GCC) version 11.2.1 20211120 (x86_64-linux-musl)]
+        ignore line: [	compiled by GNU C version 11.2.1 20211120  GMP version 6.2.1  MPFR version 4.1.0  MPC version 1.2.1  isl version none]
+        ignore line: [GGC heuristics: --param ggc-min-expand=100 --param ggc-min-heapsize=131072]
+        ignore line: [Compiler executable checksum: 6afd79366a7640c595f30555689aafce]
+        ignore line: [COLLECT_GCC_OPTIONS='-v' '-o' 'CMakeFiles/cmTC_cbccb.dir/CMakeCCompilerABI.c.o' '-c' '-mtune=generic' '-march=x86-64' '-dumpdir' 'CMakeFiles/cmTC_cbccb.dir/']
+        ignore line: [ /home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/gcc/x86_64-linux-musl/11.2.1/../../../../x86_64-linux-musl/bin/as -v --64 -o CMakeFiles/cmTC_cbccb.dir/CMakeCCompilerABI.c.o /tmp/ccgHEnEM.s]
+        ignore line: [GNU assembler version 2.37 (x86_64-linux-musl) using BFD version (GNU Binutils) 2.37]
+        ignore line: [COMPILER_PATH=/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../libexec/gcc/x86_64-linux-musl/11.2.1/:/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../libexec/gcc/:/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/gcc/x86_64-linux-musl/11.2.1/../../../../x86_64-linux-musl/bin/]
+        ignore line: [LIBRARY_PATH=/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/gcc/x86_64-linux-musl/11.2.1/:/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/gcc/:/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/gcc/x86_64-linux-musl/11.2.1/../../../../x86_64-linux-musl/lib/:/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/gcc/x86_64-linux-musl/11.2.1/../../../:/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/:/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../usr/lib/]
+        ignore line: [COLLECT_GCC_OPTIONS='-v' '-o' 'CMakeFiles/cmTC_cbccb.dir/CMakeCCompilerABI.c.o' '-c' '-mtune=generic' '-march=x86-64' '-dumpdir' 'CMakeFiles/cmTC_cbccb.dir/CMakeCCompilerABI.c.']
+        ignore line: [Linking C executable cmTC_cbccb]
+        ignore line: [/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_cbccb.dir/link.txt --verbose=1]
+        ignore line: [/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/gcc  -v CMakeFiles/cmTC_cbccb.dir/CMakeCCompilerABI.c.o -o cmTC_cbccb ]
+        ignore line: [Using built-in specs.]
+        ignore line: [COLLECT_GCC=/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/gcc]
+        ignore line: [COLLECT_LTO_WRAPPER=/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../libexec/gcc/x86_64-linux-musl/11.2.1/lto-wrapper]
+        ignore line: [Target: x86_64-linux-musl]
+        ignore line: [Configured with: ../src_gcc/configure --enable-languages=c c++ fortran CC='x86_64-linux-musl-gcc -static --static' CXX='x86_64-linux-musl-g++ -static --static' FC='x86_64-linux-musl-gfortran -static --static' CFLAGS='-g0 -O2 -fno-align-functions -fno-align-jumps -fno-align-loops -fno-align-labels -Wno-error' CXXFLAGS='-g0 -O2 -fno-align-functions -fno-align-jumps -fno-align-loops -fno-align-labels -Wno-error' FFLAGS='-g0 -O2 -fno-align-functions -fno-align-jumps -fno-align-loops -fno-align-labels -Wno-error' LDFLAGS='-s -static --static' --enable-default-pie --enable-static-pie --disable-cet --disable-bootstrap --disable-assembly --disable-werror --target=x86_64-linux-musl --prefix= --libdir=/lib --disable-multilib --with-sysroot=/ --enable-tls --disable-libmudflap --disable-libsanitizer --disable-gnu-indirect-function --disable-libmpx --enable-initfini-array --enable-libstdcxx-time=rt --enable-deterministic-archives --enable-libstdcxx-time --enable-libquadmath --enable-libquadmath-support --disable-decimal-float --build=x86_64-pc-linux-muslxx --host=x86_64-linux-musl]
+        ignore line: [Thread model: posix]
+        ignore line: [Supported LTO compression algorithms: zlib]
+        ignore line: [gcc version 11.2.1 20211120 (GCC) ]
+        ignore line: [COMPILER_PATH=/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../libexec/gcc/x86_64-linux-musl/11.2.1/:/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../libexec/gcc/:/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/gcc/x86_64-linux-musl/11.2.1/../../../../x86_64-linux-musl/bin/]
+        ignore line: [LIBRARY_PATH=/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/gcc/x86_64-linux-musl/11.2.1/:/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/gcc/:/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/gcc/x86_64-linux-musl/11.2.1/../../../../x86_64-linux-musl/lib/:/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/gcc/x86_64-linux-musl/11.2.1/../../../:/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/:/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../usr/lib/]
+        ignore line: [COLLECT_GCC_OPTIONS='-v' '-o' 'cmTC_cbccb' '-mtune=generic' '-march=x86-64' '-dumpdir' 'cmTC_cbccb.']
+        link line: [ /home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../libexec/gcc/x86_64-linux-musl/11.2.1/collect2 --sysroot=/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../ --eh-frame-hdr -m elf_x86_64 -dynamic-linker /lib/ld-musl-x86_64.so.1 -pie -o cmTC_cbccb /home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/gcc/x86_64-linux-musl/11.2.1/../../../Scrt1.o /home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/gcc/x86_64-linux-musl/11.2.1/../../../crti.o /home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/gcc/x86_64-linux-musl/11.2.1/crtbeginS.o -L/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/gcc/x86_64-linux-musl/11.2.1 -L/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/gcc -L/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/gcc/x86_64-linux-musl/11.2.1/../../../../x86_64-linux-musl/lib -L/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/gcc/x86_64-linux-musl/11.2.1/../../.. -L/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib -L/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../usr/lib CMakeFiles/cmTC_cbccb.dir/CMakeCCompilerABI.c.o -lgcc --push-state --as-needed -lgcc_s --pop-state -lc -lgcc --push-state --as-needed -lgcc_s --pop-state /home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/gcc/x86_64-linux-musl/11.2.1/crtendS.o /home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/gcc/x86_64-linux-musl/11.2.1/../../../crtn.o]
+          arg [/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../libexec/gcc/x86_64-linux-musl/11.2.1/collect2] ==> ignore
+          arg [--sysroot=/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../] ==> ignore
+          arg [--eh-frame-hdr] ==> ignore
+          arg [-m] ==> ignore
+          arg [elf_x86_64] ==> ignore
+          arg [-dynamic-linker] ==> ignore
+          arg [/lib/ld-musl-x86_64.so.1] ==> ignore
+          arg [-pie] ==> ignore
+          arg [-o] ==> ignore
+          arg [cmTC_cbccb] ==> ignore
+          arg [/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/gcc/x86_64-linux-musl/11.2.1/../../../Scrt1.o] ==> obj [/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/gcc/x86_64-linux-musl/11.2.1/../../../Scrt1.o]
+          arg [/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/gcc/x86_64-linux-musl/11.2.1/../../../crti.o] ==> obj [/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/gcc/x86_64-linux-musl/11.2.1/../../../crti.o]
+          arg [/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/gcc/x86_64-linux-musl/11.2.1/crtbeginS.o] ==> obj [/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/gcc/x86_64-linux-musl/11.2.1/crtbeginS.o]
+          arg [-L/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/gcc/x86_64-linux-musl/11.2.1] ==> dir [/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/gcc/x86_64-linux-musl/11.2.1]
+          arg [-L/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/gcc] ==> dir [/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/gcc]
+          arg [-L/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/gcc/x86_64-linux-musl/11.2.1/../../../../x86_64-linux-musl/lib] ==> dir [/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/gcc/x86_64-linux-musl/11.2.1/../../../../x86_64-linux-musl/lib]
+          arg [-L/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/gcc/x86_64-linux-musl/11.2.1/../../..] ==> dir [/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/gcc/x86_64-linux-musl/11.2.1/../../..]
+          arg [-L/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib] ==> dir [/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib]
+          arg [-L/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../usr/lib] ==> dir [/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../usr/lib]
+          arg [CMakeFiles/cmTC_cbccb.dir/CMakeCCompilerABI.c.o] ==> ignore
+          arg [-lgcc] ==> lib [gcc]
+          arg [--push-state] ==> ignore
+          arg [--as-needed] ==> ignore
+          arg [-lgcc_s] ==> lib [gcc_s]
+          arg [--pop-state] ==> ignore
+          arg [-lc] ==> lib [c]
+          arg [-lgcc] ==> lib [gcc]
+          arg [--push-state] ==> ignore
+          arg [--as-needed] ==> ignore
+          arg [-lgcc_s] ==> lib [gcc_s]
+          arg [--pop-state] ==> ignore
+          arg [/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/gcc/x86_64-linux-musl/11.2.1/crtendS.o] ==> obj [/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/gcc/x86_64-linux-musl/11.2.1/crtendS.o]
+          arg [/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/gcc/x86_64-linux-musl/11.2.1/../../../crtn.o] ==> obj [/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/gcc/x86_64-linux-musl/11.2.1/../../../crtn.o]
+        collapse obj [/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/gcc/x86_64-linux-musl/11.2.1/../../../Scrt1.o] ==> [/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/lib/Scrt1.o]
+        collapse obj [/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/gcc/x86_64-linux-musl/11.2.1/../../../crti.o] ==> [/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/lib/crti.o]
+        collapse obj [/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/gcc/x86_64-linux-musl/11.2.1/crtbeginS.o] ==> [/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/lib/gcc/x86_64-linux-musl/11.2.1/crtbeginS.o]
+        collapse obj [/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/gcc/x86_64-linux-musl/11.2.1/crtendS.o] ==> [/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/lib/gcc/x86_64-linux-musl/11.2.1/crtendS.o]
+        collapse obj [/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/gcc/x86_64-linux-musl/11.2.1/../../../crtn.o] ==> [/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/lib/crtn.o]
+        collapse library dir [/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/gcc/x86_64-linux-musl/11.2.1] ==> [/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/lib/gcc/x86_64-linux-musl/11.2.1]
+        collapse library dir [/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/gcc] ==> [/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/lib/gcc]
+        collapse library dir [/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/gcc/x86_64-linux-musl/11.2.1/../../../../x86_64-linux-musl/lib] ==> [/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/x86_64-linux-musl/lib]
+        collapse library dir [/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib/gcc/x86_64-linux-musl/11.2.1/../../..] ==> [/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/lib]
+        collapse library dir [/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../lib] ==> [/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/lib]
+        collapse library dir [/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/../usr/lib] ==> [/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/usr/lib]
+        implicit libs: [gcc;gcc_s;c;gcc;gcc_s]
+        implicit objs: [/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/lib/Scrt1.o;/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/lib/crti.o;/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/lib/gcc/x86_64-linux-musl/11.2.1/crtbeginS.o;/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/lib/gcc/x86_64-linux-musl/11.2.1/crtendS.o;/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/lib/crtn.o]
+        implicit dirs: [/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/lib/gcc/x86_64-linux-musl/11.2.1;/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/lib/gcc;/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/x86_64-linux-musl/lib;/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/lib;/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/usr/lib]
+        implicit fwks: []
+      
+      
+...

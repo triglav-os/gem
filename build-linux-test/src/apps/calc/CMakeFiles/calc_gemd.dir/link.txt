@@ -1,0 +1,1 @@
+/usr/bin/cc -O3 -DNDEBUG CMakeFiles/calc_gemd.dir/calc.c.o CMakeFiles/calc_gemd.dir/_calc.c.o -o /home/tstih/data/triglav-os/gem/bin/apps/calc  -Wl,-rpath,"\$ORIGIN/../lib" /home/tstih/data/triglav-os/gem/bin/lib/libgem.so /home/tstih/data/triglav-os/gem/bin/lib/libplatform_linux.so 

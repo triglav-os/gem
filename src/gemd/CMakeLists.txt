@@ -1,5 +1,6 @@
 add_executable(gemd
     main.c
+    ../gem/protocol.c
 )
 
 target_include_directories(gemd

@@ -27,13 +27,24 @@ int _vdi_compat_initialized;
 
 WORD _vdi_color_to_pixel(WORD color_index)
 {
+    /*
+     * Same mapping rasta uses: WHITE(0)→1, BLACK(1)→0 in the mono
+     * shadow. Rasta displays that buffer directly (set bit = black ink).
+     * Linux must not change this — only the FB present converter adapts.
+     */
     return (color_index == 0) ? 1 : 0;
 }
 
 VOID v_opnvwk(WORD work_in[11], VDI_HANDLE *handle, WORD work_out[57])
 {
+#if defined(GEM_PLATFORM_LINUX)
+    /* 0 = fill the native framebuffer (see linux gem_raster_init). */
+    WORD width = _vdi_parse_env_word("GEM_VDI_WIDTH", 0);
+    WORD height = _vdi_parse_env_word("GEM_VDI_HEIGHT", 0);
+#else
     WORD width = _vdi_parse_env_word("GEM_VDI_WIDTH", _vdi_default_width);
     WORD height = _vdi_parse_env_word("GEM_VDI_HEIGHT", _vdi_default_height);
+#endif
 
     (void) work_in;
 
