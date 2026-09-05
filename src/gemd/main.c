@@ -8,10 +8,14 @@
  * Copyright (C) 2026 tomaz stih
  */
 
+#define _GNU_SOURCE
 #include "../aes/_aes.h"
 #include "../gem/_gem.h"
+#include "transport.h"
+#include "drawing.h"
 
 #include "platform/hid.h"
+#include "platform/os.h"
 
 #include <errno.h>
 #include <poll.h>
@@ -21,6 +25,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <sys/un.h>
 #include <unistd.h>
 
@@ -30,10 +35,16 @@ enum {
 
 typedef struct gemd_session {
     int fd;
+    uint64_t generation;
     WORD app_id;
     WORD vdi_open;
     OBJECT *menu_objects;
     char *menu_strings_blob;
+    WORD menu_count;
+    gemd_io_t io;
+    uint32_t accepted_at;
+    uint32_t update_started;
+    gemd_drawing_t drawing;
 } gemd_session_t;
 
 static void gemd_free_session_menu(gemd_session_t *session)
@@ -42,13 +53,20 @@ static void gemd_free_session_menu(gemd_session_t *session)
     session->menu_objects = NULL;
     free(session->menu_strings_blob);
     session->menu_strings_blob = NULL;
+    session->menu_count = 0;
 }
 
 static int g_listen_fd = -1;
+static uint64_t g_next_generation;
 static gemd_session_t g_sessions[GEMD_MAX_SESSIONS];
 static WORD g_server_vdi_handle;
 static WORD g_server_vdi_refs;
 static WORD g_server_work_out[57];
+static struct stat g_socket_identity;
+static int g_socket_bound;
+static volatile sig_atomic_t g_stopping;
+static gemd_session_t *g_modal_session;
+static int gemd_service_modal(void);
 
 static void gemd_pump_hid(void)
 {
@@ -58,68 +76,9 @@ static void gemd_pump_hid(void)
         return;
     }
 
-    while (gem_hid_poll(&evt)) {
+    for (unsigned i = 0; i < 128 && gem_hid_poll(&evt); ++i) {
         _aes_dispatch_hid_event(&evt);
     }
-}
-
-static int gemd_send_all(int fd, const void *buf, size_t size)
-{
-    const uint8_t *cursor = (const uint8_t *) buf;
-
-    while (size > 0u) {
-        ssize_t rc = send(fd, cursor, size, 0);
-
-        if (rc < 0) {
-            if (errno == EINTR) {
-                continue;
-            }
-            return 0;
-        }
-        cursor += (size_t) rc;
-        size -= (size_t) rc;
-    }
-    return 1;
-}
-
-static int gemd_recv_all(int fd, void *buf, size_t size)
-{
-    uint8_t *cursor = (uint8_t *) buf;
-
-    while (size > 0u) {
-        ssize_t rc = recv(fd, cursor, size, 0);
-
-        if (rc <= 0) {
-            if (rc < 0 && errno == EINTR) {
-                continue;
-            }
-            return 0;
-        }
-        cursor += (size_t) rc;
-        size -= (size_t) rc;
-    }
-    return 1;
-}
-
-static int gemd_send_reply(int fd,
-                           int32_t status,
-                           const void *payload,
-                           uint32_t payload_size)
-{
-    gem_rpc_reply_t reply;
-
-    reply.magic = GEM_RPC_MAGIC;
-    reply.status = status;
-    reply.size = payload_size;
-    if (!gemd_send_all(fd, &reply, sizeof(reply))) {
-        return 0;
-    }
-    if (payload_size > 0u && payload != NULL) {
-        if (!gemd_send_all(fd, payload, payload_size)) {
-            return 0;
-        }
-    }
-    return 1;
 }
 
 static void gemd_set_current_app(const gemd_session_t *session)
@@ -255,6 +214,20 @@ static void gemd_cleanup_app(WORD app_id)
             break;
         }
     }
+    /* A desktop/menu owner may exit before the other two applications. */
+    if (!_aes.desktop_owner_app_id) {
+        for (i = 0; i < AES_MAX_APPS; ++i) {
+            if (_aes.apps[i].used && _aes.apps[i].menu_visible &&
+                _aes.apps[i].menu_tree) {
+                _aes.desktop_owner_app_id = _aes.apps[i].id;
+                break;
+            }
+        }
+    }
+    if (!_aes_find_app_by_id(_aes.active_app_id)) {
+        const aes_window_t *top = _aes_find_top_window();
+        _aes_menu_switch_to_app(top ? top->owner : _aes.desktop_owner_app_id);
+    }
 }
 
 static void gemd_close_session(gemd_session_t *session)
@@ -292,6 +265,24 @@ static gemd_session_t *gemd_alloc_session(void)
     return NULL;
 }
 
+static void gemd_accept_client(void)
+{
+    gemd_session_t *session = gemd_alloc_session();
+    int fd = accept(g_listen_fd, NULL, NULL);
+    if (fd >= 0) {
+        struct ucred peer;
+        socklen_t length = sizeof(peer);
+        if (session && gemd_nonblocking(fd) &&
+            getsockopt(fd, SOL_SOCKET, SO_PEERCRED, &peer, &length) == 0 &&
+            peer.uid == geteuid()) {
+            memset(session, 0, sizeof(*session));
+            session->fd = fd;
+            session->generation = ++g_next_generation;
+            session->accepted_at = gem_os_ticks_ms();
+        } else close(fd);
+    }
+}
+
 static int gemd_init_listener(void)
 {
     struct sockaddr_un addr;
@@ -306,7 +297,8 @@ static int gemd_init_listener(void)
     addr.sun_family = AF_UNIX;
     if (strlen(gem_rpc_socket_path()) >= sizeof(addr.sun_path)) return 0;
     strcpy(addr.sun_path, gem_rpc_socket_path());
-    (void) unlink(gem_rpc_socket_path());
+    /* Never unlink an existing path: it may be another live server or a file. */
+    (void) umask(0077);
 
     if (bind(g_listen_fd, (const struct sockaddr *) &addr, sizeof(addr)) != 0) {
         perror("gemd: bind");
@@ -314,11 +306,14 @@ static int gemd_init_listener(void)
         g_listen_fd = -1;
         return 0;
     }
+    if (lstat(addr.sun_path, &g_socket_identity) != 0) return 0;
+    g_socket_bound = 1;
+    if (chmod(addr.sun_path, 0600) != 0) return 0;
+    if (!gemd_nonblocking(g_listen_fd)) return 0;
     if (listen(g_listen_fd, GEMD_MAX_SESSIONS) != 0) {
         perror("gemd: listen");
         (void) close(g_listen_fd);
         g_listen_fd = -1;
-        (void) unlink(gem_rpc_socket_path());
         return 0;
     }
     return 1;
@@ -336,7 +331,13 @@ static void gemd_shutdown(void)
         (void) close(g_listen_fd);
         g_listen_fd = -1;
     }
-    (void) unlink(gem_rpc_socket_path());
+    if (g_socket_bound) {
+        struct stat current;
+        if (lstat(gem_rpc_socket_path(), &current) == 0 &&
+            current.st_dev == g_socket_identity.st_dev &&
+            current.st_ino == g_socket_identity.st_ino && S_ISSOCK(current.st_mode))
+            (void) unlink(gem_rpc_socket_path());
+    }
 }
 
 static int gemd_session_may_run(const gemd_session_t *session)
@@ -380,8 +381,13 @@ static int32_t gemd_dispatch(gemd_session_t *session,
         {
             gem_rpc_words8_t *rsp = (gem_rpc_words8_t *) response;
             memset(rsp, 0, sizeof(*rsp));
-            graf_mkstate(&rsp->values[0], &rsp->values[1],
-                &rsp->values[2], &rsp->values[3]);
+            if (g_modal_session && session != g_modal_session) {
+                rsp->values[0] = _vdi.mouse_x; rsp->values[1] = _vdi.mouse_y;
+                rsp->values[2] = _vdi.mouse_status; rsp->values[3] = _aes.key_state;
+            } else {
+                graf_mkstate(&rsp->values[0], &rsp->values[1],
+                    &rsp->values[2], &rsp->values[3]);
+            }
             *response_size = sizeof(*rsp);
             status = 1;
         }
@@ -425,7 +431,7 @@ static int32_t gemd_dispatch(gemd_session_t *session,
         }
         break;
     case GEM_RPC_APPL_INIT:
-        status = appl_init();
+        status = session->app_id ? session->app_id : appl_init();
         session->app_id = (WORD) status;
         break;
 
@@ -436,6 +442,7 @@ static int32_t gemd_dispatch(gemd_session_t *session,
         }
         gemd_cleanup_app(session->app_id);
         session->app_id = 0;
+        session->drawing.initialized = 0;
         gemd_free_session_menu(session);
         status = 1;
         break;
@@ -445,6 +452,7 @@ static int32_t gemd_dispatch(gemd_session_t *session,
             gem_rpc_words8_t *rsp = (gem_rpc_words8_t *) response;
 
             memset(rsp, 0, sizeof(*rsp));
+            *response_size = (uint32_t) sizeof(*rsp);
             if (_aes_dequeue_message(rsp->values) != 0) {
                 status = 1;
                 *response_size = (uint32_t) sizeof(*rsp);
@@ -462,8 +470,9 @@ static int32_t gemd_dispatch(gemd_session_t *session,
                 (gem_rpc_evnt_multi_rsp_t *) response;
             UWORD client_wants_timer = (UWORD) (req->flags & MU_TIMER);
             UWORD bounded_flags = (UWORD) (req->flags | MU_TIMER);
-            UWORD bounded_tlc = client_wants_timer != 0u ? req->tlc : 2u;
-            UWORD bounded_thc = client_wants_timer != 0u ? req->thc : 0u;
+            UWORD bounded_tlc = client_wants_timer && !req->thc && req->tlc < 2u
+                ? req->tlc : 2u;
+            UWORD bounded_thc = 0u;
 
             /*
              * evnt_multi()'s own timeout early-exit only fires when
@@ -479,6 +488,18 @@ static int32_t gemd_dispatch(gemd_session_t *session,
              * still sees plain "no event" and just polls again.
              */
             memset(rsp, 0, sizeof(*rsp));
+            if (g_modal_session && session != g_modal_session) {
+                /* Classic synchronous panels keep input modal, but other
+                 * processes can still receive redraws and advance timers. */
+                rsp->mx = _vdi.mouse_x; rsp->my = _vdi.mouse_y;
+                rsp->mb = _vdi.mouse_status; rsp->ks = _aes.key_state;
+                if ((req->flags & MU_MESAG) && _aes_dequeue_message(rsp->msg))
+                    rsp->event = MU_MESAG;
+                else if (client_wants_timer) rsp->event = MU_TIMER;
+                status = rsp->event;
+                *response_size = sizeof(*rsp);
+                break;
+            }
             rsp->event = evnt_multi(bounded_flags, req->bclk, req->bmsk,
                 req->bst, req->m1flags, req->m1x, req->m1y, req->m1w,
                 req->m1h, req->m2flags, req->m2x, req->m2y, req->m2w,
@@ -552,6 +573,7 @@ static int32_t gemd_dispatch(gemd_session_t *session,
         break;
 
     case GEM_RPC_V_CLSVWK:
+        session->drawing.initialized = 0;
         if (session->vdi_open != 0) {
             session->vdi_open = 0;
             if (g_server_vdi_refs > 0) {
@@ -847,6 +869,9 @@ static int32_t gemd_dispatch(gemd_session_t *session,
             const gem_rpc_wind_update_req_t *req =
                 (const gem_rpc_wind_update_req_t *) payload;
 
+            aes_app_t *app = _aes_find_app_by_id(session->app_id);
+            if (app && req->flag == BEG_UPDATE && app->update_depth == 0)
+                session->update_started = gem_os_ticks_ms();
             status = wind_update(req->flag);
             _aes_trace("gemd wind_update flag=%d status=%d", req->flag,
                 (int) status);
@@ -922,6 +947,7 @@ static int32_t gemd_dispatch(gemd_session_t *session,
             gemd_free_session_menu(session);
             session->menu_objects = objects;
             session->menu_strings_blob = strings_blob;
+            session->menu_count = count;
 
             status = menu_bar(objects, req->show);
             _aes_trace("gemd menu_bar app=%d objects=%d strings=%d "
@@ -939,7 +965,9 @@ static int32_t gemd_dispatch(gemd_session_t *session,
             const gem_rpc_menu_tnormal_req_t *req =
                 (const gem_rpc_menu_tnormal_req_t *) payload;
 
-            if (session->menu_objects == NULL) {
+            if (session->menu_objects == NULL || req->title < 0 ||
+                req->title >= session->menu_count ||
+                (session->menu_objects[req->title].ob_type & 0xffu) != G_TITLE) {
                 status = 0;
             } else {
                 status = menu_tnormal(session->menu_objects, req->title,
@@ -965,33 +993,191 @@ static int32_t gemd_dispatch(gemd_session_t *session,
     return status;
 }
 
+/* Connection identity, not a caller-supplied handle, determines authority. */
+static int gemd_authorized(const gemd_session_t *session,
+    uint16_t opcode, const void *payload)
+{
+    const aes_window_t *window;
+    WORD handle;
+    if (opcode == GEM_RPC_APPL_INIT) return 1;
+    if (!session->app_id) return 0;
+    if (gemd_vdi_request(opcode)) {
+        memcpy(&handle, payload, sizeof(handle));
+        if (!g_server_vdi_handle || handle != g_server_vdi_handle) return 0;
+    }
+    switch (opcode) {
+    case GEM_RPC_WIND_OPEN:
+    case GEM_RPC_WIND_CLOSE:
+    case GEM_RPC_WIND_DELETE:
+    case GEM_RPC_WIND_SET:
+    case GEM_RPC_WIND_SET_STR:
+        memcpy(&handle, payload, sizeof(handle));
+        window = _aes_find_window(handle);
+        return window && window->owner == session->app_id;
+    case GEM_RPC_WIND_UPDATE: {
+        const gem_rpc_wind_update_req_t *req = payload;
+        const aes_app_t *app = _aes_find_app_by_id(session->app_id);
+        return app && ((req->flag == BEG_UPDATE && app->update_depth < 64) ||
+            (req->flag == END_UPDATE && app->update_depth > 0));
+    }
+    case GEM_RPC_WIND_CREATE: {
+        size_t i;
+        int count = 0;
+        for (i = 0; i < AES_MAX_WINDOWS; ++i)
+            if (_aes.windows[i].used && _aes.windows[i].owner == session->app_id)
+                ++count;
+        return count < 8;
+    }
+    default:
+        return 1;
+    }
+}
+
+/* Raster writes are confined to the client's visible work areas. Only the
+ * desktop owner also paints uncovered desktop; AES alone paints shared chrome. */
+static int32_t gemd_draw_owned(gemd_session_t *session,
+    const gem_rpc_header_t *header, const uint8_t *payload,
+    uint8_t *response, uint32_t *response_size)
+{
+    size_t i;
+    GRECT requested;
+    vdi_rect_t clip;
+    _vdi_get_active_clip_rect(&clip);
+    _aes_set_rect(&requested, clip.x0, clip.y0,
+        (WORD) (clip.x1 - clip.x0 + 1), (WORD) (clip.y1 - clip.y0 + 1));
+    _vdi_begin_update();
+    for (i = 0; i <= AES_MAX_WINDOWS; ++i) {
+        const aes_window_t *window = i < AES_MAX_WINDOWS ? &_aes.windows[i] : NULL;
+        GRECT base, damage, visible[64];
+        WORD count, j;
+        if (window) {
+            if (!window->used || !window->open || window->owner != session->app_id)
+                continue;
+            base = window->work;
+        } else {
+            if (_aes.desktop_owner_app_id != session->app_id) continue;
+            _aes_desktop_rect(&base);
+        }
+        if (!_aes_intersect_rects(&base, &requested, &damage)) continue;
+        count = _aes_clip_visible_rects(window, &damage, visible, 64);
+        for (j = 0; j < count; ++j) {
+            WORD xy[4] = {visible[j].g_x, visible[j].g_y,
+                (WORD) (visible[j].g_x + visible[j].g_w - 1),
+                (WORD) (visible[j].g_y + visible[j].g_h - 1)};
+            vs_clip(g_server_vdi_handle, 1, xy);
+            if (header->opcode == GEM_RPC_V_CLRWK) {
+                _vdi.fill_color = 0;
+                _vdi_compat.write_mode = MD_REPLACE;
+                _vdi_compat.fill_interior = FIS_SOLID;
+                _vdi_compat.fill_perimeter = 0;
+                v_bar(g_server_vdi_handle, xy);
+            } else {
+                (void) gemd_dispatch(session, header, payload, response, response_size);
+            }
+        }
+    }
+    _vdi_end_update();
+    return 1;
+}
+
 static int gemd_handle_request(gemd_session_t *session)
 {
-    gem_rpc_header_t header;
-    _Alignas(max_align_t) uint8_t payload[GEM_RPC_PAYLOAD_MAX];
+    const gem_rpc_header_t header = session->io.header;
+    const uint8_t *payload = session->io.payload;
     _Alignas(max_align_t) uint8_t response[GEM_RPC_PAYLOAD_MAX];
     uint32_t response_size = 0u;
     int32_t status;
 
-    if (!gemd_recv_all(session->fd, &header, sizeof(header))) {
-        return 0;
+    if (!gem_rpc_valid_request(header.opcode, payload, header.size)) {
+        gemd_reply(&session->io, -1, NULL, 0);
+        return 1;
     }
-    if (header.magic != GEM_RPC_MAGIC || header.version != GEM_RPC_VERSION ||
-        header.size > GEM_RPC_PAYLOAD_MAX) {
-        return 0;
+    if (!gemd_authorized(session, header.opcode, payload)) {
+        gemd_reply(&session->io, 0, NULL, 0);
+        return 1;
     }
-    if (header.size > 0u) {
-        if (!gemd_recv_all(session->fd, payload, header.size)) {
-            return 0;
+    if (gemd_vdi_request(header.opcode)) {
+        gemd_drawing_t server;
+        gemd_drawing_save(&server);
+        if (!session->drawing.initialized) gemd_drawing_init(&session->drawing);
+        gemd_drawing_restore(&session->drawing);
+        if (gemd_raster_request(header.opcode)) {
+            status = gemd_draw_owned(session, &header, payload, response, &response_size);
+        } else {
+            status = gemd_dispatch(session, &header, payload, response, &response_size);
+            gemd_drawing_save(&session->drawing);
+        }
+        gemd_drawing_restore(&server);
+    } else {
+        if (header.opcode == GEM_RPC_FORM_ALERT || header.opcode == GEM_RPC_FSEL_INPUT) {
+            g_modal_session = session;
+            _aes_wait_hook = gemd_service_modal;
+        }
+        status = gemd_dispatch(session, &header, payload, response, &response_size);
+        if (g_modal_session == session) {
+            _aes_wait_hook = NULL;
+            g_modal_session = NULL;
         }
     }
+    gemd_reply(&session->io, status, response, response_size);
+    return 1;
+}
 
-    if (!gem_rpc_valid_request(header.opcode, payload, header.size)) {
-        return gemd_send_reply(session->fd, -1, NULL, 0);
+/* Cooperate from AES panel waits without recursively opening another panel.
+ * Attribute and app identity restoration keeps the suspended AES call intact. */
+static int gemd_service_modal(void)
+{
+    gemd_drawing_t drawing;
+    WORD app_id = _aes.current_app_id;
+    size_t i;
+    struct pollfd owner = {g_modal_session->fd, POLLRDHUP, 0};
+    if (g_stopping || poll(&owner, 1, 0) < 0 ||
+        (owner.revents & (POLLRDHUP | POLLHUP | POLLERR | POLLNVAL))) return 0;
+    gemd_drawing_save(&drawing);
+    gemd_accept_client();
+    for (i = 0; i < GEMD_MAX_SESSIONS; ++i) {
+        gemd_session_t *session = &g_sessions[i];
+        struct pollfd fd;
+        uint32_t now = gem_os_ticks_ms();
+        aes_app_t *app = _aes_find_app_by_id(session->app_id);
+        if (session->fd < 0) continue;
+        if (app && app->update_depth && now - session->update_started > 5000u) {
+            if (session == g_modal_session) {
+                gemd_drawing_restore(&drawing);
+                _aes.current_app_id = global[2] = app_id;
+                return 0;
+            }
+            gemd_close_session(session);
+            continue;
+        }
+        if (session == g_modal_session) continue;
+        fd.fd = session->fd;
+        fd.events = session->io.output_size ? POLLOUT : (session->io.ready ? 0 : POLLIN);
+        fd.revents = 0;
+        (void) poll(&fd, 1, 0);
+        if ((fd.revents & (POLLHUP | POLLERR | POLLNVAL)) ||
+            ((fd.revents & POLLIN) && gemd_receive(session->fd, &session->io) < 0) ||
+            ((fd.revents & POLLOUT) && gemd_send(session->fd, &session->io) < 0) ||
+            (((session->io.header_read && !session->io.ready) || session->io.output_size) &&
+                now - session->io.started > 2000u) ||
+            (!session->app_id && now - session->accepted_at > 5000u)) {
+            gemd_close_session(session);
+            continue;
+        }
+        if (session->io.ready && gemd_session_may_run(session) &&
+            session->io.header.opcode != GEM_RPC_FORM_ALERT &&
+            session->io.header.opcode != GEM_RPC_FSEL_INPUT)
+            (void) gemd_handle_request(session);
     }
-    status = gemd_dispatch(session, &header, payload, response,
-        &response_size);
-    return gemd_send_reply(session->fd, status, response, response_size);
+    gemd_drawing_restore(&drawing);
+    _aes.current_app_id = global[2] = app_id;
+    return 1;
+}
+
+static void gemd_stop(int signal_number)
+{
+    (void) signal_number;
+    g_stopping = 1;
 }
 
 int main(void)
@@ -1001,25 +1187,28 @@ int main(void)
     /*
      * Writing to a session socket whose peer already closed its end
      * raises SIGPIPE, whose default disposition kills the process --
-     * taking down every other connected client with it. gemd_send_all
+     * taking down every other connected client with it. gemd_send
      * already handles a plain -1/EPIPE return gracefully; ignoring the
      * signal is what lets that code path run instead of the process
      * dying first.
      */
     (void) signal(SIGPIPE, SIG_IGN);
+    (void) signal(SIGTERM, gemd_stop);
+    (void) signal(SIGINT, gemd_stop);
 
     for (i = 0; i < GEMD_MAX_SESSIONS; ++i) {
         g_sessions[i].fd = -1;
     }
 
     if (!gemd_init_listener()) {
+        gemd_shutdown();
         return 1;
     }
 
     printf("gemd listening on %s\n", gem_rpc_socket_path());
     fflush(stdout);
 
-    for (;;) {
+    while (!g_stopping) {
         /*
          * pollfds[] and poll_owner[] are built together, in the same
          * pass, so pollfds[k] and poll_owner[k] always describe the
@@ -1038,6 +1227,7 @@ int main(void)
          */
         struct pollfd pollfds[GEMD_MAX_SESSIONS + 1];
         gemd_session_t *poll_owner[GEMD_MAX_SESSIONS + 1];
+        uint64_t poll_generation[GEMD_MAX_SESSIONS + 1];
         nfds_t nfds = 0;
         nfds_t k;
         int rc;
@@ -1049,12 +1239,13 @@ int main(void)
         ++nfds;
 
         for (i = 0; i < GEMD_MAX_SESSIONS; ++i) {
-            if (g_sessions[i].fd >= 0 &&
-                gemd_session_may_run(&g_sessions[i]) != 0) {
+            if (g_sessions[i].fd >= 0) {
                 pollfds[nfds].fd = g_sessions[i].fd;
-                pollfds[nfds].events = POLLIN;
+                pollfds[nfds].events = g_sessions[i].io.output_size ? POLLOUT :
+                    (g_sessions[i].io.ready ? 0 : POLLIN);
                 pollfds[nfds].revents = 0;
                 poll_owner[nfds] = &g_sessions[i];
+                poll_generation[nfds] = g_sessions[i].generation;
                 ++nfds;
             }
         }
@@ -1072,29 +1263,43 @@ int main(void)
         for (k = 1; k < nfds; ++k) {
             gemd_session_t *session = poll_owner[k];
 
-            if (session == NULL || pollfds[k].revents == 0) {
+            /* A modal callback may have closed and reused this session slot
+             * (and even its fd) since this poll snapshot was built. */
+            if (session == NULL || session->fd != pollfds[k].fd ||
+                session->generation != poll_generation[k]) {
                 continue;
+            }
+            /* Bound unfinished frames, unread replies, init and update locks.
+             * A lock has an absolute deadline, not a reset-on-each-byte lease. */
+            {
+                uint32_t now = gem_os_ticks_ms();
+                aes_app_t *app = _aes_find_app_by_id(session->app_id);
+                if (((session->io.header_read && !session->io.ready) ||
+                        session->io.output_size) && now - session->io.started > 2000u) {
+                    gemd_close_session(session);
+                    continue;
+                }
+                if ((!session->app_id && now - session->accepted_at > 5000u) ||
+                    (app && app->update_depth && now - session->update_started > 5000u)) {
+                    gemd_close_session(session);
+                    continue;
+                }
             }
             if ((pollfds[k].revents & (POLLERR | POLLHUP | POLLNVAL)) != 0 ||
                 ((pollfds[k].revents & POLLIN) != 0 &&
-                    !gemd_handle_request(session))) {
+                    gemd_receive(session->fd, &session->io) < 0) ||
+                ((pollfds[k].revents & POLLOUT) != 0 &&
+                    gemd_send(session->fd, &session->io) < 0)) {
                 gemd_close_session(session);
+                continue;
             }
+            /* Recheck after every dispatch: an earlier client may have locked. */
+            if (session->io.ready && gemd_session_may_run(session))
+                (void) gemd_handle_request(session);
         }
 
         if ((pollfds[0].revents & POLLIN) != 0) {
-            gemd_session_t *session = gemd_alloc_session();
-            int fd = accept(g_listen_fd, NULL, NULL);
-
-            if (fd >= 0) {
-                if (session != NULL) {
-                    session->fd = fd;
-                    session->app_id = 0;
-                    session->vdi_open = 0;
-                } else {
-                    (void) close(fd);
-                }
-            }
+            gemd_accept_client();
         }
 
         gemd_pump_hid();

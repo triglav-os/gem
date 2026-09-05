@@ -720,18 +720,21 @@ static void _aes_alert_draw_frame(const GRECT *rect)
     vsf_color(_aes.vdi_handle, BLACK);
     vr_recfl(_aes.vdi_handle, fill);
 
-    border[0] = fill[0];
-    border[1] = fill[1];
-    border[2] = fill[2];
-    border[3] = fill[1];
-    border[4] = fill[2];
-    border[5] = fill[3];
-    border[6] = fill[0];
-    border[7] = fill[3];
-    border[8] = fill[0];
-    border[9] = fill[1];
-    vsl_color(_aes.vdi_handle, WHITE);
-    v_pline(_aes.vdi_handle, 5, border);
+    /* Classic untitled dialog enclosure: black/white/black/black. */
+    for (WORD inset = 0; inset < 4; ++inset) {
+        WORD left = (WORD) (fill[0] + inset);
+        WORD top = (WORD) (fill[1] + inset);
+        WORD right = (WORD) (fill[2] - inset);
+        WORD bottom = (WORD) (fill[3] - inset);
+        if (left > right || top > bottom) break;
+        border[0] = left; border[1] = top;
+        border[2] = right; border[3] = top;
+        border[4] = right; border[5] = bottom;
+        border[6] = left; border[7] = bottom;
+        border[8] = left; border[9] = top;
+        vsl_color(_aes.vdi_handle, inset == 1 ? BLACK : WHITE);
+        v_pline(_aes.vdi_handle, 5, border);
+    }
 }
 
 static void _aes_alert_draw_button(const GRECT *rect,
@@ -952,6 +955,10 @@ static WORD _aes_run_alert(aes_alert_t *alert)
     _aes_draw_alert(alert);
 
     for (;;) {
+        if (_aes_wait_hook && !_aes_wait_hook()) {
+            alert->default_button = 0;
+            break;
+        }
         if (gem_hid_poll(&evt) == 0) {
             gem_os_sleep_ms(1u);
             continue;
@@ -1020,6 +1027,12 @@ WORD menu_bar(OBJECT *tree, WORD show)
     aes_app_t *app = _aes_find_app_by_id(_aes.current_app_id);
     const WORD previous_height = _aes_menu_bar_height();
 
+    /* An inactive app detaches its own menu without hiding another app's. */
+    if (show == 0 && app != NULL && _aes.menu_owner_app_id != app->id) {
+        app->menu_tree = NULL;
+        app->menu_visible = 0;
+        return 1;
+    }
     _aes.menu_tree = tree;
     _aes.menu_visible = (show != 0) ? 1 : 0;
     _aes.menu_owner_app_id = _aes.current_app_id;
@@ -1489,12 +1502,18 @@ WORD form_dial(WORD flag,
 WORD form_alert(WORD defbtn, char *str)
 {
     aes_alert_t alert;
+    WORD result;
+    const GRECT *previous_cover = _aes_modal_cover;
 
     if (_aes_parse_alert(str, defbtn, &alert) == 0) {
         return (defbtn > 0) ? defbtn : 1;
     }
     _aes_alert_compute_layout(&alert);
-    return _aes_run_alert(&alert);
+    _aes_modal_cover = &alert.outer;
+    result = _aes_run_alert(&alert);
+    _aes_modal_cover = previous_cover;
+    if (_aes_wait_hook) _aes_redraw_region(&alert.outer);
+    return result;
 }
 
 WORD form_error(WORD errnum)

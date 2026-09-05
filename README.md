@@ -4,7 +4,28 @@ This project ports the Digital Research GEM user interface to Linux. It
 provides VDI, AES, the `gemd` shared display server, `libgem` clients, a
 desktop, and example applications.
 
+## Security and multi-application hardening (2026-09-05)
+
+The hosted server now checks peer identity and window ownership, isolates
+client drawing state, validates menu graphs, and bounds stalled connections
+and update locks. Standard dialog waits service other clients and unwind on
+requester disconnect. Font parsing and Rasta framebuffer/input paths also
+have additional checks. Public AES/VDI interfaces remain unchanged.
+
+See [Hosted GEM security and safety](docs/SECURITY.md) for deployment rules,
+service limits, the five passing hosted tests, and explicit remaining trust
+boundaries. Run as an ordinary user with private socket/framebuffer paths;
+this is hardening of a shared desktop, not a sandbox for hostile applications.
+
 ## Native gallery proxy verification (2026-09-05)
+
+The modal-frame follow-up returns the actual window flags for `WF_KIND`
+instead of falling through to work-area coordinates. Untitled `form_alert`
+panels use a four-pixel black/white/black/black (`1011`) enclosure. Real-server
+regressions check the query and all four alert edges. Public AES/VDI APIs
+are unchanged. Native's matching direct/proxy suites each pass six tests,
+including actual Rasta input through its application loop for both text
+modes, clipboard buttons/shortcuts and input after dialog closure.
 
 Native can link only `libgem`, with a separate Rasta-backed `gemd` process
 owning AES/VDI. Both processes accept the private `GEMD_SOCKET` environment
@@ -52,7 +73,7 @@ The desktop checker is filled only in exposed fragments; hidden window frames
 and fully obscured client redraw notifications are skipped. Native's opening
 regression checks intermediate pixels for modal/modeless windows fully above
 their owner and partly above desktop, and fails against the preceding runtime.
-All three hosted CTests pass, including VDI and public-header checks. The
+All five hosted CTests pass, including VDI and public-header checks. The
 VDI test host implements the regional-present callback used by the renderer.
 
 ## Dependencies

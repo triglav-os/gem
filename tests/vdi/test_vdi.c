@@ -10,10 +10,13 @@
 #define _POSIX_C_SOURCE 200809L
 
 #include "vdi_test.h"
+#include "_internal.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 #define ASSERT_TRUE(expr) \
     do { \
@@ -775,6 +778,51 @@ static int test_cursor_and_text_helpers(void)
     return 1;
 }
 
+static int test_hostile_fonts(void)
+{
+    uint8_t font[100] = {0};
+    char long_path[700];
+    char directory[] = "/tmp/gem-font-test.XXXXXXXX";
+    char fonts[128], path[160];
+    FILE *file;
+    const char *configured = getenv("GEM_RESOURCE_DIR");
+    char *saved = configured ? strdup(configured) : NULL;
+    /* Two glyphs, offsets 0/4/8, in one eight-bit scanline. */
+    font[92] = 4; font[94] = 8;
+    ASSERT_TRUE(_vdi_font_bitmap_valid(font, sizeof(font), 65, 66, 1, 1, 88, 90));
+    font[94] = 9;
+    ASSERT_TRUE(!_vdi_font_bitmap_valid(font, sizeof(font), 65, 66, 1, 1, 88, 90));
+    font[94] = 3;
+    ASSERT_TRUE(!_vdi_font_bitmap_valid(font, sizeof(font), 65, 66, 1, 1, 88, 90));
+    ASSERT_TRUE(!_vdi_font_bitmap_valid(font, sizeof(font), 66, 65, 1, 1, 88, 90));
+    ASSERT_TRUE(!_vdi_font_bitmap_valid(font, sizeof(font), 65, 66, -1, 1, 88, 90));
+    ASSERT_TRUE(!_vdi_font_bitmap_valid(font, sizeof(font), 65, 66, 1, 1, UINT32_MAX, 90));
+    ASSERT_TRUE(!_vdi_font_bitmap_valid(font, 94, 65, 66, 1, 1, 88, 90));
+    memset(long_path, 'x', sizeof(long_path) - 1);
+    long_path[sizeof(long_path) - 1] = '\0';
+    _vdi_unload_fonts();
+    ASSERT_TRUE(setenv("GEM_RESOURCE_DIR", long_path, 1) == 0);
+    ASSERT_TRUE(!_vdi_load_fonts());
+    ASSERT_TRUE(mkdtemp(directory));
+    snprintf(fonts, sizeof(fonts), "%s/fonts", directory);
+    snprintf(path, sizeof(path), "%s/AtariSTHigh.fnt", fonts);
+    ASSERT_TRUE(mkdir(fonts, 0700) == 0);
+    font[36] = 65; font[38] = 66; font[80] = 1; font[82] = 1;
+    file = fopen(path, "wb");
+    ASSERT_TRUE(file && fwrite(font, 1, sizeof(font), file) == sizeof(font));
+    fclose(file);
+    ASSERT_TRUE(setenv("GEM_RESOURCE_DIR", directory, 1) == 0);
+    ASSERT_TRUE(!_vdi_load_fonts());
+    ASSERT_TRUE(unlink(path) == 0 && rmdir(fonts) == 0 && rmdir(directory) == 0);
+    if (saved) {
+        setenv("GEM_RESOURCE_DIR", saved, 1);
+        free(saved);
+    } else unsetenv("GEM_RESOURCE_DIR");
+    ASSERT_TRUE(_vdi_load_fonts());
+    _vdi_unload_fonts();
+    return 1;
+}
+
 int main(void)
 {
     if (!test_open_close()) {
@@ -807,6 +855,7 @@ int main(void)
     if (!test_vrt_cpyfm_glyph_bitmap()) {
         return 1;
     }
+    if (!test_hostile_fonts()) return 1;
 
     puts("test_vdi: ok");
     return 0;

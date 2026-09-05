@@ -53,6 +53,18 @@ static void keyboard_roundtrip(void)
 
     assert(recvfrom(input_fd, subscription, sizeof(subscription), 0,
         (struct sockaddr *) &input_peer, &size) > 0);
+    {
+        int stranger = socket(AF_INET, SOCK_DGRAM, 0);
+        uint16_t packet[4] = {htons(3), htons(777), htons(777), 0};
+        assert(stranger >= 0);
+        assert(sendto(stranger, packet, 6, 0, (struct sockaddr *) &input_peer,
+            sizeof(input_peer)) == 6);
+        close(stranger);
+        assert(sendto(input_fd, packet, sizeof(packet), 0,
+            (struct sockaddr *) &input_peer, sizeof(input_peer)) == sizeof(packet));
+        graf_mkstate(&mx, &my, &mb, &ks);
+        assert(mx != 777 && my != 777);
+    }
     input_send(3, 60, 90);
     input_send(10, 60, 90);
     /* A pending WM_REDRAW must preserve the held mouse state, not return
@@ -98,6 +110,10 @@ static void malformed_and_fragmented(void)
     int fd = socket(AF_UNIX, SOCK_STREAM, 0);
     size_t i;
 
+    assert(!gem_rpc_call(GEM_RPC_APPL_INIT, NULL, 1, NULL, NULL, 0));
+    assert(!gem_rpc_call(GEM_RPC_APPL_INIT, NULL, 0, NULL, NULL, 1));
+    assert(!gem_rpc_call(GEM_RPC_APPL_INIT, &header, GEM_RPC_PAYLOAD_MAX + 1,
+        NULL, NULL, 0));
     assert(fd >= 0);
     address.sun_family = AF_UNIX;
     strcpy(address.sun_path, gem_rpc_socket_path());

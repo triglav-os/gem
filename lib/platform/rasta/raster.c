@@ -95,18 +95,25 @@ static int map_framebuffer(size_t size)
 static int reopen_framebuffer_target(size_t size)
 {
     const char *path = rasta_framebuffer_path();
+    struct stat target;
 
     if (g_framebuffer_fd >= 0) {
         close(g_framebuffer_fd);
         g_framebuffer_fd = -1;
     }
 
-    g_framebuffer_fd = open(path, O_RDWR | O_CREAT, 0644);
+    g_framebuffer_fd = open(path,
+        O_RDWR | O_CREAT | O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC, 0600);
     if (g_framebuffer_fd < 0) {
         return 0;
     }
 
-    if (ftruncate(g_framebuffer_fd, (off_t) size) != 0) {
+    /* Validate the opened inode before truncating it, not the path before
+     * open. In particular, reject symlinks, devices, FIFOs and hard links. */
+    if (fstat(g_framebuffer_fd, &target) != 0 ||
+        !S_ISREG(target.st_mode) || target.st_uid != geteuid() ||
+        target.st_nlink != 1 || fchmod(g_framebuffer_fd, 0600) != 0 ||
+        ftruncate(g_framebuffer_fd, (off_t) size) != 0) {
         close(g_framebuffer_fd);
         g_framebuffer_fd = -1;
         return 0;

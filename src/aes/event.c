@@ -1025,6 +1025,8 @@ WORD evnt_multi(UWORD flags,
         WORD mb = 0;
         WORD ks = 0;
 
+        if (_aes_wait_hook && !_aes_wait_hook()) return 0;
+
         if ((flags & MU_MESAG) != 0u && mepbuff != NULL &&
             _aes_dequeue_message(mepbuff) != 0) {
             graf_mkstate(pmx, pmy, pmb, pks);

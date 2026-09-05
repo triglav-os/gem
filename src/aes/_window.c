@@ -2041,7 +2041,6 @@ static void _aes_stipple_text_pixels(WORD x, WORD y, WORD foreground,
 static void _aes_draw_trace(const char *fmt, ...)
 {
     const char *trace;
-    FILE *fp;
     va_list ap;
 
     trace = getenv("GEM_TRACE_DRAW");
@@ -2049,16 +2048,10 @@ static void _aes_draw_trace(const char *fmt, ...)
         return;
     }
 
-    fp = fopen("/tmp/gem_draw_trace.log", "a");
-    if (fp == NULL) {
-        return;
-    }
-
     va_start(ap, fmt);
-    vfprintf(fp, fmt, ap);
+    vfprintf(stderr, fmt, ap);
     va_end(ap);
-    fputc('\n', fp);
-    fclose(fp);
+    fputc('\n', stderr);
 }
 
 static void _aes_draw_ted_object(const OBJECT *tree,

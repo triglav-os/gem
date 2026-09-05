@@ -1,5 +1,7 @@
 add_executable(gemd
     main.c
+    transport.c
+    drawing.c
     ../gem/protocol.c
 )
 

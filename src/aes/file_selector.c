@@ -61,7 +61,6 @@ static void aes_fsel_split_input(const char *pipath, const char *pisel,
     char *directory, size_t directory_size,
     char *pattern, size_t pattern_size,
     char *selection, size_t selection_size);
-static int aes_fsel_match_pattern(const char *pattern, const char *name);
 static int aes_fsel_join_path(const char *directory, const char *name,
     char *path, size_t path_size);
 static void aes_fsel_prefix_line(char *dst, size_t dst_size,
@@ -226,37 +225,30 @@ static void aes_fsel_split_input(const char *pipath, const char *pisel,
     }
 }
 
-static int aes_fsel_match_pattern(const char *pattern, const char *name)
+int _aes_fsel_match_pattern(const char *pattern, const char *name)
 {
-    unsigned char pch;
-    unsigned char nch;
-
-    if (pattern == NULL || name == NULL) {
-        return 0;
-    }
-    if (*pattern == '\0') {
-        return *name == '\0';
-    }
-    if (*pattern == '*') {
-        do {
-            if (aes_fsel_match_pattern(pattern + 1, name) != 0) {
-                return 1;
-            }
-        } while (*name++ != '\0');
-        return 0;
-    }
-    if (*name == '\0') {
-        return 0;
-    }
-
-    pch = (unsigned char) *pattern;
-    nch = (unsigned char) *name;
-    if (pch != '?') {
-        if (tolower(pch) != tolower(nch)) {
+    const char *star = NULL, *retry = NULL;
+    if (!pattern || !name) return 0;
+    /* Only the most recent star needs retrying: matching another star
+     * subsumes earlier choices. O(pattern * name), with no recursion. */
+    while (*name) {
+        if (*pattern == '*') {
+            star = ++pattern;
+            retry = name;
+        } else if (*pattern == '?' ||
+            (*pattern && tolower((unsigned char) *pattern) ==
+                tolower((unsigned char) *name))) {
+            ++pattern;
+            ++name;
+        } else if (star) {
+            pattern = star;
+            name = ++retry;
+        } else {
             return 0;
         }
     }
-    return aes_fsel_match_pattern(pattern + 1, name + 1);
+    while (*pattern == '*') ++pattern;
+    return *pattern == '\0';
 }
 
 static int aes_fsel_join_path(const char *directory, const char *name,
@@ -345,6 +337,7 @@ static void aes_fsel_reload_entries(aes_fsel_state_t *state)
     gem_os_dirent_t dent;
     WORD count = 0;
     WORD selected = NIL;
+    unsigned scanned = 0;
 
     if (state == NULL) {
         return;
@@ -364,11 +357,13 @@ static void aes_fsel_reload_entries(aes_fsel_state_t *state)
 
     if (gem_os_dir_open(state->directory, &dir) != 0) {
         while (count < AES_FSEL_MAX_ENTRIES && gem_os_dir_read(&dir, &dent) != 0) {
+            if (++scanned % 64u == 0 && _aes_wait_hook && !_aes_wait_hook())
+                break;
             if (strcmp(dent.name, ".") == 0 || strcmp(dent.name, "..") == 0) {
                 continue;
             }
             if (dent.info.is_directory == 0 &&
-                aes_fsel_match_pattern(state->pattern, dent.name) == 0) {
+                _aes_fsel_match_pattern(state->pattern, dent.name) == 0) {
                 continue;
             }
 
@@ -882,6 +877,8 @@ WORD fsel_input(char *pipath, char *pisel, WORD *pbutton)
         WORD ks = 0;
         WORD kr = 0;
         WORD br = 0;
+
+        if (_aes_wait_hook && !_aes_wait_hook()) break;
 
         event = evnt_multi(MU_MESAG | MU_BUTTON | MU_KEYBD,
             1, 1, state.pressed_button != 0 ? 0 : 1,

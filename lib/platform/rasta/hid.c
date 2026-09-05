@@ -58,23 +58,16 @@ static uint16_t g_key_mods;
 static void rasta_hid_trace(const char *fmt, ...)
 {
     const char *trace = getenv("GEM_TRACE_HID");
-    FILE *fp;
     va_list ap;
 
     if (trace == NULL || trace[0] == '\0') {
         return;
     }
 
-    fp = fopen("/tmp/gem_hid_trace.log", "a");
-    if (fp == NULL) {
-        return;
-    }
-
     va_start(ap, fmt);
-    vfprintf(fp, fmt, ap);
+    vfprintf(stderr, fmt, ap);
     va_end(ap);
-    fputc('\n', fp);
-    fclose(fp);
+    fputc('\n', stderr);
 }
 
 static uint16_t rasta_modifier_mask(uint16_t key)
@@ -310,9 +303,12 @@ static uint16_t ntoh_i16(int16_t value)
 static int receive_message(struct rasta_input_message *message)
 {
     ssize_t received;
+    unsigned char packet[sizeof(*message) + 1];
 
-    received = recvfrom(g_socket_fd, message, sizeof(*message), 0, NULL,
-        NULL);
+    /* The connected socket accepts only the configured viewer endpoint.
+     * The extra byte detects oversized datagrams instead of accepting a
+     * truncated six-byte prefix as a valid keyboard/mouse event. */
+    received = recv(g_socket_fd, packet, sizeof(packet), 0);
     if (received < 0) {
         if (errno == EAGAIN || errno == EWOULDBLOCK) {
             return 0;
@@ -323,6 +319,7 @@ static int receive_message(struct rasta_input_message *message)
     if (received != (ssize_t) sizeof(*message)) {
         return 0;
     }
+    memcpy(message, packet, sizeof(*message));
 
     message->msgid = ntohs(message->msgid);
     message->par1 = (int16_t) ntoh_i16(message->par1);
@@ -533,6 +530,11 @@ int gem_hid_init(void)
         errno = EINVAL;
         return 0;
     }
+    if (connect(g_socket_fd, (struct sockaddr *) &addr, sizeof(addr)) != 0) {
+        close(g_socket_fd);
+        g_socket_fd = -1;
+        return 0;
+    }
 
     subscription = build_subscription_payload();
     if (subscription == NULL) {
@@ -580,7 +582,7 @@ int gem_hid_poll(gem_hid_event_t *evt)
         return 0;
     }
 
-    for (;;) {
+    for (unsigned i = 0; i < 128; ++i) {
         rc = receive_message(&message);
         if (rc <= 0) {
             return 0;
@@ -589,4 +591,5 @@ int gem_hid_poll(gem_hid_event_t *evt)
             return 1;
         }
     }
+    return 0;
 }

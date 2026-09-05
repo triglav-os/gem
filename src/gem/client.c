@@ -7,6 +7,7 @@
  * Copyright (C) 2026 tomaz stih
  */
 
+#define _GNU_SOURCE
 #include "_gem.h"
 
 #include "platform/os.h"
@@ -79,13 +80,15 @@ static int gem_rpc_recv_all(int fd, void *buf, size_t size)
 static int gem_rpc_connect(void)
 {
     struct sockaddr_un addr;
+    struct ucred peer;
+    socklen_t peer_size = sizeof(peer);
     int fd;
 
     if (g_gem_socket >= 0) {
         return 1;
     }
 
-    fd = socket(AF_UNIX, SOCK_STREAM, 0);
+    fd = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0);
     if (fd < 0) {
         return 0;
     }
@@ -98,6 +101,11 @@ static int gem_rpc_connect(void)
     }
     strcpy(addr.sun_path, gem_rpc_socket_path());
     if (connect(fd, (const struct sockaddr *) &addr, sizeof(addr)) != 0) {
+        (void) close(fd);
+        return 0;
+    }
+    if (getsockopt(fd, SOL_SOCKET, SO_PEERCRED, &peer, &peer_size) != 0 ||
+        peer.uid != geteuid()) {
         (void) close(fd);
         return 0;
     }
@@ -116,6 +124,8 @@ int gem_rpc_call(gem_rpc_opcode_t opcode,
     gem_rpc_header_t header;
     gem_rpc_reply_t reply;
 
+    if (request_size > GEM_RPC_PAYLOAD_MAX || response_size > GEM_RPC_PAYLOAD_MAX ||
+        (request_size && !request) || (response_size && !response)) return 0;
     if (!gem_rpc_connect()) {
         return 0;
     }

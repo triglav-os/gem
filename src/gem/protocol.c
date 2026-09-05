@@ -10,6 +10,34 @@
 
 #include <stdlib.h>
 
+/* A GEM tree has one parent per object; sibling tails point back to it.
+ * Validate without recursion before AES walks any attacker-supplied links. */
+static int valid_menu_tree(const gem_rpc_menu_bar_req_t *req)
+{
+    unsigned char seen[GEM_RPC_MENU_MAX_OBJECTS] = {1};
+    WORD queue[GEM_RPC_MENU_MAX_OBJECTS] = {ROOT};
+    WORD first = 0, used = 1;
+    if (req->objects[ROOT].ob_next != NIL) return 0;
+    while (first < used) {
+        WORD parent = queue[first++];
+        const OBJECT *obj = &req->objects[parent];
+        WORD child = obj->ob_head;
+        if ((child == NIL) != (obj->ob_tail == NIL)) return 0;
+        if (child == NIL) continue;
+        for (;;) {
+            if (child < 0 || child >= req->object_count || seen[child]) return 0;
+            seen[child] = 1;
+            queue[used++] = child;
+            if (child == obj->ob_tail) {
+                if (req->objects[child].ob_next != parent) return 0;
+                break;
+            }
+            child = req->objects[child].ob_next;
+        }
+    }
+    return used == req->object_count;
+}
+
 const char *gem_rpc_socket_path(void)
 {
     const char *path = getenv("GEMD_SOCKET");
@@ -73,7 +101,13 @@ int gem_rpc_valid_request(uint16_t opcode, const void *payload, uint32_t size)
     default: return 0;
     }
 #undef REQUEST
-    if (size != expected) return 0;
+    if (size != expected || (size && payload == NULL)) return 0;
+    /* String-valued wind_set uses process pointers; only the copied-string
+     * opcode is meaningful across this address-space boundary. */
+    if (opcode == GEM_RPC_WIND_SET) {
+        const gem_rpc_wind_set_req_t *req = payload;
+        if (req->field == WF_NAME || req->field == WF_INFO) return 0;
+    }
     if (opcode == GEM_RPC_V_PLINE || opcode == GEM_RPC_V_FILLAREA) {
         const gem_rpc_pline_req_t *req = payload;
         if (req->count < 0 || req->count > 128) return 0;
@@ -105,8 +139,13 @@ int gem_rpc_valid_request(uint16_t opcode, const void *payload, uint32_t size)
                 if (!strings[i]) return 0;
             } else if (type != G_BOX && type != G_IBOX && type != G_BOXCHAR) {
                 return 0;
+            } else if (strings[i]) {
+                return 0;
             }
+            if ((i == req->object_count - 1) != ((obj->ob_flags & LASTOB) != 0))
+                return 0;
         }
+        return valid_menu_tree(req);
     }
     return 1;
 }

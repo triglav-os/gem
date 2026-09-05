@@ -19,6 +19,8 @@
 #include <string.h>
 
 aes_state_t _aes;
+int (*_aes_wait_hook)(void);
+const GRECT *_aes_modal_cover;
 
 __attribute__((weak)) int gem_builtin_rsrc_load(const char *filename);
 __attribute__((weak)) int gem_builtin_rsrc_gaddr(WORD type,
@@ -26,7 +28,7 @@ __attribute__((weak)) int gem_builtin_rsrc_gaddr(WORD type,
                                                  void **addr);
 __attribute__((weak)) void gem_builtin_rsrc_free(void);
 extern WORD _vdi_select_system_mouse_form(WORD selector);
-static void _aes_write_trace(const char *env_var, const char *logfile,
+static void _aes_write_trace(const char *env_var,
                              const char *fmt, va_list ap);
 void _aes_trace(const char *fmt, ...);
 void _aes_store_mouse_state(const gem_hid_event_t *evt);
@@ -87,29 +89,23 @@ __attribute__((weak)) void gem_builtin_rsrc_free(void)
 {
 }
 
-static void _aes_write_trace(const char *env_var, const char *logfile,
+static void _aes_write_trace(const char *env_var,
                              const char *fmt, va_list ap)
 {
     const char *trace = getenv(env_var);
-    FILE *fp;
 
     if (trace == NULL || trace[0] == '\0') {
         return;
     }
-    fp = fopen(logfile, "a");
-    if (fp == NULL) {
-        return;
-    }
-    vfprintf(fp, fmt, ap);
-    fputc('\n', fp);
-    fclose(fp);
+    vfprintf(stderr, fmt, ap);
+    fputc('\n', stderr);
 }
 
 void _aes_trace(const char *fmt, ...)
 {
     va_list ap;
     va_start(ap, fmt);
-    _aes_write_trace("GEM_TRACE_AES", "/tmp/gem_aes_trace.log", fmt, ap);
+    _aes_write_trace("GEM_TRACE_AES", fmt, ap);
     va_end(ap);
 }
 

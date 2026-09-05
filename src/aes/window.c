@@ -119,25 +119,27 @@ WORD _aes_clip_visible_rects(const aes_window_t *target, const GRECT *base,
 
     pending[0] = *base;
 
-    for (i = 0; i < AES_MAX_WINDOWS && pending_count > 0; ++i) {
-        const aes_window_t *cover = &_aes.windows[i];
+    for (i = 0; i <= AES_MAX_WINDOWS && pending_count > 0; ++i) {
+        const aes_window_t *cover = i < AES_MAX_WINDOWS ? &_aes.windows[i] : NULL;
         GRECT cover_rect;
         WORD next_count = 0;
         WORD j;
 
-        if (cover->used == 0 || cover->open == 0) {
-            continue;
+        if (cover) {
+            if (cover->used == 0 || cover->open == 0) continue;
+            if (target != NULL &&
+                (cover->handle == handle || cover->z_order <= target->z_order))
+                continue;
+            _aes_window_cover_rect(cover, &cover_rect);
+        } else {
+            if (!_aes_modal_cover) continue;
+            cover_rect = *_aes_modal_cover;
         }
-        if (target != NULL &&
-            (cover->handle == handle || cover->z_order <= target->z_order)) {
-            continue;
-        }
-        _aes_window_cover_rect(cover, &cover_rect);
         if (cover_rect.g_w <= 0 || cover_rect.g_h <= 0) {
             continue;
         }
         _aes_trace("visible_rects cover handle=%d z=%lu rect=%d,%d %dx%d pending=%d",
-            cover->handle, (unsigned long) cover->z_order, cover_rect.g_x,
+            cover ? cover->handle : 0, (unsigned long) (cover ? cover->z_order : 0), cover_rect.g_x,
             cover_rect.g_y, cover_rect.g_w, cover_rect.g_h, pending_count);
 
         for (j = 0; j < pending_count; ++j) {
@@ -438,6 +440,9 @@ WORD wind_get(WORD handle, WORD field, WORD *w1, WORD *w2, WORD *w3, WORD *w4)
             }
             _aes_set_rect(&rect_value, 0, 0, 0, 0);
         }
+    } else if (field == WF_KIND) {
+        _aes_set_rect(&rect_value, (WORD) window->kind, 0, 0, 0);
+        rect = &rect_value;
     } else if (field == WF_WXYWH) {
         rect = &window->outer;
     } else if (field == WF_CXYWH) {
@@ -629,12 +634,15 @@ WORD wind_update(WORD flag)
     aes_app_t *app = _aes_find_app_by_id(_aes.current_app_id);
 
     if (flag == BEG_UPDATE) {
+        if (_aes.update_depth >= 32766 || (app && app->update_depth >= 32766))
+            return 0;
         ++_aes.update_depth;
         if (app != NULL) {
             ++app->update_depth;
         }
         _vdi_begin_update();
-    } else if (flag == END_UPDATE && _aes.update_depth > 0) {
+    } else if (flag == END_UPDATE && _aes.update_depth > 0 &&
+        (app == NULL || app->update_depth > 0)) {
         --_aes.update_depth;
         if (app != NULL && app->update_depth > 0) {
             --app->update_depth;

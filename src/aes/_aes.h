@@ -73,6 +73,13 @@ typedef struct aes_app {
     WORD input_event_count;
 } aes_app_t;
 
+/* Hosted server cooperation during synchronous panels; absent in direct AES. */
+extern int (*_aes_wait_hook)(void);
+/* Case-insensitive selector glob (* and ?); no recursive backtracking. */
+int _aes_fsel_match_pattern(const char *pattern, const char *name);
+/* Temporary alert occlusion; this is not an application-visible window. */
+extern const GRECT *_aes_modal_cover;
+
 typedef struct aes_window {
     WORD used;
     WORD handle;

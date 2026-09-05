@@ -67,8 +67,15 @@ WORD appl_init(void)
 
     for (i = 0; i < AES_MAX_APPS; ++i) {
         if (_aes.apps[i].used == 0) {
+            /* Reuse only a free positive WORD id; long-lived servers must
+             * not wrap into zero, negative ids, or another live app. */
+            WORD candidate = _aes.next_app_id;
+            if (candidate <= 0) candidate = 1;
+            while (_aes_find_app_by_id(candidate) != NULL)
+                candidate = candidate == 32767 ? 1 : (WORD) (candidate + 1);
             _aes.apps[i].used = 1;
-            _aes.apps[i].id = _aes.next_app_id++;
+            _aes.apps[i].id = candidate;
+            _aes.next_app_id = candidate == 32767 ? 1 : (WORD) (candidate + 1);
             strcpy(_aes.apps[i].name, "APP");
             _aes.current_app_id = _aes.apps[i].id;
             global[2] = _aes.current_app_id;

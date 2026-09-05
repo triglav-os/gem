@@ -258,6 +258,29 @@ static void clear_font_slot(vdi_font_t *font)
     memset(font, 0, sizeof(*font));
 }
 
+int _vdi_font_bitmap_valid(const uint8_t *data, size_t size,
+    WORD first, WORD last, WORD width, WORD height,
+    uint32_t bitmap_offset, uint32_t table_offset)
+{
+    size_t bitmap_size, entries, i;
+    uint16_t previous = 0;
+    if (!data || first < 0 || last < first || last > 255 ||
+        width <= 0 || width > 4095 || height <= 0 || height > 1024)
+        return 0;
+    bitmap_size = (size_t) width * (size_t) height;
+    entries = (size_t) (last - first + 2);
+    if (bitmap_offset < 88 || bitmap_offset > size ||
+        bitmap_size > size - bitmap_offset ||
+        table_offset < bitmap_offset + bitmap_size || table_offset > size ||
+        entries * 2 > size - table_offset) return 0;
+    for (i = 0; i < entries; ++i) {
+        uint16_t bit = read_le16(data + table_offset + i * 2);
+        if (bit < previous || bit > (unsigned) width * 8u) return 0;
+        previous = bit;
+    }
+    return 1;
+}
+
 static int load_font_file(vdi_font_t *font, WORD font_id, const char *file_name)
 {
     BYTE path[512];
@@ -271,10 +294,13 @@ static int load_font_file(vdi_font_t *font, WORD font_id, const char *file_name)
     size_t bitmap_size;
     size_t off_size;
     int i;
+    int path_length;
 
     strncpy(stored_file_name, file_name, sizeof(stored_file_name) - 1u);
     stored_file_name[sizeof(stored_file_name) - 1u] = '\0';
-    sprintf((char *) path, "%s/%s", font_dir(), stored_file_name);
+    path_length = snprintf((char *) path, sizeof(path), "%s/%s",
+        font_dir(), stored_file_name);
+    if (path_length < 0 || (size_t) path_length >= sizeof(path)) return 0;
     stream = fopen((const char *) path, "rb");
     if (stream == NULL) {
         return 0;
@@ -285,7 +311,8 @@ static int load_font_file(vdi_font_t *font, WORD font_id, const char *file_name)
         return 0;
     }
     file_size = ftell(stream);
-    if (file_size < 88L || fseek(stream, 0L, SEEK_SET) != 0) {
+    if (file_size < 88L || file_size > 16L * 1024L * 1024L ||
+        fseek(stream, 0L, SEEK_SET) != 0) {
         fclose(stream);
         return 0;
     }
@@ -322,6 +349,12 @@ static int load_font_file(vdi_font_t *font, WORD font_id, const char *file_name)
     font->data = data;
     font->data_size = (size_t) file_size;
 
+    if (font->form_width <= 0 || font->form_height <= 0 ||
+        font->first_ade < 0 || font->last_ade < font->first_ade ||
+        font->last_ade > 255) {
+        clear_font_slot(font);
+        return 0;
+    }
     bitmap_size = (size_t) font->form_width * (size_t) font->form_height;
     off_size = (size_t) (font->last_ade - font->first_ade + 2) * 2u;
     fields[0] = read_le32(data + 68);
@@ -338,8 +371,9 @@ static int load_font_file(vdi_font_t *font, WORD font_id, const char *file_name)
             }
         }
     }
-    if (data_offset == 0u || off_offset == 0u || off_offset <= data_offset) {
-        free(data);
+    if (!_vdi_font_bitmap_valid(data, (size_t) file_size,
+        font->first_ade, font->last_ade, font->form_width, font->form_height,
+        data_offset, off_offset)) {
         clear_font_runtime(font);
         return 0;
     }

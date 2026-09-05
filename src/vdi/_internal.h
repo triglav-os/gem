@@ -63,6 +63,10 @@ extern vdi_state_t _vdi;
 WORD _vdi_parse_env_word(const char *name, WORD fallback);
 WORD _vdi_load_standard_mouse_forms(void);
 int _vdi_load_fonts(void);
+/* Validate bitmap and glyph offsets before trusting an on-disk GEM font. */
+int _vdi_font_bitmap_valid(const uint8_t *data, size_t size,
+    WORD first, WORD last, WORD width, WORD height,
+    uint32_t bitmap_offset, uint32_t table_offset);
 WORD _vdi_load_external_fonts(void);
 WORD _vdi_unload_external_fonts(void);
 void _vdi_unload_fonts(void);
