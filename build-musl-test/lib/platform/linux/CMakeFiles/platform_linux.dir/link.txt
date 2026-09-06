@@ -1,1 +1,0 @@
-/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/gcc -fPIC -O3 -DNDEBUG -shared -Wl,-soname,libplatform_linux.so -o /home/tstih/data/triglav-os/gem/bin/lib/libplatform_linux.so CMakeFiles/platform_linux.dir/hid.c.o CMakeFiles/platform_linux.dir/os.c.o CMakeFiles/platform_linux.dir/raster.c.o  -Wl,-rpath,"\$ORIGIN/../lib" 

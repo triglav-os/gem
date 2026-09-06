@@ -1,3 +1,10 @@
+# Compilation artifacts
 /bin/
 /build/
+
+# Binaries we don't want in github.
 /docs/manuals/*.pdf
+
+# AI files
+.agents/
+.claude/

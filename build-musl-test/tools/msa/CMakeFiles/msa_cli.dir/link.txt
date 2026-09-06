@@ -1,1 +1,0 @@
-/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/gcc -O3 -DNDEBUG CMakeFiles/msa_cli.dir/cli.c.o -o ../../msa  -Wl,-rpath,"\$ORIGIN/../lib" /home/tstih/data/triglav-os/gem/bin/lib/libmsa.so /home/tstih/data/triglav-os/gem/bin/lib/libfat12.so 

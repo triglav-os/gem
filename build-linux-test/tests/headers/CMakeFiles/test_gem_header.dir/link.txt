@@ -1,1 +1,0 @@
-/usr/bin/cc -O3 -DNDEBUG CMakeFiles/test_gem_header.dir/test_gem_header.c.o -o test_gem_header  -Wl,-rpath,"\$ORIGIN/../lib" 

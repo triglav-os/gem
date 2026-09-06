@@ -1,1 +1,0 @@
-/usr/bin/cc -O3 -DNDEBUG CMakeFiles/multi.dir/main.c.o -o /home/tstih/data/triglav-os/gem/bin/demos/multi  -Wl,-rpath,"\$ORIGIN/../lib" /home/tstih/data/triglav-os/gem/bin/lib/libgem.so /home/tstih/data/triglav-os/gem/bin/lib/libplatform_linux.so 

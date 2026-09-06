@@ -76,7 +76,6 @@ if(EXISTS ${PROJECT_SOURCE_DIR}/src/rcs/CMakeLists.txt)
 endif()
 add_subdirectory(src/desktop)
 add_subdirectory(src/apps)
-add_subdirectory(samples)
 add_subdirectory(tests)
 
 set(GEMIX_ROOT ${PROJECT_SOURCE_DIR}/bin/gemix)

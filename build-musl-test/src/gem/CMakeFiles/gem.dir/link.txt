@@ -1,1 +1,0 @@
-/home/tstih/data/triglav-os/gemix/build/toolchain/obj/native/bin/gcc -fPIC -O3 -DNDEBUG -shared -Wl,-soname,libgem.so -o /home/tstih/data/triglav-os/gem/bin/lib/libgem.so CMakeFiles/gem.dir/client.c.o CMakeFiles/gem.dir/client_objc.c.o  -Wl,-rpath,"\$ORIGIN/../lib" /home/tstih/data/triglav-os/gem/bin/lib/libplatform_linux.so 

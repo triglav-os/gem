@@ -10,7 +10,7 @@
 
 # Demo23 Compatibility Gaps
 
-`samples/demo23/main.c` is intentionally treated as a compatibility
+`tests/uat/demo23/main.c` is intentionally treated as a compatibility
 probe rather than a hosted-native sample. The important question is not
 "can we rewrite it to work?" but "which historical GEM assumptions does
 the hosted port still violate?"

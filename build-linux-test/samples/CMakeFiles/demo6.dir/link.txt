@@ -1,1 +1,0 @@
-/usr/bin/cc -O3 -DNDEBUG CMakeFiles/demo6.dir/demo6/main.c.o CMakeFiles/demo6.dir/manual/manual_demo.c.o -o /home/tstih/data/triglav-os/gem/bin/demos/demo6  -Wl,-rpath,"\$ORIGIN/../lib" /home/tstih/data/triglav-os/gem/bin/lib/libvdi.so /home/tstih/data/triglav-os/gem/bin/lib/libplatform_linux.so -lm 

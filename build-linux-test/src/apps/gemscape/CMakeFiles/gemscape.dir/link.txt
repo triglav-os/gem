@@ -1,1 +1,0 @@
-/usr/bin/cc -O3 -DNDEBUG CMakeFiles/gemscape.dir/gemscape.c.o CMakeFiles/gemscape.dir/_gemscape.c.o -o /home/tstih/data/triglav-os/gem/bin/apps/gemscape  -Wl,-rpath,"\$ORIGIN/../lib" /home/tstih/data/triglav-os/gem/bin/lib/libaes.so /home/tstih/data/triglav-os/gem/bin/lib/libvdi.so /home/tstih/data/triglav-os/gem/bin/lib/libplatform_linux.so -lm 
