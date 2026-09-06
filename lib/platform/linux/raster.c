@@ -43,7 +43,7 @@ static uint32_t scale_channel(uint8_t value, uint32_t length)
         return 0u;
     }
     maximum = (length >= 32u) ? UINT32_MAX : ((UINT64_C(1) << length) - 1u);
-    return (uint32_t) (((uint64_t) value * maximum + 127u) / 255u);
+    return (uint32_t)(((uint64_t)value * maximum + 127u) / 255u);
 }
 
 static uint32_t native_pixel(uint8_t value)
@@ -54,19 +54,19 @@ static uint32_t native_pixel(uint8_t value)
     pixel |= scale_channel(value, g_var.green.length) << g_var.green.offset;
     pixel |= scale_channel(value, g_var.blue.length) << g_var.blue.offset;
     if (g_var.transp.length != 0u) {
-        pixel |= scale_channel(255u, g_var.transp.length) <<
-            g_var.transp.offset;
+        pixel |= scale_channel(255u, g_var.transp.length)
+                 << g_var.transp.offset;
     }
     return pixel;
 }
 
 static void write_native_pixel(uint8_t *destination, uint32_t pixel,
-    uint32_t bytes_per_pixel)
+                               uint32_t bytes_per_pixel)
 {
     uint32_t byte;
 
     for (byte = 0u; byte < bytes_per_pixel; ++byte) {
-        destination[byte] = (uint8_t) (pixel >> (byte * 8u));
+        destination[byte] = (uint8_t)(pixel >> (byte * 8u));
     }
 }
 
@@ -78,14 +78,13 @@ static void set_indexed_palette(void)
     struct fb_cmap map;
     unsigned int index;
 
-    if (g_var.bits_per_pixel != 8u ||
-        g_fix.visual == FB_VISUAL_TRUECOLOR ||
+    if (g_var.bits_per_pixel != 8u || g_fix.visual == FB_VISUAL_TRUECOLOR ||
         g_fix.visual == FB_VISUAL_DIRECTCOLOR) {
         return;
     }
 
     for (index = 0u; index < 256u; ++index) {
-        uint16_t value = (uint16_t) (index * 257u);
+        uint16_t value = (uint16_t)(index * 257u);
 
         red[index] = value;
         green[index] = value;
@@ -97,11 +96,10 @@ static void set_indexed_palette(void)
     map.red = red;
     map.green = green;
     map.blue = blue;
-    (void) ioctl(g_framebuffer_fd, FBIOPUTCMAP, &map);
+    (void)ioctl(g_framebuffer_fd, FBIOPUTCMAP, &map);
 }
 
-int gem_raster_init(uint16_t width, uint16_t height,
-    gem_raster_format_t format)
+int gem_raster_init(uint16_t width, uint16_t height, gem_raster_format_t format)
 {
     size_t pitch;
     size_t shadow_size;
@@ -130,24 +128,24 @@ int gem_raster_init(uint16_t width, uint16_t height,
 
     /* width/height 0 (or oversized) → use the full visible framebuffer. */
     if (width == 0u || width > g_var.xres) {
-        width = (uint16_t) g_var.xres;
+        width = (uint16_t)g_var.xres;
     }
     if (height == 0u || height > g_var.yres) {
-        height = (uint16_t) g_var.yres;
+        height = (uint16_t)g_var.yres;
     }
     if (width == 0u || height == 0u) {
         errno = ENOTSUP;
         gem_raster_shutdown();
         return 0;
     }
-    pitch = ((size_t) width + 7u) / 8u;
+    pitch = ((size_t)width + 7u) / 8u;
     if (pitch > UINT16_MAX) {
         errno = EOVERFLOW;
         gem_raster_shutdown();
         return 0;
     }
 
-    shadow_size = pitch * (size_t) height;
+    shadow_size = pitch * (size_t)height;
     g_surface.pixels = calloc(1u, shadow_size);
     if (g_surface.pixels == NULL) {
         gem_raster_shutdown();
@@ -156,7 +154,7 @@ int gem_raster_init(uint16_t width, uint16_t height,
 
     g_framebuffer_size = g_fix.smem_len;
     g_framebuffer = mmap(NULL, g_framebuffer_size, PROT_READ | PROT_WRITE,
-        MAP_SHARED, g_framebuffer_fd, 0);
+                         MAP_SHARED, g_framebuffer_fd, 0);
     if (g_framebuffer == MAP_FAILED) {
         g_framebuffer = NULL;
         gem_raster_shutdown();
@@ -165,7 +163,7 @@ int gem_raster_init(uint16_t width, uint16_t height,
 
     g_surface.width = width;
     g_surface.height = height;
-    g_surface.pitch = (uint16_t) pitch;
+    g_surface.pitch = (uint16_t)pitch;
     g_surface.format = format;
     set_indexed_palette();
     return 1;
@@ -180,10 +178,10 @@ void gem_raster_shutdown(void)
 {
     free(g_surface.pixels);
     if (g_framebuffer != NULL) {
-        (void) munmap(g_framebuffer, g_framebuffer_size);
+        (void)munmap(g_framebuffer, g_framebuffer_size);
     }
     if (g_framebuffer_fd >= 0) {
-        (void) close(g_framebuffer_fd);
+        (void)close(g_framebuffer_fd);
     }
     memset(&g_surface, 0, sizeof(g_surface));
     memset(&g_fix, 0, sizeof(g_fix));
@@ -215,26 +213,28 @@ static uint8_t shadow_bit_to_intensity(int bit_set)
  * mono shadow bytes into eight native pixels with 32-bit stores instead
  * of one bit → one pixel per loop iteration.
  */
-static void present_rect_xrgb32(const uint8_t *source, int x0, int y0,
-    int x1, int y1)
+static void present_rect_xrgb32(const uint8_t *source, int x0, int y0, int x1,
+                                int y1)
 {
     const uint32_t black = native_pixel(0u);
     const uint32_t white = native_pixel(255u);
     const size_t fb_pitch = g_fix.line_length;
     const size_t mono_pitch = g_surface.pitch;
-    const size_t x_off = (size_t) g_var.xoffset;
+    const size_t x_off = (size_t)g_var.xoffset;
     int row_y;
 
     for (row_y = y0; row_y <= y1; ++row_y) {
-        uint32_t *dst = (uint32_t *) (g_framebuffer +
-            ((size_t) row_y + g_var.yoffset) * fb_pitch) + x_off;
-        const uint8_t *src_row = source + (size_t) row_y * mono_pitch;
+        uint32_t *dst =
+            (uint32_t *)(g_framebuffer +
+                         ((size_t)row_y + g_var.yoffset) * fb_pitch) +
+            x_off;
+        const uint8_t *src_row = source + (size_t)row_y * mono_pitch;
         int col_x = x0;
 
         /* Leading partial mono byte. */
-        while (col_x <= x1 && ((unsigned int) col_x & 7u) != 0u) {
+        while (col_x <= x1 && ((unsigned int)col_x & 7u) != 0u) {
             uint8_t bits = src_row[col_x / 8];
-            int bit_set = (bits & (uint8_t) (0x80u >> (col_x & 7))) != 0u;
+            int bit_set = (bits & (uint8_t)(0x80u >> (col_x & 7))) != 0u;
 
             dst[col_x] = bit_set ? black : white;
             ++col_x;
@@ -259,7 +259,7 @@ static void present_rect_xrgb32(const uint8_t *source, int x0, int y0,
         /* Trailing partial mono byte. */
         while (col_x <= x1) {
             uint8_t bits = src_row[col_x / 8];
-            int bit_set = (bits & (uint8_t) (0x80u >> (col_x & 7))) != 0u;
+            int bit_set = (bits & (uint8_t)(0x80u >> (col_x & 7))) != 0u;
 
             dst[col_x] = bit_set ? black : white;
             ++col_x;
@@ -273,8 +273,8 @@ void gem_raster_present_rect(int x, int y, int width, int height)
     uint32_t bytes_per_pixel = (g_var.bits_per_pixel + 7u) / 8u;
     int x0;
     int y0;
-    int x1;
-    int y1;
+    int64_t x1;
+    int64_t y1;
     int row_y;
 
     if (source == NULL || g_framebuffer == NULL || width <= 0 || height <= 0) {
@@ -283,46 +283,44 @@ void gem_raster_present_rect(int x, int y, int width, int height)
 
     x0 = x;
     y0 = y;
-    x1 = x + width - 1;
-    y1 = y + height - 1;
+    x1 = (int64_t)x + width - 1;
+    y1 = (int64_t)y + height - 1;
     if (x0 < 0) {
         x0 = 0;
     }
     if (y0 < 0) {
         y0 = 0;
     }
-    if (x1 >= (int) g_surface.width) {
-        x1 = (int) g_surface.width - 1;
+    if (x1 >= (int)g_surface.width) {
+        x1 = (int)g_surface.width - 1;
     }
-    if (y1 >= (int) g_surface.height) {
-        y1 = (int) g_surface.height - 1;
+    if (y1 >= (int)g_surface.height) {
+        y1 = (int)g_surface.height - 1;
     }
     if (x0 > x1 || y0 > y1) {
         return;
     }
 
     /* QEMU std / most DRM fbdev: 32bpp, 4-byte aligned line length. */
-    if (g_var.bits_per_pixel == 32u &&
-        (g_fix.line_length % 4u) == 0u &&
-        ((uintptr_t) g_framebuffer % 4u) == 0u) {
+    if (g_var.bits_per_pixel == 32u && (g_fix.line_length % 4u) == 0u &&
+        ((uintptr_t)g_framebuffer % 4u) == 0u) {
         present_rect_xrgb32(source, x0, y0, x1, y1);
         return;
     }
 
     for (row_y = y0; row_y <= y1; ++row_y) {
-        uint8_t *row = g_framebuffer +
-            ((size_t) row_y + g_var.yoffset) * g_fix.line_length;
+        uint8_t *row =
+            g_framebuffer + ((size_t)row_y + g_var.yoffset) * g_fix.line_length;
         int col_x;
 
         if (g_var.bits_per_pixel == 1u) {
             for (col_x = x0; col_x <= x1; ++col_x) {
                 size_t source_offset =
-                    (size_t) row_y * g_surface.pitch + (size_t) col_x / 8u;
+                    (size_t)row_y * g_surface.pitch + (size_t)col_x / 8u;
                 uint8_t source_mask =
-                    (uint8_t) (0x80u >> ((unsigned int) col_x & 7u));
-                size_t target_x = (size_t) col_x + g_var.xoffset;
-                uint8_t target_mask =
-                    (uint8_t) (0x80u >> (target_x & 7u));
+                    (uint8_t)(0x80u >> ((unsigned int)col_x & 7u));
+                size_t target_x = (size_t)col_x + g_var.xoffset;
+                uint8_t target_mask = (uint8_t)(0x80u >> (target_x & 7u));
                 int bit_set = (source[source_offset] & source_mask) != 0u;
                 int white = shadow_bit_to_intensity(bit_set) != 0u;
 
@@ -332,25 +330,25 @@ void gem_raster_present_rect(int x, int y, int width, int height)
                 if (white) {
                     row[target_x / 8u] |= target_mask;
                 } else {
-                    row[target_x / 8u] &= (uint8_t) ~target_mask;
+                    row[target_x / 8u] &= (uint8_t)~target_mask;
                 }
             }
             continue;
         }
 
-        row += (size_t) g_var.xoffset * bytes_per_pixel;
+        row += (size_t)g_var.xoffset * bytes_per_pixel;
         for (col_x = x0; col_x <= x1; ++col_x) {
             size_t source_offset =
-                (size_t) row_y * g_surface.pitch + (size_t) col_x / 8u;
-            uint8_t mask =
-                (uint8_t) (0x80u >> ((unsigned int) col_x & 7u));
+                (size_t)row_y * g_surface.pitch + (size_t)col_x / 8u;
+            uint8_t mask = (uint8_t)(0x80u >> ((unsigned int)col_x & 7u));
             int bit_set = (source[source_offset] & mask) != 0u;
             uint8_t intensity = shadow_bit_to_intensity(bit_set);
-            uint32_t pixel = (g_var.bits_per_pixel == 8u) ?
-                intensity : native_pixel(intensity);
+            uint32_t pixel = (g_var.bits_per_pixel == 8u)
+                                 ? intensity
+                                 : native_pixel(intensity);
 
-            write_native_pixel(row + (size_t) col_x * bytes_per_pixel,
-                pixel, bytes_per_pixel);
+            write_native_pixel(row + (size_t)col_x * bytes_per_pixel, pixel,
+                               bytes_per_pixel);
         }
     }
 }
@@ -360,15 +358,14 @@ void gem_raster_present(void)
     if (g_surface.pixels == NULL) {
         return;
     }
-    gem_raster_present_rect(0, 0, (int) g_surface.width,
-        (int) g_surface.height);
+    gem_raster_present_rect(0, 0, (int)g_surface.width, (int)g_surface.height);
 }
 
 void gem_raster_set_palette(uint8_t index, uint8_t red, uint8_t green,
-    uint8_t blue)
+                            uint8_t blue)
 {
-    (void) index;
-    (void) red;
-    (void) green;
-    (void) blue;
+    (void)index;
+    (void)red;
+    (void)green;
+    (void)blue;
 }

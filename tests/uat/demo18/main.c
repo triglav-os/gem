@@ -26,14 +26,11 @@
  */
 static void handle_signal(int signum)
 {
-    (void) signum;
+    (void)signum;
     _exit(0);
 }
 
-enum {
-    TITLE_LABEL = 3,
-    ITEM_QUIT = 6
-};
+enum { TITLE_LABEL = 3, ITEM_QUIT = 6 };
 
 static char g_title_text[32];
 
@@ -44,8 +41,7 @@ static OBJECT g_tree[] = {
     {2, -1, -1, G_TITLE, NONE, NORMAL, 0L, 0, 0, 8, 1},
     {0, 5, 5, G_IBOX, NONE, NORMAL, 0L, 0, 0, 0, 0},
     {4, 6, 6, G_BOX, NONE, NORMAL, 0x1100L, 0, 0, 20, 1},
-    {5, -1, -1, G_STRING, LASTOB, NORMAL, (LONG) "  Quit \t^Q", 0, 0, 20, 1}
-};
+    {5, -1, -1, G_STRING, LASTOB, NORMAL, (LONG) "  Quit \t^Q", 0, 0, 20, 1}};
 
 static void redraw_window(WORD handle, VDI_HANDLE vdi_handle, char label)
 {
@@ -60,13 +56,13 @@ static void redraw_window(WORD handle, VDI_HANDLE vdi_handle, char label)
     wind_update(BEG_UPDATE);
     wind_get(handle, WF_WORKXYWH, &work.g_x, &work.g_y, &work.g_w, &work.g_h);
     wind_get(handle, WF_FIRSTXYWH, &visible.g_x, &visible.g_y, &visible.g_w,
-        &visible.g_h);
+             &visible.g_h);
 
     while (visible.g_w > 0 && visible.g_h > 0) {
         clip_xy[0] = visible.g_x;
         clip_xy[1] = visible.g_y;
-        clip_xy[2] = (WORD) (visible.g_x + visible.g_w - 1);
-        clip_xy[3] = (WORD) (visible.g_y + visible.g_h - 1);
+        clip_xy[2] = (WORD)(visible.g_x + visible.g_w - 1);
+        clip_xy[3] = (WORD)(visible.g_y + visible.g_h - 1);
         vs_clip(vdi_handle, 1, clip_xy);
 
         fill[0] = visible.g_x;
@@ -75,22 +71,22 @@ static void redraw_window(WORD handle, VDI_HANDLE vdi_handle, char label)
         fill[3] = clip_xy[3];
         /*
          * The VDI color-index-to-pixel mapping is inverted (see
-         * _vdi_color_to_pixel), so BLACK paints white pixels and
+         * vdi_color_to_pixel), so BLACK paints white pixels and
          * WHITE paints black ones -- matching how the AES engine's
-         * own _aes_light_color()/_aes_dark_color() do it.
+         * own aes_light_color()/aes_dark_color() do it.
          */
         vsf_color(vdi_handle, BLACK);
         vr_recfl(vdi_handle, fill);
         vst_color(vdi_handle, WHITE);
-        v_gtext(vdi_handle, (WORD) (work.g_x + 12), (WORD) (work.g_y + 18),
-            (CONST BYTE *) text);
-        v_gtext(vdi_handle, (WORD) (work.g_x + 12), (WORD) (work.g_y + 34),
-            (CONST BYTE *) "Click the other window,");
-        v_gtext(vdi_handle, (WORD) (work.g_x + 12), (WORD) (work.g_y + 46),
-            (CONST BYTE *) "then look at the menu bar.");
+        v_gtext(vdi_handle, (WORD)(work.g_x + 12), (WORD)(work.g_y + 18),
+                (CONST BYTE *)text);
+        v_gtext(vdi_handle, (WORD)(work.g_x + 12), (WORD)(work.g_y + 34),
+                (CONST BYTE *)"Click the other window,");
+        v_gtext(vdi_handle, (WORD)(work.g_x + 12), (WORD)(work.g_y + 46),
+                (CONST BYTE *)"then look at the menu bar.");
 
-        wind_get(handle, WF_NEXTXYWH, &visible.g_x, &visible.g_y,
-            &visible.g_w, &visible.g_h);
+        wind_get(handle, WF_NEXTXYWH, &visible.g_x, &visible.g_y, &visible.g_w,
+                 &visible.g_h);
     }
 
     vs_clip(vdi_handle, 0, clip_xy);
@@ -111,7 +107,7 @@ int main(int argc, char *argv[])
     int running = 1;
 
     if (argc > 1 && argv[1][0] != '\0') {
-        label = (char) toupper((unsigned char) argv[1][0]);
+        label = (char)toupper((unsigned char)argv[1][0]);
     }
     if (label == 'B') {
         x_offset = 260;
@@ -119,43 +115,43 @@ int main(int argc, char *argv[])
 
     snprintf(g_title_text, sizeof(g_title_text), " Demo %c ", label);
     snprintf(window_title, sizeof(window_title), "Menu Demo %c", label);
-    g_tree[TITLE_LABEL].ob_spec = (LONG) (intptr_t) g_title_text;
+    g_tree[TITLE_LABEL].ob_spec = (LONG)(intptr_t)g_title_text;
 
-    (void) signal(SIGINT, handle_signal);
-    (void) signal(SIGTERM, handle_signal);
+    (void)signal(SIGINT, handle_signal);
+    (void)signal(SIGTERM, handle_signal);
 
     app_id = appl_init();
     if (app_id <= 0) {
-        fprintf(stderr,
-            "menu_demo %c: appl_init failed -- is gemd running?\n", label);
+        fprintf(stderr, "menu_demo %c: appl_init failed -- is gemd running?\n",
+                label);
         return 1;
     }
 
     vdi_handle = graf_handle();
     if (vdi_handle == 0) {
         fprintf(stderr, "menu_demo %c: graf_handle failed\n", label);
-        (void) appl_exit();
+        (void)appl_exit();
         return 1;
     }
 
     wind_get(0, WF_WORKXYWH, &full.g_x, &full.g_y, &full.g_w, &full.g_h);
-    (void) wind_calc(WC_BORDER, NAME | CLOSER | MOVER,
-        (WORD) (full.g_x + 20 + x_offset), (WORD) (full.g_y + 40), 220, 110,
-        &outer.g_x, &outer.g_y, &outer.g_w, &outer.g_h);
+    (void)wind_calc(WC_BORDER, NAME | CLOSER | MOVER,
+                    (WORD)(full.g_x + 20 + x_offset), (WORD)(full.g_y + 40),
+                    220, 110, &outer.g_x, &outer.g_y, &outer.g_w, &outer.g_h);
 
     win_handle = wind_create(NAME | CLOSER | MOVER, full.g_x, full.g_y,
-        full.g_w, full.g_h);
+                             full.g_w, full.g_h);
     if (win_handle <= 0) {
         fprintf(stderr, "menu_demo %c: wind_create failed\n", label);
-        (void) appl_exit();
+        (void)appl_exit();
         return 1;
     }
 
-    wind_set(win_handle, WF_NAME, window_title, 0, 0);
+    wind_set_str(win_handle, WF_NAME, window_title);
     if (!wind_open(win_handle, outer.g_x, outer.g_y, outer.g_w, outer.g_h)) {
         fprintf(stderr, "menu_demo %c: wind_open failed\n", label);
-        (void) wind_delete(win_handle);
-        (void) appl_exit();
+        (void)wind_delete(win_handle);
+        (void)appl_exit();
         return 1;
     }
 
@@ -165,11 +161,11 @@ int main(int argc, char *argv[])
 
     redraw_window(win_handle, vdi_handle, label);
 
-    printf("menu_demo %c: window %d open, menu \"%s\" installed.\n",
-        label, win_handle, g_title_text);
+    printf("menu_demo %c: window %d open, menu \"%s\" installed.\n", label,
+           win_handle, g_title_text);
     printf("menu_demo %c: click between windows and watch the top menu\n"
            "  switch; Ctrl-Q or the Quit menu item exits this instance.\n",
-        label);
+           label);
     fflush(stdout);
 
     while (running) {
@@ -178,46 +174,47 @@ int main(int argc, char *argv[])
         }
 
         switch (msg[0]) {
-        case WM_REDRAW:
-            if (msg[3] == win_handle) {
-                redraw_window(win_handle, vdi_handle, label);
-            }
-            break;
+            case WM_REDRAW:
+                if (msg[3] == win_handle) {
+                    redraw_window(win_handle, vdi_handle, label);
+                }
+                break;
 
-        case WM_MOVED:
-        case WM_SIZED:
-            if (msg[3] == win_handle) {
-                (void) wind_set(win_handle, WF_CURRXYWH, msg[4], msg[5],
-                    msg[6], msg[7]);
-            }
-            break;
+            case WM_MOVED:
+            case WM_SIZED:
+                if (msg[3] == win_handle) {
+                    (void)wind_set(win_handle, WF_CURRXYWH, msg[4], msg[5],
+                                   msg[6], msg[7]);
+                }
+                break;
 
-        case WM_TOPPED:
-            if (msg[3] == win_handle) {
-                (void) wind_set(win_handle, WF_TOP, 0, 0, 0, 0);
-            }
-            break;
+            case WM_TOPPED:
+                if (msg[3] == win_handle) {
+                    (void)wind_set(win_handle, WF_TOP, 0, 0, 0, 0);
+                }
+                break;
 
-        case WM_CLOSED:
-            if (msg[3] == win_handle) {
-                running = 0;
-            }
-            break;
+            case WM_CLOSED:
+                if (msg[3] == win_handle) {
+                    running = 0;
+                }
+                break;
 
-        case MN_SELECTED:
-            if (msg[3] == TITLE_LABEL && msg[4] == ITEM_QUIT) {
-                running = 0;
-            }
-            break;
+            case MN_SELECTED:
+                if (msg[3] == TITLE_LABEL && msg[4] == ITEM_QUIT) {
+                    running = 0;
+                }
+                break;
 
-        default:
-            break;
+            default:
+                break;
         }
     }
 
-    (void) wind_close(win_handle);
-    (void) wind_delete(win_handle);
-    (void) appl_exit();
+    (void)menu_bar(g_tree, 0);
+    (void)wind_close(win_handle);
+    (void)wind_delete(win_handle);
+    (void)appl_exit();
     printf("menu_demo %c: exiting\n", label);
     return 0;
 }

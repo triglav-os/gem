@@ -15,7 +15,7 @@
 
 WORD appl_id;
 VDI_HANDLE vdi_handle;
-WORD work_in[11] = {1,1,1,1,1,1,1,1,1,1,2};
+WORD work_in[11] = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2};
 WORD work_out[57];
 
 int main(void)
@@ -54,7 +54,7 @@ int main(void)
         return 1;
     }
 
-    if (!rsrc_gaddr(R_TREE, DEMO27_TREE_DIALOG, (void **) &tree) ||
+    if (!rsrc_gaddr(R_TREE, DEMO27_TREE_DIALOG, (void **)&tree) ||
         tree == NULL) {
         form_alert(1, "[1][ Cannot find tree ][ Abort ]");
         rsrc_free();
@@ -76,11 +76,8 @@ int main(void)
     objc_draw(tree, ROOT, MAX_DEPTH, cx, cy, cw, ch);
 
     while (1) {
-        event = evnt_multi(MU_BUTTON | MU_KEYBD,
-            1, 1, 1,
-            0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0,
-            NULL, 0, 0, &mx, &my, &mb, &ks, &kr, &br);
+        event = evnt_multi(MU_BUTTON | MU_KEYBD, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0,
+                           0, 0, 0, NULL, 0, 0, &mx, &my, &mb, &ks, &kr, &br);
 
         if ((event & MU_KEYBD) != 0 && (kr & 0xff) == 27) {
             break;
@@ -100,13 +97,11 @@ int main(void)
         rect.g_w = tree[object].ob_width;
         rect.g_h = tree[object].ob_height;
 
-        objc_change(tree, object, 0,
-            rect.g_x, rect.g_y, rect.g_w, rect.g_h,
-            (WORD) (tree[object].ob_state | SELECTED), 1);
+        objc_change(tree, object, 0, rect.g_x, rect.g_y, rect.g_w, rect.g_h,
+                    (WORD)(tree[object].ob_state | SELECTED), 1);
         evnt_timer(90, 0);
-        objc_change(tree, object, 0,
-            rect.g_x, rect.g_y, rect.g_w, rect.g_h,
-            tree[object].ob_state, 1);
+        objc_change(tree, object, 0, rect.g_x, rect.g_y, rect.g_w, rect.g_h,
+                    tree[object].ob_state, 1);
 
         if (object == DEMO27_OBJ_OK) {
             strcpy(alert_text, "[1][ Resource file loaded ][ Nice ]");

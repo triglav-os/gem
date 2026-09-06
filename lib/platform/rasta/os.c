@@ -36,9 +36,7 @@ int gem_os_init(void)
     return 1;
 }
 
-void gem_os_shutdown(void)
-{
-}
+void gem_os_shutdown(void) {}
 
 void *gem_os_alloc(size_t size)
 {
@@ -59,9 +57,9 @@ uint32_t gem_os_ticks_ms(void)
         return 0u;
     }
 
-    ms = (uint64_t) ts.tv_sec * 1000u;
-    ms += (uint64_t) ts.tv_nsec / 1000000u;
-    return (uint32_t) (ms & 0xffffffffu);
+    ms = (uint64_t)ts.tv_sec * 1000u;
+    ms += (uint64_t)ts.tv_nsec / 1000000u;
+    return (uint32_t)(ms & 0xffffffffu);
 }
 
 void gem_os_sleep_ms(uint32_t ms)
@@ -69,8 +67,8 @@ void gem_os_sleep_ms(uint32_t ms)
     struct timespec req;
     struct timespec rem;
 
-    req.tv_sec = (time_t) (ms / 1000u);
-    req.tv_nsec = (long) (ms % 1000u) * 1000000l;
+    req.tv_sec = (time_t)(ms / 1000u);
+    req.tv_nsec = (long)(ms % 1000u) * 1000000l;
 
     while (nanosleep(&req, &rem) != 0) {
         if (errno != EINTR) {
@@ -123,7 +121,7 @@ int32_t gem_os_read(int fd, void *buf, uint32_t size)
         return -1;
     }
 
-    return (int32_t) rc;
+    return (int32_t)rc;
 }
 
 int32_t gem_os_write(int fd, const void *buf, uint32_t size)
@@ -144,7 +142,7 @@ int32_t gem_os_write(int fd, const void *buf, uint32_t size)
         return -1;
     }
 
-    return (int32_t) rc;
+    return (int32_t)rc;
 }
 
 int64_t gem_os_seek(int fd, int64_t offset, int whence)
@@ -153,25 +151,25 @@ int64_t gem_os_seek(int fd, int64_t offset, int whence)
     off_t rc;
 
     switch (whence) {
-    case 0:
-        seek_whence = SEEK_SET;
-        break;
-    case 1:
-        seek_whence = SEEK_CUR;
-        break;
-    case 2:
-        seek_whence = SEEK_END;
-        break;
-    default:
-        errno = EINVAL;
-        return -1;
+        case 0:
+            seek_whence = SEEK_SET;
+            break;
+        case 1:
+            seek_whence = SEEK_CUR;
+            break;
+        case 2:
+            seek_whence = SEEK_END;
+            break;
+        default:
+            errno = EINVAL;
+            return -1;
     }
 
-    rc = lseek(fd, (off_t) offset, seek_whence);
+    rc = lseek(fd, (off_t)offset, seek_whence);
     if (rc < 0) {
         return -1;
     }
-    return (int64_t) rc;
+    return (int64_t)rc;
 }
 
 int gem_os_getcwd(char *buf, size_t size)
@@ -228,8 +226,7 @@ int gem_os_rename(const char *old_path, const char *new_path)
     return (rename(old_path, new_path) == 0) ? 1 : 0;
 }
 
-static int gem_os_fill_info_from_stat(const char *name,
-                                      const struct stat *st,
+static int gem_os_fill_info_from_stat(const char *name, const struct stat *st,
                                       gem_os_file_info_t *info)
 {
     if (st == NULL || info == NULL) {
@@ -237,9 +234,9 @@ static int gem_os_fill_info_from_stat(const char *name,
         return 0;
     }
 
-    info->size_bytes = (uint64_t) st->st_size;
-    info->mtime_ms = (uint64_t) st->st_mtim.tv_sec * 1000u +
-        (uint64_t) st->st_mtim.tv_nsec / 1000000u;
+    info->size_bytes = (uint64_t)st->st_size;
+    info->mtime_ms = (uint64_t)st->st_mtim.tv_sec * 1000u +
+                     (uint64_t)st->st_mtim.tv_nsec / 1000000u;
     info->is_directory = S_ISDIR(st->st_mode) ? 1 : 0;
     info->is_hidden = (name != NULL && name[0] == '.') ? 1 : 0;
     info->is_read_only = ((st->st_mode & S_IWUSR) == 0) ? 1 : 0;
@@ -290,7 +287,7 @@ int gem_os_dir_read(gem_os_dir_t *dir, gem_os_dirent_t *entry)
         return 0;
     }
 
-    handle = (DIR *) dir->handle;
+    handle = (DIR *)dir->handle;
     for (;;) {
         char full_path[PATH_MAX];
         struct stat st;
@@ -305,9 +302,9 @@ int gem_os_dir_read(gem_os_dir_t *dir, gem_os_dirent_t *entry)
         strncpy(entry->name, dent->d_name, sizeof(entry->name) - 1u);
         entry->name[sizeof(entry->name) - 1u] = '\0';
 
-        rc = snprintf(full_path, sizeof(full_path), "%s/%s",
-            dir->path, dent->d_name);
-        if (rc < 0 || (size_t) rc >= sizeof(full_path)) {
+        rc = snprintf(full_path, sizeof(full_path), "%s/%s", dir->path,
+                      dent->d_name);
+        if (rc < 0 || (size_t)rc >= sizeof(full_path)) {
             continue;
         }
         if (stat(full_path, &st) != 0) {
@@ -325,7 +322,7 @@ void gem_os_dir_close(gem_os_dir_t *dir)
         return;
     }
 
-    (void) closedir((DIR *) dir->handle);
+    (void)closedir((DIR *)dir->handle);
     dir->handle = NULL;
     dir->path[0] = '\0';
 }
@@ -342,10 +339,10 @@ int gem_os_space(const char *path, uint64_t *total_bytes, uint64_t *avail_bytes)
         return 0;
     }
     if (total_bytes != NULL) {
-        *total_bytes = (uint64_t) st.f_blocks * (uint64_t) st.f_frsize;
+        *total_bytes = (uint64_t)st.f_blocks * (uint64_t)st.f_frsize;
     }
     if (avail_bytes != NULL) {
-        *avail_bytes = (uint64_t) st.f_bavail * (uint64_t) st.f_frsize;
+        *avail_bytes = (uint64_t)st.f_bavail * (uint64_t)st.f_frsize;
     }
     return 1;
 }
@@ -375,11 +372,10 @@ int gem_os_set_read_only(const char *path, int read_only)
 static int gem_os_should_expose_mount(const struct mntent *mnt)
 {
     static const char *const ignored_fs[] = {
-        "proc", "sysfs", "tmpfs", "devtmpfs", "devpts", "cgroup",
-        "cgroup2", "overlay", "squashfs", "nsfs", "mqueue", "debugfs",
-        "tracefs", "securityfs", "pstore", "autofs", "fusectl",
-        "configfs", "binfmt_misc", "ramfs"
-    };
+        "proc",   "sysfs",   "tmpfs",    "devtmpfs",    "devpts",
+        "cgroup", "cgroup2", "overlay",  "squashfs",    "nsfs",
+        "mqueue", "debugfs", "tracefs",  "securityfs",  "pstore",
+        "autofs", "fusectl", "configfs", "binfmt_misc", "ramfs"};
     size_t i;
 
     if (mnt == NULL || mnt->mnt_dir == NULL || mnt->mnt_type == NULL) {
@@ -418,9 +414,9 @@ static void gem_os_capitalize_label(char *label, size_t size)
             continue;
         }
         if (new_word != 0 && label[i] >= 'a' && label[i] <= 'z') {
-            label[i] = (char) (label[i] - ('a' - 'A'));
+            label[i] = (char)(label[i] - ('a' - 'A'));
         } else if (new_word == 0 && label[i] >= 'A' && label[i] <= 'Z') {
-            label[i] = (char) (label[i] + ('a' - 'A'));
+            label[i] = (char)(label[i] + ('a' - 'A'));
         }
         new_word = 0;
     }
@@ -444,8 +440,7 @@ int gem_os_volume_iter_open(gem_os_volume_iter_t *iter)
     return 1;
 }
 
-int gem_os_volume_iter_read(gem_os_volume_iter_t *iter,
-    gem_os_volume_t *volume)
+int gem_os_volume_iter_read(gem_os_volume_iter_t *iter, gem_os_volume_t *volume)
 {
     FILE *fp;
     struct mntent *mnt;
@@ -456,7 +451,7 @@ int gem_os_volume_iter_read(gem_os_volume_iter_t *iter,
         return 0;
     }
 
-    fp = (FILE *) iter->handle;
+    fp = (FILE *)iter->handle;
     for (;;) {
         mnt = getmntent(fp);
         if (mnt == NULL) {
@@ -467,7 +462,7 @@ int gem_os_volume_iter_read(gem_os_volume_iter_t *iter,
         }
 
         strncpy(volume->mount_path, mnt->mnt_dir,
-            sizeof(volume->mount_path) - 1u);
+                sizeof(volume->mount_path) - 1u);
         volume->mount_path[sizeof(volume->mount_path) - 1u] = '\0';
 
         if (strcmp(mnt->mnt_dir, "/") == 0) {
@@ -494,7 +489,7 @@ void gem_os_volume_iter_close(gem_os_volume_iter_t *iter)
         return;
     }
 
-    (void) endmntent((FILE *) iter->handle);
+    (void)endmntent((FILE *)iter->handle);
     iter->handle = NULL;
 }
 
@@ -508,16 +503,13 @@ static int gem_os_pty_apply_size(int fd, uint16_t columns, uint16_t rows)
     }
 
     memset(&ws, 0, sizeof(ws));
-    ws.ws_col = (unsigned short) ((columns > 0u) ? columns : 80u);
-    ws.ws_row = (unsigned short) ((rows > 0u) ? rows : 25u);
+    ws.ws_col = (unsigned short)((columns > 0u) ? columns : 80u);
+    ws.ws_row = (unsigned short)((rows > 0u) ? rows : 25u);
     return (ioctl(fd, TIOCSWINSZ, &ws) == 0) ? 1 : 0;
 }
 
-int gem_os_pty_spawn_shell(gem_os_pty_t *pty,
-                           const char *shell_path,
-                           const char *cwd,
-                           uint16_t columns,
-                           uint16_t rows)
+int gem_os_pty_spawn_shell(gem_os_pty_t *pty, const char *shell_path,
+                           const char *cwd, uint16_t columns, uint16_t rows)
 {
     int master_fd;
     int slave_fd = -1;
@@ -537,19 +529,19 @@ int gem_os_pty_spawn_shell(gem_os_pty_t *pty,
         return 0;
     }
     if (grantpt(master_fd) != 0 || unlockpt(master_fd) != 0) {
-        (void) close(master_fd);
+        (void)close(master_fd);
         return 0;
     }
 
     slave_name = ptsname(master_fd);
     if (slave_name == NULL) {
-        (void) close(master_fd);
+        (void)close(master_fd);
         return 0;
     }
 
     pid = fork();
     if (pid < 0) {
-        (void) close(master_fd);
+        (void)close(master_fd);
         return 0;
     }
 
@@ -571,12 +563,12 @@ int gem_os_pty_spawn_shell(gem_os_pty_t *pty,
             }
         }
 
-        (void) signal(SIGINT, SIG_DFL);
-        (void) signal(SIGTERM, SIG_DFL);
-        (void) signal(SIGHUP, SIG_DFL);
-        (void) signal(SIGCHLD, SIG_DFL);
+        (void)signal(SIGINT, SIG_DFL);
+        (void)signal(SIGTERM, SIG_DFL);
+        (void)signal(SIGHUP, SIG_DFL);
+        (void)signal(SIGCHLD, SIG_DFL);
 
-        (void) close(master_fd);
+        (void)close(master_fd);
         if (setsid() < 0) {
             _exit(127);
         }
@@ -585,28 +577,28 @@ int gem_os_pty_spawn_shell(gem_os_pty_t *pty,
         if (slave_fd < 0) {
             _exit(127);
         }
-        (void) gem_os_pty_apply_size(slave_fd, columns, rows);
-        (void) ioctl(slave_fd, TIOCSCTTY, 0);
-        (void) dup2(slave_fd, STDIN_FILENO);
-        (void) dup2(slave_fd, STDOUT_FILENO);
-        (void) dup2(slave_fd, STDERR_FILENO);
+        (void)gem_os_pty_apply_size(slave_fd, columns, rows);
+        (void)ioctl(slave_fd, TIOCSCTTY, 0);
+        (void)dup2(slave_fd, STDIN_FILENO);
+        (void)dup2(slave_fd, STDOUT_FILENO);
+        (void)dup2(slave_fd, STDERR_FILENO);
         if (slave_fd > STDERR_FILENO) {
-            (void) close(slave_fd);
+            (void)close(slave_fd);
         }
 
         if (cwd != NULL && cwd[0] != '\0') {
-            (void) chdir(cwd);
+            (void)chdir(cwd);
         }
-        (void) setenv("TERM", "dumb", 1);
-        (void) setenv("LINES", "25", 1);
-        (void) setenv("COLUMNS", "80", 1);
-        execl(shell, shell, "-i", (char *) NULL);
+        (void)setenv("TERM", "dumb", 1);
+        (void)setenv("LINES", "25", 1);
+        (void)setenv("COLUMNS", "80", 1);
+        execl(shell, shell, "-i", (char *)NULL);
         _exit(127);
     }
 
     pty->master_fd = master_fd;
-    pty->child_pid = (int) pid;
-    (void) gem_os_pty_apply_size(master_fd, columns, rows);
+    pty->child_pid = (int)pid;
+    (void)gem_os_pty_apply_size(master_fd, columns, rows);
     return 1;
 }
 
@@ -628,14 +620,14 @@ int32_t gem_os_pty_read(gem_os_pty_t *pty, void *buf, uint32_t size)
         return -1;
     }
 
-    rc = read(pty->master_fd, buf, (size_t) size);
+    rc = read(pty->master_fd, buf, (size_t)size);
     if (rc < 0) {
         if (errno == EAGAIN || errno == EWOULDBLOCK) {
             return 0;
         }
         return -1;
     }
-    return (int32_t) rc;
+    return (int32_t)rc;
 }
 
 int32_t gem_os_pty_write(gem_os_pty_t *pty, const void *buf, uint32_t size)
@@ -647,14 +639,14 @@ int32_t gem_os_pty_write(gem_os_pty_t *pty, const void *buf, uint32_t size)
         return -1;
     }
 
-    rc = write(pty->master_fd, buf, (size_t) size);
+    rc = write(pty->master_fd, buf, (size_t)size);
     if (rc < 0) {
         if (errno == EAGAIN || errno == EWOULDBLOCK) {
             return 0;
         }
         return -1;
     }
-    return (int32_t) rc;
+    return (int32_t)rc;
 }
 
 int gem_os_pty_is_alive(gem_os_pty_t *pty)
@@ -666,11 +658,11 @@ int gem_os_pty_is_alive(gem_os_pty_t *pty)
         return 0;
     }
 
-    rc = waitpid((pid_t) pty->child_pid, &status, WNOHANG);
+    rc = waitpid((pid_t)pty->child_pid, &status, WNOHANG);
     if (rc == 0) {
         return 1;
     }
-    if (rc == (pid_t) pty->child_pid) {
+    if (rc == (pid_t)pty->child_pid) {
         pty->child_pid = -1;
         return 0;
     }
@@ -684,12 +676,12 @@ void gem_os_pty_close(gem_os_pty_t *pty)
     }
 
     if (pty->child_pid > 0) {
-        (void) kill((pid_t) pty->child_pid, SIGHUP);
-        (void) waitpid((pid_t) pty->child_pid, NULL, 0);
+        (void)kill((pid_t)pty->child_pid, SIGHUP);
+        (void)waitpid((pid_t)pty->child_pid, NULL, 0);
         pty->child_pid = -1;
     }
     if (pty->master_fd >= 0) {
-        (void) close(pty->master_fd);
+        (void)close(pty->master_fd);
         pty->master_fd = -1;
     }
 }

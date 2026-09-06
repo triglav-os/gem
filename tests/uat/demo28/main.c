@@ -38,29 +38,20 @@ typedef struct demo28_state {
 
 static WORD appl_id;
 static VDI_HANDLE vdi_handle;
-static WORD work_in[11] = {1,1,1,1,1,1,1,1,1,1,2};
+static WORD work_in[11] = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2};
 static WORD work_out[57];
 
 static UWORD demo28_image_data[16] = {
-    0x07e0, 0x1ff8, 0x3c3c, 0x781e,
-    0x700e, 0xe667, 0xe667, 0xe667,
-    0xe007, 0xe667, 0xe667, 0x700e,
-    0x781e, 0x3c3c, 0x1ff8, 0x07e0
-};
+    0x07e0, 0x1ff8, 0x3c3c, 0x781e, 0x700e, 0xe667, 0xe667, 0xe667,
+    0xe007, 0xe667, 0xe667, 0x700e, 0x781e, 0x3c3c, 0x1ff8, 0x07e0};
 
 static UWORD demo28_icon_mask[16] = {
-    0x03c0, 0x0ff0, 0x1ff8, 0x3ffc,
-    0x7ffe, 0x7ffe, 0xffff, 0xffff,
-    0xffff, 0xffff, 0x7ffe, 0x7ffe,
-    0x3ffc, 0x1ff8, 0x0ff0, 0x03c0
-};
+    0x03c0, 0x0ff0, 0x1ff8, 0x3ffc, 0x7ffe, 0x7ffe, 0xffff, 0xffff,
+    0xffff, 0xffff, 0x7ffe, 0x7ffe, 0x3ffc, 0x1ff8, 0x0ff0, 0x03c0};
 
 static UWORD demo28_icon_data[16] = {
-    0x0000, 0x0660, 0x0ff0, 0x1ff8,
-    0x3c3c, 0x781e, 0x700e, 0xe667,
-    0xe667, 0x700e, 0x781e, 0x3c3c,
-    0x1ff8, 0x0ff0, 0x0660, 0x0000
-};
+    0x0000, 0x0660, 0x0ff0, 0x1ff8, 0x3c3c, 0x781e, 0x700e, 0xe667,
+    0xe667, 0x700e, 0x781e, 0x3c3c, 0x1ff8, 0x0ff0, 0x0660, 0x0000};
 
 static char demo28_icon_text[] = "ICON";
 static char demo28_plain_text[] = "Plain TEDINFO text";
@@ -68,15 +59,8 @@ static char demo28_box_text[] = "Boxed TEDINFO";
 static char demo28_text_template[] = "____________________";
 static char demo28_text_valid[] = "XXXXXXXXXXXXXXXXXXXX";
 
-static void init_object(OBJECT *object,
-                        UWORD type,
-                        UWORD flags,
-                        UWORD state,
-                        LONG spec,
-                        WORD x,
-                        WORD y,
-                        WORD w,
-                        WORD h)
+static void init_object(OBJECT *object, UWORD type, UWORD flags, UWORD state,
+                        LONG spec, WORD x, WORD y, WORD w, WORD h)
 {
     object->ob_next = NIL;
     object->ob_head = NIL;
@@ -95,16 +79,16 @@ static void update_status(demo28_state_t *state, const char *text)
 {
     strncpy(state->status, text, sizeof(state->status) - 1u);
     state->status[sizeof(state->status) - 1u] = '\0';
-    state->tree[D28_STATUS].ob_spec = (LONG) (intptr_t) state->status;
+    state->tree[D28_STATUS].ob_spec = (LONG)(intptr_t)state->status;
 }
 
 static void init_tree(demo28_state_t *state)
 {
     memset(state, 0, sizeof(*state));
 
-    state->ted[0].te_ptext = (LONG) (intptr_t) demo28_plain_text;
-    state->ted[0].te_ptmplt = (LONG) (intptr_t) demo28_text_template;
-    state->ted[0].te_pvalid = (LONG) (intptr_t) demo28_text_valid;
+    state->ted[0].te_ptext = (LONG)(intptr_t)demo28_plain_text;
+    state->ted[0].te_ptmplt = (LONG)(intptr_t)demo28_text_template;
+    state->ted[0].te_pvalid = (LONG)(intptr_t)demo28_text_valid;
     state->ted[0].te_font = 3;
     state->ted[0].te_junk1 = 0;
     state->ted[0].te_just = 0;
@@ -115,20 +99,20 @@ static void init_tree(demo28_state_t *state)
     state->ted[0].te_tmplen = 21;
 
     state->ted[1] = state->ted[0];
-    state->ted[1].te_ptext = (LONG) (intptr_t) demo28_box_text;
+    state->ted[1].te_ptext = (LONG)(intptr_t)demo28_box_text;
     state->ted[1].te_txtlen = 16;
     state->ted[1].te_tmplen = 16;
 
-    state->bitblk.bi_pdata = (LONG) (intptr_t) demo28_image_data;
+    state->bitblk.bi_pdata = (LONG)(intptr_t)demo28_image_data;
     state->bitblk.bi_wb = 2;
     state->bitblk.bi_hl = 16;
     state->bitblk.bi_x = 0;
     state->bitblk.bi_y = 0;
     state->bitblk.bi_color = 1;
 
-    state->iconblk.ib_pmask = (LONG) (intptr_t) demo28_icon_mask;
-    state->iconblk.ib_pdata = (LONG) (intptr_t) demo28_icon_data;
-    state->iconblk.ib_ptext = (LONG) (intptr_t) demo28_icon_text;
+    state->iconblk.ib_pmask = (LONG)(intptr_t)demo28_icon_mask;
+    state->iconblk.ib_pdata = (LONG)(intptr_t)demo28_icon_data;
+    state->iconblk.ib_ptext = (LONG)(intptr_t)demo28_icon_text;
     state->iconblk.ib_char = 0;
     state->iconblk.ib_xchar = 0;
     state->iconblk.ib_ychar = 0;
@@ -141,31 +125,30 @@ static void init_tree(demo28_state_t *state)
     state->iconblk.ib_wtext = 32;
     state->iconblk.ib_htext = 8;
 
-    init_object(&state->tree[D28_ROOT], G_IBOX, LASTOB, NORMAL, 0L,
-        0, 0, 340, 184);
+    init_object(&state->tree[D28_ROOT], G_IBOX, NONE, NORMAL, 0L, 0, 0, 340,
+                184);
     init_object(&state->tree[D28_HEAD], G_STRING, NONE, NORMAL,
-        (LONG) (intptr_t) "Demo 28 object gallery", 14, 14, 150, 8);
+                (LONG)(intptr_t) "Demo 28 object gallery", 14, 14, 150, 8);
     init_object(&state->tree[D28_TEXT_LABEL], G_STRING, NONE, NORMAL,
-        (LONG) (intptr_t) "G_TEXT", 14, 42, 48, 8);
+                (LONG)(intptr_t) "G_TEXT", 14, 42, 48, 8);
     init_object(&state->tree[D28_TEXT_VALUE], G_TEXT, NONE, NORMAL,
-        (LONG) (intptr_t) &state->ted[0], 84, 38, 150, 16);
+                (LONG)(intptr_t)&state->ted[0], 84, 38, 150, 16);
     init_object(&state->tree[D28_BOXTEXT_LABEL], G_STRING, NONE, NORMAL,
-        (LONG) (intptr_t) "G_BOXTEXT", 14, 74, 64, 8);
+                (LONG)(intptr_t) "G_BOXTEXT", 14, 74, 64, 8);
     init_object(&state->tree[D28_BOXTEXT_VALUE], G_BOXTEXT, NONE, NORMAL,
-        (LONG) (intptr_t) &state->ted[1], 84, 70, 128, 18);
+                (LONG)(intptr_t)&state->ted[1], 84, 70, 128, 18);
     init_object(&state->tree[D28_IMAGE_LABEL], G_STRING, NONE, NORMAL,
-        (LONG) (intptr_t) "G_IMAGE", 14, 108, 54, 8);
+                (LONG)(intptr_t) "G_IMAGE", 14, 108, 54, 8);
     init_object(&state->tree[D28_IMAGE], G_IMAGE, SELECTABLE, NORMAL,
-        (LONG) (intptr_t) &state->bitblk, 84, 104, 16, 16);
+                (LONG)(intptr_t)&state->bitblk, 84, 104, 16, 16);
     init_object(&state->tree[D28_ICON_LABEL], G_STRING, NONE, NORMAL,
-        (LONG) (intptr_t) "G_ICON", 150, 108, 48, 8);
+                (LONG)(intptr_t) "G_ICON", 150, 108, 48, 8);
     init_object(&state->tree[D28_ICON], G_ICON, SELECTABLE, NORMAL,
-        (LONG) (intptr_t) &state->iconblk, 218, 102, 32, 28);
-    init_object(&state->tree[D28_STATUS], G_STRING, NONE, NORMAL, 0L,
-        14, 146, 250, 8);
-    init_object(&state->tree[D28_DONE], G_BUTTON,
-        SELECTABLE | EXIT | DEFAULT, NORMAL,
-        (LONG) (intptr_t) "Done", 258, 142, 58, 22);
+                (LONG)(intptr_t)&state->iconblk, 218, 102, 32, 28);
+    init_object(&state->tree[D28_STATUS], G_STRING, NONE, NORMAL, 0L, 14, 146,
+                250, 8);
+    init_object(&state->tree[D28_DONE], G_BUTTON, SELECTABLE | EXIT | DEFAULT,
+                NORMAL, (LONG)(intptr_t) "Done", 258, 142, 58, 22);
 
     objc_add(state->tree, D28_ROOT, D28_HEAD);
     objc_add(state->tree, D28_ROOT, D28_TEXT_LABEL);
@@ -178,6 +161,7 @@ static void init_tree(demo28_state_t *state)
     objc_add(state->tree, D28_ROOT, D28_ICON);
     objc_add(state->tree, D28_ROOT, D28_STATUS);
     objc_add(state->tree, D28_ROOT, D28_DONE);
+    state->tree[D28_DONE].ob_flags |= LASTOB;
 
     update_status(state, "Click image or icon to test object hit/draw.");
 }
@@ -186,8 +170,8 @@ static void sync_root_rect(demo28_state_t *state)
 {
     GRECT work;
 
-    wind_get(state->handle, WF_WORKXYWH,
-        &work.g_x, &work.g_y, &work.g_w, &work.g_h);
+    wind_get(state->handle, WF_WORKXYWH, &work.g_x, &work.g_y, &work.g_w,
+             &work.g_h);
     state->tree[D28_ROOT].ob_x = work.g_x;
     state->tree[D28_ROOT].ob_y = work.g_y;
     state->tree[D28_ROOT].ob_width = work.g_w;
@@ -200,37 +184,41 @@ static void draw_tree(demo28_state_t *state, const GRECT *dirty)
 
     sync_root_rect(state);
     wind_update(BEG_UPDATE);
-    wind_get(state->handle, WF_FIRSTXYWH,
-        &box.g_x, &box.g_y, &box.g_w, &box.g_h);
+    wind_get(state->handle, WF_FIRSTXYWH, &box.g_x, &box.g_y, &box.g_w,
+             &box.g_h);
 
     while (box.g_w > 0 && box.g_h > 0) {
         WORD x0 = box.g_x;
         WORD y0 = box.g_y;
-        WORD x1 = (WORD) (box.g_x + box.g_w - 1);
-        WORD y1 = (WORD) (box.g_y + box.g_h - 1);
+        WORD x1 = (WORD)(box.g_x + box.g_w - 1);
+        WORD y1 = (WORD)(box.g_y + box.g_h - 1);
 
         if (dirty != NULL) {
-            WORD dx1 = (WORD) (dirty->g_x + dirty->g_w - 1);
-            WORD dy1 = (WORD) (dirty->g_y + dirty->g_h - 1);
+            WORD dx1 = (WORD)(dirty->g_x + dirty->g_w - 1);
+            WORD dy1 = (WORD)(dirty->g_y + dirty->g_h - 1);
 
-            if (x0 < dirty->g_x) x0 = dirty->g_x;
-            if (y0 < dirty->g_y) y0 = dirty->g_y;
-            if (x1 > dx1) x1 = dx1;
-            if (y1 > dy1) y1 = dy1;
+            if (x0 < dirty->g_x)
+                x0 = dirty->g_x;
+            if (y0 < dirty->g_y)
+                y0 = dirty->g_y;
+            if (x1 > dx1)
+                x1 = dx1;
+            if (y1 > dy1)
+                y1 = dy1;
         }
 
         if (x0 <= x1 && y0 <= y1) {
-            WORD fill[4] = { x0, y0, x1, y1 };
+            WORD fill[4] = {x0, y0, x1, y1};
 
-            (void) vswr_mode(vdi_handle, MD_REPLACE);
+            (void)vswr_mode(vdi_handle, MD_REPLACE);
             vsf_color(vdi_handle, BLACK);
             v_bar(vdi_handle, fill);
-            objc_draw(state->tree, ROOT, MAX_DEPTH,
-                x0, y0, (WORD) (x1 - x0 + 1), (WORD) (y1 - y0 + 1));
+            objc_draw(state->tree, ROOT, MAX_DEPTH, x0, y0, (WORD)(x1 - x0 + 1),
+                      (WORD)(y1 - y0 + 1));
         }
 
-        wind_get(state->handle, WF_NEXTXYWH,
-            &box.g_x, &box.g_y, &box.g_w, &box.g_h);
+        wind_get(state->handle, WF_NEXTXYWH, &box.g_x, &box.g_y, &box.g_w,
+                 &box.g_h);
     }
     wind_update(END_UPDATE);
 }
@@ -248,13 +236,11 @@ static void flash_object(demo28_state_t *state, WORD object)
     rect.g_w = state->tree[object].ob_width;
     rect.g_h = state->tree[object].ob_height;
     old_state = state->tree[object].ob_state;
-    objc_change(state->tree, object, 0,
-        rect.g_x, rect.g_y, rect.g_w, rect.g_h,
-        (WORD) (old_state | SELECTED), 1);
+    objc_change(state->tree, object, 0, rect.g_x, rect.g_y, rect.g_w, rect.g_h,
+                (WORD)(old_state | SELECTED), 1);
     evnt_timer(100, 0);
-    objc_change(state->tree, object, 0,
-        rect.g_x, rect.g_y, rect.g_w, rect.g_h,
-        old_state, 1);
+    objc_change(state->tree, object, 0, rect.g_x, rect.g_y, rect.g_w, rect.g_h,
+                old_state, 1);
 }
 
 int main(void)
@@ -276,7 +262,7 @@ int main(void)
     init_tree(&state);
     wind_get(0, WF_WORKXYWH, &work.g_x, &work.g_y, &work.g_w, &work.g_h);
     state.handle = wind_create(NAME | CLOSER | MOVER, work.g_x + 32,
-        work.g_y + 24, 360, 212);
+                               work.g_y + 24, 360, 212);
     if (state.handle <= 0) {
         v_clsvwk(vdi_handle);
         appl_exit();
@@ -296,11 +282,9 @@ int main(void)
         WORD kr = 0;
         WORD br = 0;
 
-        event = evnt_multi(MU_MESAG | MU_BUTTON | MU_KEYBD,
-            1, 1, 1,
-            0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0,
-            msg, 0, 0, &mx, &my, &mb, &ks, &kr, &br);
+        event =
+            evnt_multi(MU_MESAG | MU_BUTTON | MU_KEYBD, 1, 1, 1, 0, 0, 0, 0, 0,
+                       0, 0, 0, 0, 0, msg, 0, 0, &mx, &my, &mb, &ks, &kr, &br);
 
         if ((event & MU_KEYBD) != 0 && (kr & 0xff) == 27) {
             done = 1;
@@ -308,30 +292,30 @@ int main(void)
 
         if ((event & MU_MESAG) != 0) {
             switch (msg[0]) {
-            case WM_REDRAW: {
-                GRECT dirty;
+                case WM_REDRAW: {
+                    GRECT dirty;
 
-                dirty.g_x = msg[4];
-                dirty.g_y = msg[5];
-                dirty.g_w = msg[6];
-                dirty.g_h = msg[7];
-                draw_tree(&state, &dirty);
-                break;
-            }
-            case WM_TOPPED:
-                wind_set(state.handle, WF_TOP, 0, 0, 0, 0);
-                break;
-            case WM_CLOSED:
-                done = 1;
-                break;
-            case WM_MOVED:
-            case WM_SIZED:
-                wind_set(state.handle, WF_CURRXYWH,
-                    msg[4], msg[5], msg[6], msg[7]);
-                draw_tree(&state, NULL);
-                break;
-            default:
-                break;
+                    dirty.g_x = msg[4];
+                    dirty.g_y = msg[5];
+                    dirty.g_w = msg[6];
+                    dirty.g_h = msg[7];
+                    draw_tree(&state, &dirty);
+                    break;
+                }
+                case WM_TOPPED:
+                    wind_set(state.handle, WF_TOP, 0, 0, 0, 0);
+                    break;
+                case WM_CLOSED:
+                    done = 1;
+                    break;
+                case WM_MOVED:
+                case WM_SIZED:
+                    wind_set(state.handle, WF_CURRXYWH, msg[4], msg[5], msg[6],
+                             msg[7]);
+                    draw_tree(&state, NULL);
+                    break;
+                default:
+                    break;
             }
         }
 
@@ -339,22 +323,22 @@ int main(void)
             WORD object = objc_find(state.tree, ROOT, MAX_DEPTH, mx, my);
 
             switch (object) {
-            case D28_IMAGE:
-                update_status(&state, "G_IMAGE clicked.");
-                flash_object(&state, object);
-                draw_tree(&state, NULL);
-                break;
-            case D28_ICON:
-                update_status(&state, "G_ICON clicked.");
-                flash_object(&state, object);
-                draw_tree(&state, NULL);
-                break;
-            case D28_DONE:
-                flash_object(&state, object);
-                done = 1;
-                break;
-            default:
-                break;
+                case D28_IMAGE:
+                    update_status(&state, "G_IMAGE clicked.");
+                    flash_object(&state, object);
+                    draw_tree(&state, NULL);
+                    break;
+                case D28_ICON:
+                    update_status(&state, "G_ICON clicked.");
+                    flash_object(&state, object);
+                    draw_tree(&state, NULL);
+                    break;
+                case D28_DONE:
+                    flash_object(&state, object);
+                    done = 1;
+                    break;
+                default:
+                    break;
             }
         }
     }

@@ -27,7 +27,7 @@ enum {
 
 WORD appl_id;
 VDI_HANDLE vdi_handle;
-WORD work_in[11] = {1,1,1,1,1,1,1,1,1,1,2};
+WORD work_in[11] = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2};
 WORD work_out[57];
 OBJECT dialog_tree[D24_COUNT];
 char dialog_status[80] = "Vintage selected, mode A.";
@@ -35,9 +35,8 @@ WORD dialog_done = 0;
 WORD checkbox_on = 1;
 WORD radio_mode = 0;
 
-void init_object(OBJECT *object,
-    UWORD type, UWORD flags, UWORD state, LONG spec,
-    WORD x, WORD y, WORD w, WORD h)
+void init_object(OBJECT *object, UWORD type, UWORD flags, UWORD state,
+                 LONG spec, WORD x, WORD y, WORD w, WORD h)
 {
     object->ob_next = NIL;
     object->ob_head = NIL;
@@ -54,53 +53,49 @@ void init_object(OBJECT *object,
 
 void update_dialog_status(void)
 {
-    strcpy(dialog_status, checkbox_on ?
-        "Vintage selected, " : "Vintage cleared, ");
+    strcpy(dialog_status,
+           checkbox_on ? "Vintage selected, " : "Vintage cleared, ");
     strcat(dialog_status, (radio_mode == 0) ? "mode A." : "mode B.");
-    dialog_tree[D24_STATUS].ob_spec = (LONG) (intptr_t) dialog_status;
+    dialog_tree[D24_STATUS].ob_spec = (LONG)(intptr_t)dialog_status;
 
     if (checkbox_on != 0) {
         dialog_tree[D24_CHECK].ob_state |= CHECKED;
     } else {
-        dialog_tree[D24_CHECK].ob_state &= (UWORD) ~CHECKED;
+        dialog_tree[D24_CHECK].ob_state &= (UWORD)~CHECKED;
     }
 
     if (radio_mode == 0) {
         dialog_tree[D24_RADIO_A].ob_state |= CHECKED;
-        dialog_tree[D24_RADIO_B].ob_state &= (UWORD) ~CHECKED;
+        dialog_tree[D24_RADIO_B].ob_state &= (UWORD)~CHECKED;
     } else {
-        dialog_tree[D24_RADIO_A].ob_state &= (UWORD) ~CHECKED;
+        dialog_tree[D24_RADIO_A].ob_state &= (UWORD)~CHECKED;
         dialog_tree[D24_RADIO_B].ob_state |= CHECKED;
     }
 }
 
 void init_dialog_tree(void)
 {
-    init_object(&dialog_tree[D24_ROOT], G_IBOX, LASTOB, NORMAL, 0L,
-        0, 0, 300, 170);
-    init_object(&dialog_tree[D24_PANEL], G_BOX, NONE, NORMAL, 0L,
-        0, 0, 300, 170);
+    init_object(&dialog_tree[D24_ROOT], G_IBOX, NONE, NORMAL, 0L, 0, 0, 300,
+                170);
+    init_object(&dialog_tree[D24_PANEL], G_BOX, NONE, NORMAL, 0L, 0, 0, 300,
+                170);
     init_object(&dialog_tree[D24_TITLE], G_STRING, NONE, NORMAL,
-        (LONG) (intptr_t) "Demo 24 Dialog", 18, 14, 120, 8);
+                (LONG)(intptr_t) "Demo 24 Dialog", 18, 14, 120, 8);
     init_object(&dialog_tree[D24_PROMPT], G_STRING, NONE, NORMAL,
-        (LONG) (intptr_t) "Classic form objects, no helper magic.",
-        18, 34, 220, 8);
+                (LONG)(intptr_t) "Classic form objects, no helper magic.", 18,
+                34, 220, 8);
     init_object(&dialog_tree[D24_CHECK], G_BUTTON, SELECTABLE, NORMAL,
-        (LONG) (intptr_t) "Vintage style", 18, 56, 122, 22);
-    init_object(&dialog_tree[D24_RADIO_A], G_BUTTON,
-        SELECTABLE | RBUTTON, NORMAL,
-        (LONG) (intptr_t) "Mode A", 18, 84, 100, 22);
-    init_object(&dialog_tree[D24_RADIO_B], G_BUTTON,
-        SELECTABLE | RBUTTON, NORMAL,
-        (LONG) (intptr_t) "Mode B", 128, 84, 100, 22);
-    init_object(&dialog_tree[D24_STATUS], G_STRING, NONE, NORMAL, 0L,
-        18, 118, 220, 8);
-    init_object(&dialog_tree[D24_OK], G_BUTTON,
-        SELECTABLE | EXIT | DEFAULT, NORMAL,
-        (LONG) (intptr_t) "OK", 150, 140, 58, 22);
-    init_object(&dialog_tree[D24_CANCEL], G_BUTTON,
-        SELECTABLE | EXIT, NORMAL,
-        (LONG) (intptr_t) "Cancel", 218, 140, 64, 22);
+                (LONG)(intptr_t) "Vintage style", 18, 56, 122, 22);
+    init_object(&dialog_tree[D24_RADIO_A], G_BUTTON, SELECTABLE | RBUTTON,
+                NORMAL, (LONG)(intptr_t) "Mode A", 18, 84, 100, 22);
+    init_object(&dialog_tree[D24_RADIO_B], G_BUTTON, SELECTABLE | RBUTTON,
+                NORMAL, (LONG)(intptr_t) "Mode B", 128, 84, 100, 22);
+    init_object(&dialog_tree[D24_STATUS], G_STRING, NONE, NORMAL, 0L, 18, 118,
+                220, 8);
+    init_object(&dialog_tree[D24_OK], G_BUTTON, SELECTABLE | EXIT | DEFAULT,
+                NORMAL, (LONG)(intptr_t) "OK", 150, 140, 58, 22);
+    init_object(&dialog_tree[D24_CANCEL], G_BUTTON, SELECTABLE | EXIT, NORMAL,
+                (LONG)(intptr_t) "Cancel", 218, 140, 64, 22);
 
     objc_add(dialog_tree, D24_ROOT, D24_PANEL);
     objc_add(dialog_tree, D24_ROOT, D24_TITLE);
@@ -111,6 +106,7 @@ void init_dialog_tree(void)
     objc_add(dialog_tree, D24_ROOT, D24_STATUS);
     objc_add(dialog_tree, D24_ROOT, D24_OK);
     objc_add(dialog_tree, D24_ROOT, D24_CANCEL);
+    dialog_tree[D24_CANCEL].ob_flags |= LASTOB;
 
     update_dialog_status();
 }
@@ -134,20 +130,18 @@ void flash_object(WORD object)
 
     object_rect(dialog_tree, object, &rect);
     old_state = dialog_tree[object].ob_state;
-    objc_change(dialog_tree, object, 0,
-        rect.g_x, rect.g_y, rect.g_w, rect.g_h,
-        (WORD) (old_state | SELECTED), 1);
+    objc_change(dialog_tree, object, 0, rect.g_x, rect.g_y, rect.g_w, rect.g_h,
+                (WORD)(old_state | SELECTED), 1);
     evnt_timer(180, 0);
-    objc_change(dialog_tree, object, 0,
-        rect.g_x, rect.g_y, rect.g_w, rect.g_h,
-        old_state, 1);
+    objc_change(dialog_tree, object, 0, rect.g_x, rect.g_y, rect.g_w, rect.g_h,
+                old_state, 1);
 }
 
 void redraw_dialog(void)
 {
-    objc_draw(dialog_tree, ROOT, MAX_DEPTH,
-        dialog_tree[ROOT].ob_x, dialog_tree[ROOT].ob_y,
-        dialog_tree[ROOT].ob_width, dialog_tree[ROOT].ob_height);
+    objc_draw(dialog_tree, ROOT, MAX_DEPTH, dialog_tree[ROOT].ob_x,
+              dialog_tree[ROOT].ob_y, dialog_tree[ROOT].ob_width,
+              dialog_tree[ROOT].ob_height);
 }
 
 int main(void)
@@ -183,13 +177,9 @@ int main(void)
     while (dialog_done == 0) {
         WORD object;
 
-        event = evnt_multi(MU_BUTTON | MU_KEYBD,
-            1, 1, 1,
-            0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0,
-            NULL, 0, 0,
-            &mouse_x, &mouse_y, &mouse_buttons, &key_state,
-            &key_return, &dummy);
+        event = evnt_multi(MU_BUTTON | MU_KEYBD, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0,
+                           0, 0, 0, NULL, 0, 0, &mouse_x, &mouse_y,
+                           &mouse_buttons, &key_state, &key_return, &dummy);
 
         if ((event & MU_KEYBD) != 0 && (key_return & 0xff) == 27) {
             dialog_done = 1;
@@ -208,27 +198,27 @@ int main(void)
         flash_object(object);
 
         switch (object) {
-        case D24_CHECK:
-            checkbox_on = !checkbox_on;
-            update_dialog_status();
-            redraw_dialog();
-            break;
-        case D24_RADIO_A:
-            radio_mode = 0;
-            update_dialog_status();
-            redraw_dialog();
-            break;
-        case D24_RADIO_B:
-            radio_mode = 1;
-            update_dialog_status();
-            redraw_dialog();
-            break;
-        case D24_OK:
-        case D24_CANCEL:
-            dialog_done = 1;
-            break;
-        default:
-            break;
+            case D24_CHECK:
+                checkbox_on = !checkbox_on;
+                update_dialog_status();
+                redraw_dialog();
+                break;
+            case D24_RADIO_A:
+                radio_mode = 0;
+                update_dialog_status();
+                redraw_dialog();
+                break;
+            case D24_RADIO_B:
+                radio_mode = 1;
+                update_dialog_status();
+                redraw_dialog();
+                break;
+            case D24_OK:
+            case D24_CANCEL:
+                dialog_done = 1;
+                break;
+            default:
+                break;
         }
     }
 

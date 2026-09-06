@@ -1,0 +1,12 @@
+add_subdirectory(desktop)
+add_subdirectory(calc)
+add_subdirectory(clock)
+add_subdirectory(gemscape)
+add_subdirectory(maestro)
+add_subdirectory(terminal)
+add_subdirectory(msa)
+add_subdirectory(stout)
+
+foreach(target clock clock_gemd gemscape gemscape_hosted maestro maestro_hosted)
+    target_link_libraries(${target} PRIVATE sample_resources)
+endforeach()

@@ -24,395 +24,395 @@ extern "C" {
 /*
  * Root object index and null object marker.
  */
-#define ROOT 0     /* Root object index in a tree. */
-#define NIL  (-1)  /* Missing object / null link marker. */
+#define ROOT 0   /* Root object index in a tree. */
+#define NIL (-1) /* Missing object / null link marker. */
 
 /*
  * Keyboard shift-state bits reported by AES input calls.
  */
-#define K_RSHIFT 0x0001  /* Right Shift key is pressed. */
-#define K_LSHIFT 0x0002  /* Left Shift key is pressed. */
-#define K_CTRL   0x0004  /* Control key is pressed. */
-#define K_ALT    0x0008  /* Alternate / Alt key is pressed. */
+#define K_RSHIFT 0x0001 /* Right Shift key is pressed. */
+#define K_LSHIFT 0x0002 /* Left Shift key is pressed. */
+#define K_CTRL 0x0004   /* Control key is pressed. */
+#define K_ALT 0x0008    /* Alternate / Alt key is pressed. */
 
 /*
  * Maximum object-tree traversal depth used by the classic AES API.
  */
-#define MAX_LEN   81  /* Historical maximum string/template length. */
-#define MAX_DEPTH 8   /* Historical tree traversal depth limit. */
+#define MAX_LEN 81  /* Historical maximum string/template length. */
+#define MAX_DEPTH 8 /* Historical tree traversal depth limit. */
 
 /*
  * Classic fill-pattern selectors used by object colors and alerts.
  */
-#define IP_HOLLOW 0  /* Hollow interior pattern. */
-#define IP_1PATT  1  /* Pattern fill style 1. */
-#define IP_2PATT  2  /* Pattern fill style 2. */
-#define IP_3PATT  3  /* Pattern fill style 3. */
-#define IP_4PATT  4  /* Pattern fill style 4. */
-#define IP_5PATT  5  /* Pattern fill style 5. */
-#define IP_6PATT  6  /* Pattern fill style 6. */
-#define IP_SOLID  7  /* Solid interior fill. */
+#define IP_HOLLOW 0 /* Hollow interior pattern. */
+#define IP_1PATT 1  /* Pattern fill style 1. */
+#define IP_2PATT 2  /* Pattern fill style 2. */
+#define IP_3PATT 3  /* Pattern fill style 3. */
+#define IP_4PATT 4  /* Pattern fill style 4. */
+#define IP_5PATT 5  /* Pattern fill style 5. */
+#define IP_6PATT 6  /* Pattern fill style 6. */
+#define IP_SOLID 7  /* Solid interior fill. */
 
 /*
  * Common object color words used by historical GEM resources.
  */
-#define SYS_FG 0x1100  /* Standard system foreground color word. */
-#define WTS_FG 0x11a1  /* Selected window-title foreground word. */
-#define WTN_FG 0x1100  /* Normal window-title foreground word. */
+#define SYS_FG 0x1100 /* Standard system foreground color word. */
+#define WTS_FG 0x11a1 /* Selected window-title foreground word. */
+#define WTN_FG 0x1100 /* Normal window-title foreground word. */
 
 /*
  * VDI fill styles and write modes reused by object colors and images.
  */
-#define MD_REPLACE 1  /* Replace destination pixels. */
-#define MD_TRANS   2  /* Draw transparently. */
-#define MD_XOR     3  /* XOR with destination pixels. */
-#define MD_ERASE   4  /* Erase from destination pixels. */
+#define MD_REPLACE 1 /* Replace destination pixels. */
+#define MD_TRANS 2   /* Draw transparently. */
+#define MD_XOR 3     /* XOR with destination pixels. */
+#define MD_ERASE 4   /* Erase from destination pixels. */
 
-#define ALL_WHITE  0  /* Raster op: force white. */
-#define S_AND_D    1  /* Raster op: source AND destination. */
-#define S_ONLY     3  /* Raster op: source only. */
-#define NOTS_AND_D 4  /* Raster op: NOT source AND destination. */
-#define S_XOR_D    6  /* Raster op: source XOR destination. */
-#define S_OR_D     7  /* Raster op: source OR destination. */
-#define D_INVERT  10  /* Raster op: invert destination. */
-#define NOTS_OR_D 13  /* Raster op: NOT source OR destination. */
-#define ALL_BLACK 15  /* Raster op: force black. */
+#define ALL_WHITE 0  /* Raster op: force white. */
+#define S_AND_D 1    /* Raster op: source AND destination. */
+#define S_ONLY 3     /* Raster op: source only. */
+#define NOTS_AND_D 4 /* Raster op: NOT source AND destination. */
+#define S_XOR_D 6    /* Raster op: source XOR destination. */
+#define S_OR_D 7     /* Raster op: source OR destination. */
+#define D_INVERT 10  /* Raster op: invert destination. */
+#define NOTS_OR_D 13 /* Raster op: NOT source OR destination. */
+#define ALL_BLACK 15 /* Raster op: force black. */
 
-#define FIS_HOLLOW  0  /* Hollow fill interior. */
-#define FIS_SOLID   1  /* Solid fill interior. */
-#define FIS_PATTERN 2  /* Pattern fill interior. */
-#define FIS_HATCH   3  /* Hatch fill interior. */
-#define FIS_USER    4  /* User-defined fill interior. */
+#define FIS_HOLLOW 0  /* Hollow fill interior. */
+#define FIS_SOLID 1   /* Solid fill interior. */
+#define FIS_PATTERN 2 /* Pattern fill interior. */
+#define FIS_HATCH 3   /* Hatch fill interior. */
+#define FIS_USER 4    /* User-defined fill interior. */
 
-#define ATARI 1  /* Atari ST high-resolution system font. */
-#define IBM   3  /* Historical alias for the system font. */
-#define SMALL 5  /* Historical small font id alias. */
+#define ATARI 1 /* Atari ST high-resolution system font. */
+#define IBM 3   /* Historical alias for the system font. */
+#define SMALL 5 /* Historical small font id alias. */
 
 /*
  * Object-library color indices.
  */
-#define WHITE     0  /* Standard white color index. */
-#define BLACK     1  /* Standard black color index. */
-#define RED       2  /* Standard red color index. */
-#define GREEN     3  /* Standard green color index. */
-#define BLUE      4  /* Standard blue color index. */
-#define CYAN      5  /* Standard cyan color index. */
-#define YELLOW    6  /* Standard yellow color index. */
-#define MAGENTA   7  /* Standard magenta color index. */
-#define LWHITE    8  /* Light white color index. */
-#define LBLACK    9  /* Light black / dark gray color index. */
-#define LRED     10  /* Light red color index. */
-#define LGREEN   11  /* Light green color index. */
-#define LBLUE    12  /* Light blue color index. */
-#define LCYAN    13  /* Light cyan color index. */
-#define LYELLOW  14  /* Light yellow color index. */
-#define LMAGENTA 15  /* Light magenta color index. */
+#define WHITE 0     /* Standard white color index. */
+#define BLACK 1     /* Standard black color index. */
+#define RED 2       /* Standard red color index. */
+#define GREEN 3     /* Standard green color index. */
+#define BLUE 4      /* Standard blue color index. */
+#define CYAN 5      /* Standard cyan color index. */
+#define YELLOW 6    /* Standard yellow color index. */
+#define MAGENTA 7   /* Standard magenta color index. */
+#define LWHITE 8    /* Light white color index. */
+#define LBLACK 9    /* Light black / dark gray color index. */
+#define LRED 10     /* Light red color index. */
+#define LGREEN 11   /* Light green color index. */
+#define LBLUE 12    /* Light blue color index. */
+#define LCYAN 13    /* Light cyan color index. */
+#define LYELLOW 14  /* Light yellow color index. */
+#define LMAGENTA 15 /* Light magenta color index. */
 
 /*
  * AES object types.
  */
-#define G_BOX      20        /* Plain box object. */
-#define G_TEXT     21        /* Static text object. */
-#define G_BOXTEXT  22        /* Text object with box background. */
-#define G_IMAGE    23        /* Bit image object. */
-#define G_USERDEF  24        /* Application-defined draw object. */
-#define G_PROGDEF  G_USERDEF /* Alias for user-defined object. */
-#define G_IBOX     25        /* Invisible box object. */
-#define G_BUTTON   26        /* Button object. */
-#define G_BOXCHAR  27        /* Box with single character. */
-#define G_STRING   28        /* Static string object. */
-#define G_FTEXT    29        /* Editable text object. */
-#define G_FBOXTEXT 30        /* Editable boxed text object. */
-#define G_ICON     31        /* Icon object. */
-#define G_TITLE    32        /* Menu title object. */
+#define G_BOX 20            /* Plain box object. */
+#define G_TEXT 21           /* Static text object. */
+#define G_BOXTEXT 22        /* Text object with box background. */
+#define G_IMAGE 23          /* Bit image object. */
+#define G_USERDEF 24        /* Application-defined draw object. */
+#define G_PROGDEF G_USERDEF /* Alias for user-defined object. */
+#define G_IBOX 25           /* Invisible box object. */
+#define G_BUTTON 26         /* Button object. */
+#define G_BOXCHAR 27        /* Box with single character. */
+#define G_STRING 28         /* Static string object. */
+#define G_FTEXT 29          /* Editable text object. */
+#define G_FBOXTEXT 30       /* Editable boxed text object. */
+#define G_ICON 31           /* Icon object. */
+#define G_TITLE 32          /* Menu title object. */
 
 /*
  * AES object flags.
  */
-#define NONE       0x0000  /* No object flags set. */
-#define SELECTABLE 0x0001  /* Object can be selected. */
-#define DEFAULT    0x0002  /* Default object in a dialog. */
-#define EXIT       0x0004  /* Object exits a dialog when activated. */
-#define EDITABLE   0x0008  /* Object accepts text editing. */
-#define RBUTTON    0x0010  /* Object is a radio button. */
-#define LASTOB     0x0020  /* Object is last sibling in a list. */
-#define TOUCHEXIT  0x0040  /* Touch/click exits immediately. */
-#define HIDETREE   0x0080  /* Object subtree is hidden. */
-#define INDIRECT   0x0100  /* Object spec is an indirect pointer. */
+#define NONE 0x0000       /* No object flags set. */
+#define SELECTABLE 0x0001 /* Object can be selected. */
+#define DEFAULT 0x0002    /* Default object in a dialog. */
+#define EXIT 0x0004       /* Object exits a dialog when activated. */
+#define EDITABLE 0x0008   /* Object accepts text editing. */
+#define RBUTTON 0x0010    /* Object is a radio button. */
+#define LASTOB 0x0020     /* Object is last sibling in a list. */
+#define TOUCHEXIT 0x0040  /* Touch/click exits immediately. */
+#define HIDETREE 0x0080   /* Object subtree is hidden. */
+#define INDIRECT 0x0100   /* Object spec is an indirect pointer. */
 
 /*
  * AES object states.
  */
-#define NORMAL    0x0000  /* Normal object appearance. */
-#define SELECTED  0x0001  /* Object is selected. */
-#define CROSSED   0x0002  /* Object is crossed out. */
-#define CHECKED   0x0004  /* Object is checked. */
-#define DISABLED  0x0008  /* Object is disabled. */
-#define OUTLINED  0x0010  /* Object is outlined. */
-#define SHADOWED  0x0020  /* Object is shadowed. */
-#define WHITEBAK  0x0040  /* Object uses white background. */
-#define DRAW3D    0x0080  /* Object requests 3D drawing. */
+#define NORMAL 0x0000   /* Normal object appearance. */
+#define SELECTED 0x0001 /* Object is selected. */
+#define CROSSED 0x0002  /* Object is crossed out. */
+#define CHECKED 0x0004  /* Object is checked. */
+#define DISABLED 0x0008 /* Object is disabled. */
+#define OUTLINED 0x0010 /* Object is outlined. */
+#define SHADOWED 0x0020 /* Object is shadowed. */
+#define WHITEBAK 0x0040 /* Object uses white background. */
+#define DRAW3D 0x0080   /* Object requests 3D drawing. */
 
 /*
  * Editable-text operation selectors.
  */
-#define EDSTART 0  /* Start editing session. */
-#define EDINIT  1  /* Initialize editing state. */
-#define EDCHAR  2  /* Process one input character. */
-#define EDEND   3  /* End editing session. */
+#define EDSTART 0 /* Start editing session. */
+#define EDINIT 1  /* Initialize editing state. */
+#define EDCHAR 2  /* Process one input character. */
+#define EDEND 3   /* End editing session. */
 
 /*
  * Text justification values.
  */
-#define TE_LEFT  0  /* Left-justified text. */
-#define TE_RIGHT 1  /* Right-justified text. */
-#define TE_CNTR  2  /* Center-justified text. */
+#define TE_LEFT 0  /* Left-justified text. */
+#define TE_RIGHT 1 /* Right-justified text. */
+#define TE_CNTR 2  /* Center-justified text. */
 
 /*
  * Standard AES event flags.
  */
-#define MU_KEYBD  0x0001  /* Wait for keyboard event. */
-#define MU_BUTTON 0x0002  /* Wait for button event. */
-#define MU_M1     0x0004  /* Wait for mouse rectangle 1 event. */
-#define MU_M2     0x0008  /* Wait for mouse rectangle 2 event. */
-#define MU_MESAG  0x0010  /* Wait for AES message event. */
-#define MU_TIMER  0x0020  /* Wait for timer event. */
-#define MU_SDMSG  0x0040  /* Wait for shell/desk message. */
-#define MU_MUTEX  0x0080  /* Wait with AES mutual exclusion. */
+#define MU_KEYBD 0x0001  /* Wait for keyboard event. */
+#define MU_BUTTON 0x0002 /* Wait for button event. */
+#define MU_M1 0x0004     /* Wait for mouse rectangle 1 event. */
+#define MU_M2 0x0008     /* Wait for mouse rectangle 2 event. */
+#define MU_MESAG 0x0010  /* Wait for AES message event. */
+#define MU_TIMER 0x0020  /* Wait for timer event. */
+#define MU_SDMSG 0x0040  /* Wait for shell/desk message. */
+#define MU_MUTEX 0x0080  /* Wait with AES mutual exclusion. */
 
 /*
  * AES message types.
  */
-#define MN_SELECTED 10  /* Menu item selected message. */
+#define MN_SELECTED 10 /* Menu item selected message. */
 
-#define WM_REDRAW   20  /* Window redraw request. */
-#define WM_TOPPED   21  /* Window topped request. */
-#define WM_CLOSED   22  /* Window close request. */
-#define WM_FULLED   23  /* Window full-size toggle request. */
-#define WM_ARROWED  24  /* Window arrow action message. */
-#define WM_HSLID    25  /* Horizontal slider moved. */
-#define WM_VSLID    26  /* Vertical slider moved. */
-#define WM_SIZED    27  /* Window resized. */
-#define WM_MOVED    28  /* Window moved. */
-#define WM_NEWTOP   29  /* New top window notification. */
-#define WM_UNTOPPED 30  /* Window lost top status. */
+#define WM_REDRAW 20   /* Window redraw request. */
+#define WM_TOPPED 21   /* Window topped request. */
+#define WM_CLOSED 22   /* Window close request. */
+#define WM_FULLED 23   /* Window full-size toggle request. */
+#define WM_ARROWED 24  /* Window arrow action message. */
+#define WM_HSLID 25    /* Horizontal slider moved. */
+#define WM_VSLID 26    /* Vertical slider moved. */
+#define WM_SIZED 27    /* Window resized. */
+#define WM_MOVED 28    /* Window moved. */
+#define WM_NEWTOP 29   /* New top window notification. */
+#define WM_UNTOPPED 30 /* Window lost top status. */
 
-#define AC_OPEN   40  /* Accessory open message. */
-#define AC_CLOSE  41  /* Accessory close message. */
-#define AC_ABORT  42  /* Accessory abort message. */
+#define AC_OPEN 40  /* Accessory open message. */
+#define AC_CLOSE 41 /* Accessory close message. */
+#define AC_ABORT 42 /* Accessory abort message. */
 
-#define CT_UPDATE 50  /* Control-manager update message. */
-#define CT_MOVE   51  /* Control-manager move message. */
-#define CT_NEWTOP 52  /* Control-manager new-top message. */
+#define CT_UPDATE 50 /* Control-manager update message. */
+#define CT_MOVE 51   /* Control-manager move message. */
+#define CT_NEWTOP 52 /* Control-manager new-top message. */
 
 /*
  * Form-dial operation selectors.
  */
-#define FMD_START  0  /* Begin form-dial operation. */
-#define FMD_GROW   1  /* Animate grow phase. */
-#define FMD_SHRINK 2  /* Animate shrink phase. */
-#define FMD_FINISH 3  /* Finish form-dial operation. */
+#define FMD_START 0  /* Begin form-dial operation. */
+#define FMD_GROW 1   /* Animate grow phase. */
+#define FMD_SHRINK 2 /* Animate shrink phase. */
+#define FMD_FINISH 3 /* Finish form-dial operation. */
 
 /*
  * Standard graf_mouse() cursor selectors.
  */
-#define ARROW       0    /* Standard arrow cursor. */
-#define TEXT_CRSR   1    /* Text-entry cursor. */
-#define HGLASS      2    /* Busy / hourglass cursor. */
-#define POINT_HAND  3    /* Pointing hand cursor. */
-#define FLAT_HAND   4    /* Flat hand cursor. */
-#define THIN_CROSS  5    /* Thin crosshair cursor. */
-#define THICK_CROSS 6    /* Thick crosshair cursor. */
-#define OUTLN_CROSS 7    /* Outlined crosshair cursor. */
-#define USER_DEF    255  /* Use caller-supplied cursor form. */
-#define M_OFF       256  /* Hide the mouse cursor. */
-#define M_ON        257  /* Show the mouse cursor. */
+#define ARROW 0       /* Standard arrow cursor. */
+#define TEXT_CRSR 1   /* Text-entry cursor. */
+#define HGLASS 2      /* Busy / hourglass cursor. */
+#define POINT_HAND 3  /* Pointing hand cursor. */
+#define FLAT_HAND 4   /* Flat hand cursor. */
+#define THIN_CROSS 5  /* Thin crosshair cursor. */
+#define THICK_CROSS 6 /* Thick crosshair cursor. */
+#define OUTLN_CROSS 7 /* Outlined crosshair cursor. */
+#define USER_DEF 255  /* Use caller-supplied cursor form. */
+#define M_OFF 256     /* Hide the mouse cursor. */
+#define M_ON 257      /* Show the mouse cursor. */
 
 /*
  * Window border element flags.
  */
-#define NAME     0x0001  /* Window has title/name bar. */
-#define CLOSER   0x0002  /* Window has close box. */
-#define FULLER   0x0004  /* Window has full-size box. */
-#define MOVER    0x0008  /* Window can be moved. */
-#define INFO     0x0010  /* Window has info line. */
-#define SIZER    0x0020  /* Window has size box. */
-#define UPARROW  0x0040  /* Window has up arrow. */
-#define DNARROW  0x0080  /* Window has down arrow. */
-#define VSLIDE   0x0100  /* Window has vertical slider. */
-#define LFARROW  0x0200  /* Window has left arrow. */
-#define RTARROW  0x0400  /* Window has right arrow. */
-#define HSLIDE   0x0800  /* Window has horizontal slider. */
-#define HOTCLOSE 0x1000  /* Window supports hot close behavior. */
+#define NAME 0x0001     /* Window has title/name bar. */
+#define CLOSER 0x0002   /* Window has close box. */
+#define FULLER 0x0004   /* Window has full-size box. */
+#define MOVER 0x0008    /* Window can be moved. */
+#define INFO 0x0010     /* Window has info line. */
+#define SIZER 0x0020    /* Window has size box. */
+#define UPARROW 0x0040  /* Window has up arrow. */
+#define DNARROW 0x0080  /* Window has down arrow. */
+#define VSLIDE 0x0100   /* Window has vertical slider. */
+#define LFARROW 0x0200  /* Window has left arrow. */
+#define RTARROW 0x0400  /* Window has right arrow. */
+#define HSLIDE 0x0800   /* Window has horizontal slider. */
+#define HOTCLOSE 0x1000 /* Window supports hot close behavior. */
 
 /*
  * Window kind selectors used by wind_calc().
  */
-#define WC_BORDER 0  /* Convert using border rectangle. */
-#define WC_WORK   1  /* Convert using work-area rectangle. */
+#define WC_BORDER 0 /* Convert using border rectangle. */
+#define WC_WORK 1   /* Convert using work-area rectangle. */
 
 /*
  * Window field selectors.
  */
-#define WF_KIND       1  /* Window kind bit mask. */
-#define WF_NAME       2  /* Window title string. */
-#define WF_INFO       3  /* Window info-line string. */
-#define WF_WXYWH      4  /* Current outer window rectangle. */
-#define WF_CXYWH      5  /* Current work-area rectangle. */
-#define WF_PXYWH      6  /* Previous outer window rectangle. */
-#define WF_FXYWH      7  /* Full-size rectangle. */
-#define WF_HSLIDE     8  /* Horizontal slider position. */
-#define WF_VSLIDE     9  /* Vertical slider position. */
-#define WF_TOP       10  /* Bring window to top. */
-#define WF_FIRSTXYWH 11  /* First visible rectangle. */
-#define WF_NEXTXYWH  12  /* Next visible rectangle. */
-#define WF_IGNORE    13  /* Ignore rectangle or field. */
-#define WF_NEWDESK   14  /* Install new desktop tree. */
-#define WF_HSLSIZ    15  /* Horizontal slider size. */
-#define WF_VSLSIZ    16  /* Vertical slider size. */
-#define WF_SCREEN    17  /* Screen/workstation data. */
-#define WF_TATTRB    18  /* Title attributes. */
-#define WF_SIZTOP    19  /* Size and top in one call. */
+#define WF_KIND 1       /* Window kind bit mask. */
+#define WF_NAME 2       /* Window title string. */
+#define WF_INFO 3       /* Window info-line string. */
+#define WF_WXYWH 4      /* Current outer window rectangle. */
+#define WF_CXYWH 5      /* Current work-area rectangle. */
+#define WF_PXYWH 6      /* Previous outer window rectangle. */
+#define WF_FXYWH 7      /* Full-size rectangle. */
+#define WF_HSLIDE 8     /* Horizontal slider position. */
+#define WF_VSLIDE 9     /* Vertical slider position. */
+#define WF_TOP 10       /* Bring window to top. */
+#define WF_FIRSTXYWH 11 /* First visible rectangle. */
+#define WF_NEXTXYWH 12  /* Next visible rectangle. */
+#define WF_IGNORE 13    /* Ignore rectangle or field. */
+#define WF_NEWDESK 14   /* Install new desktop tree. */
+#define WF_HSLSIZ 15    /* Horizontal slider size. */
+#define WF_VSLSIZ 16    /* Vertical slider size. */
+#define WF_SCREEN 17    /* Screen/workstation data. */
+#define WF_TATTRB 18    /* Title attributes. */
+#define WF_SIZTOP 19    /* Size and top in one call. */
 
 /*
  * Window-manager update modes and arrow-message codes.
  */
-#define END_UPDATE 0  /* End window update bracket. */
-#define BEG_UPDATE 1  /* Begin window update bracket. */
+#define END_UPDATE 0 /* End window update bracket. */
+#define BEG_UPDATE 1 /* Begin window update bracket. */
 
-#define WA_UPPAGE 0  /* Page up action. */
-#define WA_DNPAGE 1  /* Page down action. */
-#define WA_UPLINE 2  /* Line up action. */
-#define WA_DNLINE 3  /* Line down action. */
-#define WA_LFPAGE 4  /* Page left action. */
-#define WA_RTPAGE 5  /* Page right action. */
-#define WA_LFLINE 6  /* Line left action. */
-#define WA_RTLINE 7  /* Line right action. */
+#define WA_UPPAGE 0 /* Page up action. */
+#define WA_DNPAGE 1 /* Page down action. */
+#define WA_UPLINE 2 /* Line up action. */
+#define WA_DNLINE 3 /* Line down action. */
+#define WA_LFPAGE 4 /* Page left action. */
+#define WA_RTPAGE 5 /* Page right action. */
+#define WA_LFLINE 6 /* Line left action. */
+#define WA_RTLINE 7 /* Line right action. */
 
 /*
  * Resource type selectors for rsrc_gaddr() and rsrc_saddr().
  */
-#define R_TREE      0   /* Resource tree pointer. */
-#define R_OBJECT    1   /* Resource object entry. */
-#define R_TEDINFO   2   /* Resource TEDINFO entry. */
-#define R_ICONBLK   3   /* Resource ICONBLK entry. */
-#define R_BITBLK    4   /* Resource BITBLK entry. */
-#define R_STRING    5   /* Resource string entry. */
-#define R_IMAGEDATA 6   /* Resource image-data entry. */
-#define R_OBSPEC    7   /* Resource object spec entry. */
-#define R_TEPTEXT   8   /* TEDINFO text pointer entry. */
-#define R_TEPTMPLT  9   /* TEDINFO template pointer entry. */
-#define R_TEPVALID 10   /* TEDINFO validation pointer entry. */
-#define R_IBPMASK  11   /* ICONBLK mask pointer entry. */
-#define R_IBPDATA  12   /* ICONBLK data pointer entry. */
-#define R_IBPTEXT  13   /* ICONBLK text pointer entry. */
-#define R_BIPDATA  14   /* BITBLK data pointer entry. */
-#define R_FRSTR    15   /* Free string list entry. */
-#define R_FRIMG    16   /* Free image list entry. */
+#define R_TREE 0      /* Resource tree pointer. */
+#define R_OBJECT 1    /* Resource object entry. */
+#define R_TEDINFO 2   /* Resource TEDINFO entry. */
+#define R_ICONBLK 3   /* Resource ICONBLK entry. */
+#define R_BITBLK 4    /* Resource BITBLK entry. */
+#define R_STRING 5    /* Resource string entry. */
+#define R_IMAGEDATA 6 /* Resource image-data entry. */
+#define R_OBSPEC 7    /* Resource object spec entry. */
+#define R_TEPTEXT 8   /* TEDINFO text pointer entry. */
+#define R_TEPTMPLT 9  /* TEDINFO template pointer entry. */
+#define R_TEPVALID 10 /* TEDINFO validation pointer entry. */
+#define R_IBPMASK 11  /* ICONBLK mask pointer entry. */
+#define R_IBPDATA 12  /* ICONBLK data pointer entry. */
+#define R_IBPTEXT 13  /* ICONBLK text pointer entry. */
+#define R_BIPDATA 14  /* BITBLK data pointer entry. */
+#define R_FRSTR 15    /* Free string list entry. */
+#define R_FRIMG 16    /* Free image list entry. */
 
 /*
  * Scrap file-type flags used by the historical clipboard directory.
  */
-#define SC_FTCSV 0x0001  /* CSV clipboard content available. */
-#define SC_FTTXT 0x0002  /* Text clipboard content available. */
-#define SC_FTGEM 0x0004  /* GEM clipboard content available. */
-#define SC_FTIMG 0x0008  /* Image clipboard content available. */
-#define SC_FTDCA 0x0010  /* DCA clipboard content available. */
-#define SC_FTUSR 0x8000  /* User-defined clipboard content available. */
+#define SC_FTCSV 0x0001 /* CSV clipboard content available. */
+#define SC_FTTXT 0x0002 /* Text clipboard content available. */
+#define SC_FTGEM 0x0004 /* GEM clipboard content available. */
+#define SC_FTIMG 0x0008 /* Image clipboard content available. */
+#define SC_FTDCA 0x0010 /* DCA clipboard content available. */
+#define SC_FTUSR 0x8000 /* User-defined clipboard content available. */
 
 /*
  * Rectangle in GEM origin-width-height form.
  */
 typedef struct grect {
-    WORD g_x;  /* Left edge in screen or work coordinates. */
-    WORD g_y;  /* Top edge in screen or work coordinates. */
-    WORD g_w;  /* Rectangle width. */
-    WORD g_h;  /* Rectangle height. */
+    WORD g_x; /* Left edge in screen or work coordinates. */
+    WORD g_y; /* Top edge in screen or work coordinates. */
+    WORD g_w; /* Rectangle width. */
+    WORD g_h; /* Rectangle height. */
 } GRECT;
 
 /*
  * Rectangle list node used by window and redraw logic.
  */
 typedef struct orect {
-    struct orect *o_link;  /* Next rectangle node in the list. */
-    WORD o_x;              /* Left edge. */
-    WORD o_y;              /* Top edge. */
-    WORD o_w;              /* Rectangle width. */
-    WORD o_h;              /* Rectangle height. */
+    struct orect *o_link; /* Next rectangle node in the list. */
+    WORD o_x;             /* Left edge. */
+    WORD o_y;             /* Top edge. */
+    WORD o_w;             /* Rectangle width. */
+    WORD o_h;             /* Rectangle height. */
 } ORECT;
 
 /*
  * AES object tree entry.
  */
 typedef struct object {
-    WORD  ob_next;    /* Next sibling object index. */
-    WORD  ob_head;    /* First child object index. */
-    WORD  ob_tail;    /* Last child object index. */
-    UWORD ob_type;    /* Object type selector. */
-    UWORD ob_flags;   /* Object behavior flags. */
-    UWORD ob_state;   /* Current object state bits. */
-    LONG  ob_spec;    /* Type-specific object data or pointer. */
-    WORD  ob_x;       /* X position relative to parent. */
-    WORD  ob_y;       /* Y position relative to parent. */
-    WORD  ob_width;   /* Object width. */
-    WORD  ob_height;  /* Object height. */
+    WORD ob_next;   /* Next sibling object index. */
+    WORD ob_head;   /* First child object index. */
+    WORD ob_tail;   /* Last child object index. */
+    UWORD ob_type;  /* Object type selector. */
+    UWORD ob_flags; /* Object behavior flags. */
+    UWORD ob_state; /* Current object state bits. */
+    LONG ob_spec;   /* Type-specific object data or pointer. */
+    WORD ob_x;      /* X position relative to parent. */
+    WORD ob_y;      /* Y position relative to parent. */
+    WORD ob_width;  /* Object width. */
+    WORD ob_height; /* Object height. */
 } OBJECT;
 
 /*
  * AES editable text information block.
  */
 typedef struct text_edinfo {
-    LONG te_ptext;      /* Pointer to current text buffer. */
-    LONG te_ptmplt;     /* Pointer to edit template string. */
-    LONG te_pvalid;     /* Pointer to validation string. */
-    WORD te_font;       /* Font selector. */
-    WORD te_junk1;      /* Reserved / historical filler field. */
-    WORD te_just;       /* Text justification mode. */
-    WORD te_color;      /* Text color word. */
-    WORD te_junk2;      /* Reserved / historical filler field. */
-    WORD te_thickness;  /* Border thickness. */
-    WORD te_txtlen;     /* Text buffer length. */
-    WORD te_tmplen;     /* Template length. */
+    LONG te_ptext;     /* Pointer to current text buffer. */
+    LONG te_ptmplt;    /* Pointer to edit template string. */
+    LONG te_pvalid;    /* Pointer to validation string. */
+    WORD te_font;      /* Font selector. */
+    WORD te_junk1;     /* Reserved / historical filler field. */
+    WORD te_just;      /* Text justification mode. */
+    WORD te_color;     /* Text color word. */
+    WORD te_junk2;     /* Reserved / historical filler field. */
+    WORD te_thickness; /* Border thickness. */
+    WORD te_txtlen;    /* Text buffer length. */
+    WORD te_tmplen;    /* Template length. */
 } TEDINFO;
 
 /*
  * AES icon object description block.
  */
 typedef struct icon_block {
-    LONG ib_pmask;   /* Pointer to icon mask bitmap. */
-    LONG ib_pdata;   /* Pointer to icon data bitmap. */
-    LONG ib_ptext;   /* Pointer to icon label text. */
-    WORD ib_char;    /* Character and color word. */
-    WORD ib_xchar;   /* Character origin X within the icon. */
-    WORD ib_ychar;   /* Character origin Y within the icon. */
-    WORD ib_xicon;   /* Icon bitmap origin X. */
-    WORD ib_yicon;   /* Icon bitmap origin Y. */
-    WORD ib_wicon;   /* Icon bitmap width. */
-    WORD ib_hicon;   /* Icon bitmap height. */
-    WORD ib_xtext;   /* Text origin X. */
-    WORD ib_ytext;   /* Text origin Y. */
-    WORD ib_wtext;   /* Text area width. */
-    WORD ib_htext;   /* Text area height. */
+    LONG ib_pmask; /* Pointer to icon mask bitmap. */
+    LONG ib_pdata; /* Pointer to icon data bitmap. */
+    LONG ib_ptext; /* Pointer to icon label text. */
+    WORD ib_char;  /* Character and color word. */
+    WORD ib_xchar; /* Character origin X within the icon. */
+    WORD ib_ychar; /* Character origin Y within the icon. */
+    WORD ib_xicon; /* Icon bitmap origin X. */
+    WORD ib_yicon; /* Icon bitmap origin Y. */
+    WORD ib_wicon; /* Icon bitmap width. */
+    WORD ib_hicon; /* Icon bitmap height. */
+    WORD ib_xtext; /* Text origin X. */
+    WORD ib_ytext; /* Text origin Y. */
+    WORD ib_wtext; /* Text area width. */
+    WORD ib_htext; /* Text area height. */
 } ICONBLK;
 
 /*
  * AES bit-image object block.
  */
 typedef struct bit_block {
-    LONG bi_pdata;   /* Pointer to image bitmap data. */
-    WORD bi_wb;      /* Row width in bytes. */
-    WORD bi_hl;      /* Image height in scanlines. */
-    WORD bi_x;       /* X origin within the object. */
-    WORD bi_y;       /* Y origin within the object. */
-    WORD bi_color;   /* Drawing color word. */
+    LONG bi_pdata; /* Pointer to image bitmap data. */
+    WORD bi_wb;    /* Row width in bytes. */
+    WORD bi_hl;    /* Image height in scanlines. */
+    WORD bi_x;     /* X origin within the object. */
+    WORD bi_y;     /* Y origin within the object. */
+    WORD bi_color; /* Drawing color word. */
 } BITBLK;
 
 /*
  * AES application-defined object block.
  */
 typedef struct appl_blk {
-    LONG ab_code;  /* Pointer to application callback code. */
-    LONG ab_parm;  /* Caller-defined callback parameter. */
+    LONG ab_code; /* Pointer to application callback code. */
+    LONG ab_parm; /* Caller-defined callback parameter. */
 } APPLBLK;
 
 typedef APPLBLK USERBLK;
@@ -422,30 +422,30 @@ typedef APPLBLK USERBLK;
  * routine.
  */
 typedef struct parm_blk {
-    LONG pb_tree;       /* Pointer to the object tree. */
-    WORD pb_obj;        /* Current object index. */
-    WORD pb_prevstate;  /* Previous object state. */
-    WORD pb_currstate;  /* Current object state. */
-    WORD pb_x;          /* Object X position. */
-    WORD pb_y;          /* Object Y position. */
-    WORD pb_w;          /* Object width. */
-    WORD pb_h;          /* Object height. */
-    WORD pb_xc;         /* Clipping rectangle X. */
-    WORD pb_yc;         /* Clipping rectangle Y. */
-    WORD pb_wc;         /* Clipping rectangle width. */
-    WORD pb_hc;         /* Clipping rectangle height. */
-    LONG pb_parm;       /* Caller-defined user parameter. */
+    LONG pb_tree;      /* Pointer to the object tree. */
+    WORD pb_obj;       /* Current object index. */
+    WORD pb_prevstate; /* Previous object state. */
+    WORD pb_currstate; /* Current object state. */
+    WORD pb_x;         /* Object X position. */
+    WORD pb_y;         /* Object Y position. */
+    WORD pb_w;         /* Object width. */
+    WORD pb_h;         /* Object height. */
+    WORD pb_xc;        /* Clipping rectangle X. */
+    WORD pb_yc;        /* Clipping rectangle Y. */
+    WORD pb_wc;        /* Clipping rectangle width. */
+    WORD pb_hc;        /* Clipping rectangle height. */
+    LONG pb_parm;      /* Caller-defined user parameter. */
 } PARMBLK;
 
 /*
  * Mouse rectangle block used by evnt_multi().
  */
 typedef struct moblk {
-    WORD m_out;  /* Enter/leave mode selector. */
-    WORD m_x;    /* Rectangle X origin. */
-    WORD m_y;    /* Rectangle Y origin. */
-    WORD m_w;    /* Rectangle width. */
-    WORD m_h;    /* Rectangle height. */
+    WORD m_out; /* Enter/leave mode selector. */
+    WORD m_x;   /* Rectangle X origin. */
+    WORD m_y;   /* Rectangle Y origin. */
+    WORD m_w;   /* Rectangle width. */
+    WORD m_h;   /* Rectangle height. */
 } MOBLK;
 
 /*
@@ -476,10 +476,10 @@ typedef struct rshdr {
  * Corner-coordinate rectangle used by some GEM examples and helper code.
  */
 typedef struct vrect {
-    WORD x1;  /* Left edge. */
-    WORD y1;  /* Top edge. */
-    WORD x2;  /* Right edge. */
-    WORD y2;  /* Bottom edge. */
+    WORD x1; /* Left edge. */
+    WORD y1; /* Top edge. */
+    WORD x2; /* Right edge. */
+    WORD y2; /* Bottom edge. */
 } VRECT;
 
 /*
@@ -694,8 +694,8 @@ WORD evnt_keybd(void);
  *      WORD mx, my, mb, ks;
  *      evnt_button(1, 1, 1, &mx, &my, &mb, &ks);
  */
-WORD evnt_button(WORD clicks, UWORD mask, UWORD state,
-                 WORD *pmx, WORD *pmy, WORD *pmb, WORD *pks);
+WORD evnt_button(WORD clicks, UWORD mask, UWORD state, WORD *pmx, WORD *pmy,
+                 WORD *pmb, WORD *pks);
 
 /*
  * Wait for the mouse to enter or leave a rectangle.
@@ -717,8 +717,8 @@ WORD evnt_button(WORD clicks, UWORD mask, UWORD state,
  *      WORD mx, my, mb, ks;
  *      evnt_mouse(1, 10, 10, 100, 40, &mx, &my, &mb, &ks);
  */
-WORD evnt_mouse(WORD flags, WORD x, WORD y, WORD w, WORD h,
-                WORD *pmx, WORD *pmy, WORD *pmb, WORD *pks);
+WORD evnt_mouse(WORD flags, WORD x, WORD y, WORD w, WORD h, WORD *pmx,
+                WORD *pmy, WORD *pmb, WORD *pks);
 
 /*
  * Wait for and receive the next AES message.
@@ -790,13 +790,10 @@ WORD evnt_timer(WORD locnt, WORD hicnt);
  *          0, 0, 0, 0, 0,
  *          msg, 0, 0, &mx, &my, &mb, &ks, &kr, &br);
  */
-WORD evnt_multi(UWORD flags,
-                UWORD bclk, UWORD bmsk, UWORD bst,
-                UWORD m1flags, WORD m1x, WORD m1y, WORD m1w, WORD m1h,
-                UWORD m2flags, WORD m2x, WORD m2y, WORD m2w, WORD m2h,
-                WORD mepbuff[8],
-                UWORD tlc, UWORD thc,
-                WORD *pmx, WORD *pmy, WORD *pmb, WORD *pks,
+WORD evnt_multi(UWORD flags, UWORD bclk, UWORD bmsk, UWORD bst, UWORD m1flags,
+                WORD m1x, WORD m1y, WORD m1w, WORD m1h, UWORD m2flags, WORD m2x,
+                WORD m2y, WORD m2w, WORD m2h, WORD mepbuff[8], UWORD tlc,
+                UWORD thc, WORD *pmx, WORD *pmy, WORD *pmb, WORD *pks,
                 WORD *pkr, WORD *pbr);
 
 /*
@@ -1020,8 +1017,8 @@ WORD objc_delete(OBJECT *tree, WORD object);
  *      objc_draw(tree, ROOT, MAX_DEPTH, clip.g_x, clip.g_y,
  *          clip.g_w, clip.g_h);
  */
-WORD objc_draw(OBJECT *tree, WORD startob, WORD depth,
-               WORD xc, WORD yc, WORD wc, WORD hc);
+WORD objc_draw(OBJECT *tree, WORD startob, WORD depth, WORD xc, WORD yc,
+               WORD wc, WORD hc);
 
 /*
  * Find the deepest object at the given mouse coordinates.
@@ -1102,8 +1099,7 @@ WORD objc_order(OBJECT *tree, WORD object, WORD newpos);
  *      WORD idx = 0;
  *      objc_edit(tree, field_id, 'A', &idx, EDCHAR);
  */
-WORD objc_edit(OBJECT *tree, WORD object, WORD charidx, WORD *idx,
-               WORD kind);
+WORD objc_edit(OBJECT *tree, WORD object, WORD charidx, WORD *idx, WORD kind);
 
 /*
  * Change an object's state and optionally redraw it.
@@ -1127,9 +1123,8 @@ WORD objc_edit(OBJECT *tree, WORD object, WORD charidx, WORD *idx,
  *      objc_change(tree, button_id, 0, clip.g_x, clip.g_y, clip.g_w,
  *          clip.g_h, SELECTED, 1);
  */
-WORD objc_change(OBJECT *tree, WORD object, WORD depth,
-                 WORD xc, WORD yc, WORD wc, WORD hc,
-                 WORD newstate, WORD redraw);
+WORD objc_change(OBJECT *tree, WORD object, WORD depth, WORD xc, WORD yc,
+                 WORD wc, WORD hc, WORD newstate, WORD redraw);
 
 /*
  * Run a dialog until an exit object is selected.
@@ -1166,8 +1161,8 @@ WORD form_do(OBJECT *tree, WORD startob);
  * Sample call:
  *      form_dial(FMD_START, 0, 0, 10, 10, 50, 50, 200, 120);
  */
-WORD form_dial(WORD flag, WORD x1, WORD y1, WORD w1, WORD h1,
-               WORD x2, WORD y2, WORD w2, WORD h2);
+WORD form_dial(WORD flag, WORD x1, WORD y1, WORD w1, WORD h1, WORD x2, WORD y2,
+               WORD w2, WORD h2);
 
 /*
  * Display a formatted alert box and return the selected button.
@@ -1244,8 +1239,8 @@ WORD form_center(OBJECT *tree, WORD *cx, WORD *cy, WORD *cw, WORD *ch);
  *      WORD next_obj, next_char;
  *      form_keybd(tree, obj, obj, key, &next_obj, &next_char);
  */
-WORD form_keybd(OBJECT *tree, WORD object, WORD next,
-                WORD thechar, WORD *newobj, WORD *newchar);
+WORD form_keybd(OBJECT *tree, WORD object, WORD next, WORD thechar,
+                WORD *newobj, WORD *newchar);
 
 /*
  * Process a button click for a form and compute the next object.
@@ -1287,10 +1282,10 @@ WORD form_button(OBJECT *tree, WORD object, WORD clicks, WORD *newobj);
  *      WORD w, h;
  *      graf_rubbox(10, 10, 16, 16, &w, &h);
  */
-WORD graf_rubbox(WORD xorigin, WORD yorigin, WORD wmin, WORD hmin,
-                 WORD *pwend, WORD *phend);
+WORD graf_rubbox(WORD xorigin, WORD yorigin, WORD wmin, WORD hmin, WORD *pwend,
+                 WORD *phend);
 
-#define graf_rubberbox graf_rubbox  /* Historical alias for graf_rubbox(). */
+#define graf_rubberbox graf_rubbox /* Historical alias for graf_rubbox(). */
 
 /*
  * Let the user drag a box within a bounding rectangle.
@@ -1311,9 +1306,8 @@ WORD graf_rubbox(WORD xorigin, WORD yorigin, WORD wmin, WORD hmin,
  *      WORD dx, dy;
  *      graf_dragbox(32, 32, 10, 10, 0, 0, 320, 200, &dx, &dy);
  */
-WORD graf_dragbox(WORD w, WORD h, WORD sx, WORD sy,
-                  WORD xc, WORD yc, WORD wc, WORD hc,
-                  WORD *pdx, WORD *pdy);
+WORD graf_dragbox(WORD w, WORD h, WORD sx, WORD sy, WORD xc, WORD yc, WORD wc,
+                  WORD hc, WORD *pdx, WORD *pdy);
 
 /*
  * Move a box visually from one rectangle to another.
@@ -1334,7 +1328,7 @@ WORD graf_dragbox(WORD w, WORD h, WORD sx, WORD sy,
  */
 WORD graf_mbox(WORD w, WORD h, WORD srcx, WORD srcy, WORD dstx, WORD dsty);
 
-#define graf_movebox graf_mbox  /* Historical alias for graf_mbox(). */
+#define graf_movebox graf_mbox /* Historical alias for graf_mbox(). */
 
 /*
  * Animate a growing box.
@@ -1352,8 +1346,8 @@ WORD graf_mbox(WORD w, WORD h, WORD srcx, WORD srcy, WORD dstx, WORD dsty);
  * Sample call:
  *      graf_growbox(0, 0, 10, 10, 40, 40, 200, 120);
  */
-WORD graf_growbox(WORD x1, WORD y1, WORD w1, WORD h1,
-                  WORD x2, WORD y2, WORD w2, WORD h2);
+WORD graf_growbox(WORD x1, WORD y1, WORD w1, WORD h1, WORD x2, WORD y2, WORD w2,
+                  WORD h2);
 
 /*
  * Animate a shrinking box.
@@ -1371,8 +1365,8 @@ WORD graf_growbox(WORD x1, WORD y1, WORD w1, WORD h1,
  * Sample call:
  *      graf_shrinkbox(40, 40, 200, 120, 0, 0, 10, 10);
  */
-WORD graf_shrinkbox(WORD x1, WORD y1, WORD w1, WORD h1,
-                    WORD x2, WORD y2, WORD w2, WORD h2);
+WORD graf_shrinkbox(WORD x1, WORD y1, WORD w1, WORD h1, WORD x2, WORD y2,
+                    WORD w2, WORD h2);
 
 /*
  * Track an object while the user holds the mouse button.
@@ -1392,8 +1386,7 @@ WORD graf_shrinkbox(WORD x1, WORD y1, WORD w1, WORD h1,
  * Sample call:
  *      graf_watchbox(tree, button_id, SELECTED, NORMAL);
  */
-WORD graf_watchbox(OBJECT *tree, WORD object, UWORD in_state,
-                   UWORD out_state);
+WORD graf_watchbox(OBJECT *tree, WORD object, UWORD in_state, UWORD out_state);
 
 /*
  * Return a slider position relative to its parent elevator range.
@@ -1413,8 +1406,7 @@ WORD graf_watchbox(OBJECT *tree, WORD object, UWORD in_state,
  * Sample call:
  *      WORD pos = graf_slidebox(tree, parent_id, slider_id, 0);
  */
-WORD graf_slidebox(OBJECT *tree, WORD parent, WORD object,
-                   WORD orientation);
+WORD graf_slidebox(OBJECT *tree, WORD parent, WORD object, WORD orientation);
 
 /*
  * Query character and box metrics for the current workstation.
@@ -1639,8 +1631,7 @@ WORD wind_delete(WORD handle);
  *      WORD x, y, w, h;
  *      wind_get(win, WF_WXYWH, &x, &y, &w, &h);
  */
-WORD wind_get(WORD handle, WORD field, WORD *w1, WORD *w2, WORD *w3,
-              WORD *w4);
+WORD wind_get(WORD handle, WORD field, WORD *w1, WORD *w2, WORD *w3, WORD *w4);
 
 /*
  * Set a window field or geometry tuple.
@@ -1659,8 +1650,7 @@ WORD wind_get(WORD handle, WORD field, WORD *w1, WORD *w2, WORD *w3,
  * Sample call:
  *      wind_set(win, WF_TOP, 0, 0, 0, 0);
  */
-WORD wind_set(WORD handle, WORD field, WORD w1, WORD w2, WORD w3,
-              WORD w4);
+WORD wind_set(WORD handle, WORD field, WORD w1, WORD w2, WORD w3, WORD w4);
 
 /*
  * Set a pointer-based window string field such as `WF_NAME` or
@@ -1738,8 +1728,7 @@ WORD wind_update(WORD beg_update);
  *      wind_calc(WC_BORDER, NAME | CLOSER, 0, 0, 320, 200,
  *          &x, &y, &w, &h);
  */
-WORD wind_calc(WORD type, UWORD kind,
-               WORD inx, WORD iny, WORD inw, WORD inh,
+WORD wind_calc(WORD type, UWORD kind, WORD inx, WORD iny, WORD inw, WORD inh,
                WORD *outx, WORD *outy, WORD *outw, WORD *outh);
 
 /*

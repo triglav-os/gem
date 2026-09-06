@@ -6,7 +6,7 @@
  * Copyright (C) 2026 tomaz stih
  */
 
-#include "_gem.h"
+#include "gem_protocol.h"
 
 #include <assert.h>
 #include <arpa/inet.h>
@@ -31,16 +31,17 @@ static void input_listen(void)
     address.sin_family = AF_INET;
     address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
     address.sin_port = htons(5003);
-    assert(bind(input_fd, (struct sockaddr *) &address, sizeof(address)) == 0);
+    assert(bind(input_fd, (struct sockaddr *)&address, sizeof(address)) == 0);
     assert(setsockopt(input_fd, SOL_SOCKET, SO_RCVTIMEO, &timeout,
-        sizeof(timeout)) == 0);
+                      sizeof(timeout)) == 0);
 }
 
 static void input_send(WORD type, WORD first, WORD second)
 {
     uint16_t packet[3] = {htons(type), htons(first), htons(second)};
     assert(sendto(input_fd, packet, sizeof(packet), 0,
-        (struct sockaddr *) &input_peer, sizeof(input_peer)) == sizeof(packet));
+                  (struct sockaddr *)&input_peer,
+                  sizeof(input_peer)) == sizeof(packet));
 }
 
 static void keyboard_roundtrip(void)
@@ -52,16 +53,17 @@ static void keyboard_roundtrip(void)
     int attempt;
 
     assert(recvfrom(input_fd, subscription, sizeof(subscription), 0,
-        (struct sockaddr *) &input_peer, &size) > 0);
+                    (struct sockaddr *)&input_peer, &size) > 0);
     {
         int stranger = socket(AF_INET, SOCK_DGRAM, 0);
         uint16_t packet[4] = {htons(3), htons(777), htons(777), 0};
         assert(stranger >= 0);
-        assert(sendto(stranger, packet, 6, 0, (struct sockaddr *) &input_peer,
-            sizeof(input_peer)) == 6);
+        assert(sendto(stranger, packet, 6, 0, (struct sockaddr *)&input_peer,
+                      sizeof(input_peer)) == 6);
         close(stranger);
         assert(sendto(input_fd, packet, sizeof(packet), 0,
-            (struct sockaddr *) &input_peer, sizeof(input_peer)) == sizeof(packet));
+                      (struct sockaddr *)&input_peer,
+                      sizeof(input_peer)) == sizeof(packet));
         graf_mkstate(&mx, &my, &mb, &ks);
         assert(mx != 777 && my != 777);
     }
@@ -71,9 +73,8 @@ static void keyboard_roundtrip(void)
      * the zero-filled response buffer and invent a release in the client. */
     graf_mkstate(&mx, &my, &mb, &ks);
     assert(mx == 60 && my == 90 && (mb & 1));
-    event = evnt_multi(MU_MESAG | MU_TIMER, 1, 1, 1,
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, (WORD[8]) {0}, 20, 0,
-        &mx, &my, &mb, &ks, &kr, &br);
+    event = evnt_multi(MU_MESAG | MU_TIMER, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                       0, (WORD[8]){0}, 20, 0, &mx, &my, &mb, &ks, &kr, &br);
     assert(event == MU_MESAG);
     assert(mx == 60 && my == 90 && (mb & 1));
     input_send(11, 60, 90);
@@ -84,9 +85,8 @@ static void keyboard_roundtrip(void)
     input_send(1, 5, 0);
     input_send(2, 5, 0);
     for (attempt = 0; attempt < 20 && found < 2; ++attempt) {
-        event = evnt_multi(MU_KEYBD | MU_TIMER, 1, 1, 1,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, 20, 0,
-            &mx, &my, &mb, &ks, &kr, &br);
+        event = evnt_multi(MU_KEYBD | MU_TIMER, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0,
+                           0, 0, NULL, 20, 0, &mx, &my, &mb, &ks, &kr, &br);
         if (event & MU_KEYBD) {
             if ((kr & 0xff) == 'a') {
                 assert((ks & 4) != 0);
@@ -104,8 +104,8 @@ static void keyboard_roundtrip(void)
 static void malformed_and_fragmented(void)
 {
     struct sockaddr_un address = {0};
-    gem_rpc_header_t header = {GEM_RPC_MAGIC, GEM_RPC_VERSION,
-        GEM_RPC_WIND_GET, 0};
+    gem_rpc_header_t header = {GEM_RPC_MAGIC, GEM_RPC_VERSION, GEM_RPC_WIND_GET,
+                               0};
     gem_rpc_reply_t reply;
     int fd = socket(AF_UNIX, SOCK_STREAM, 0);
     size_t i;
@@ -113,14 +113,14 @@ static void malformed_and_fragmented(void)
     assert(!gem_rpc_call(GEM_RPC_APPL_INIT, NULL, 1, NULL, NULL, 0));
     assert(!gem_rpc_call(GEM_RPC_APPL_INIT, NULL, 0, NULL, NULL, 1));
     assert(!gem_rpc_call(GEM_RPC_APPL_INIT, &header, GEM_RPC_PAYLOAD_MAX + 1,
-        NULL, NULL, 0));
+                         NULL, NULL, 0));
     assert(fd >= 0);
     address.sun_family = AF_UNIX;
     strcpy(address.sun_path, gem_rpc_socket_path());
-    assert(connect(fd, (struct sockaddr *) &address, sizeof(address)) == 0);
+    assert(connect(fd, (struct sockaddr *)&address, sizeof(address)) == 0);
     /* A short WIND_GET used to dispatch from uninitialized stack bytes. */
     for (i = 0; i < sizeof(header); ++i) {
-        assert(send(fd, (char *) &header + i, 1, 0) == 1);
+        assert(send(fd, (char *)&header + i, 1, 0) == 1);
     }
     assert(recv(fd, &reply, sizeof(reply), MSG_WAITALL) == sizeof(reply));
     assert(reply.magic == GEM_RPC_MAGIC && reply.status == -1 && !reply.size);
@@ -139,18 +139,21 @@ static void bad_counts(void)
     int32_t status = 0;
 
     points.count = 129;
-    assert(gem_rpc_call(GEM_RPC_V_PLINE, &points, sizeof(points),
-        &status, NULL, 0) && status == -1);
+    assert(gem_rpc_call(GEM_RPC_V_PLINE, &points, sizeof(points), &status, NULL,
+                        0) &&
+           status == -1);
     menu.show = 1;
     menu.object_count = 1;
     menu.string_count = GEM_RPC_MENU_MAX_STRINGS + 1;
-    assert(gem_rpc_call(GEM_RPC_MENU_BAR, &menu, sizeof(menu),
-        &status, NULL, 0) && status == -1);
+    assert(
+        gem_rpc_call(GEM_RPC_MENU_BAR, &menu, sizeof(menu), &status, NULL, 0) &&
+        status == -1);
     menu.string_count = 0;
     menu.objects[0].ob_type = G_USERDEF;
     menu.objects[0].ob_spec = 0x1234;
-    assert(gem_rpc_call(GEM_RPC_MENU_BAR, &menu, sizeof(menu),
-        &status, NULL, 0) && status == -1);
+    assert(
+        gem_rpc_call(GEM_RPC_MENU_BAR, &menu, sizeof(menu), &status, NULL, 0) &&
+        status == -1);
 }
 
 static void menu_client(void)
@@ -166,18 +169,26 @@ static void menu_client(void)
         tree[i].ob_width = 100;
         tree[i].ob_height = 20;
     }
-    tree[0].ob_next = NIL; tree[0].ob_head = 1; tree[0].ob_tail = 4;
-    tree[1].ob_next = 4; tree[1].ob_head = tree[1].ob_tail = 2;
+    tree[0].ob_next = NIL;
+    tree[0].ob_head = 1;
+    tree[0].ob_tail = 4;
+    tree[1].ob_next = 4;
+    tree[1].ob_head = tree[1].ob_tail = 2;
     tree[1].ob_type = G_BOX;
-    tree[2].ob_next = 1; tree[2].ob_head = tree[2].ob_tail = 3;
-    tree[3].ob_next = 2; tree[3].ob_type = G_TITLE;
-    tree[3].ob_spec = (LONG) (intptr_t) title;
-    tree[4].ob_next = 0; tree[4].ob_head = tree[4].ob_tail = 5;
-    tree[5].ob_next = 4; tree[5].ob_head = tree[5].ob_tail = 6;
+    tree[2].ob_next = 1;
+    tree[2].ob_head = tree[2].ob_tail = 3;
+    tree[3].ob_next = 2;
+    tree[3].ob_type = G_TITLE;
+    tree[3].ob_spec = (LONG)(intptr_t)title;
+    tree[4].ob_next = 0;
+    tree[4].ob_head = tree[4].ob_tail = 5;
+    tree[5].ob_next = 4;
+    tree[5].ob_head = tree[5].ob_tail = 6;
     tree[5].ob_type = G_BOX;
-    tree[6].ob_next = 5; tree[6].ob_type = G_STRING;
+    tree[6].ob_next = 5;
+    tree[6].ob_type = G_STRING;
     tree[6].ob_flags = LASTOB;
-    tree[6].ob_spec = (LONG) (intptr_t) item;
+    tree[6].ob_spec = (LONG)(intptr_t)item;
     assert(appl_init() > 0);
     assert(menu_bar(tree, 1));
     assert(menu_bar(tree, 1));
@@ -207,7 +218,8 @@ int main(int argc, char **argv)
     assert(handle > 0 && cw > 0 && ch > 0);
     v_opnvwk(work_in, &handle, work_out);
     assert(handle > 0 && work_out[0] == 903 && work_out[1] == 899);
-    assert(vqt_fontinfo(handle, &min_ade, &max_ade, distances, &width, effects));
+    assert(
+        vqt_fontinfo(handle, &min_ade, &max_ade, distances, &width, effects));
     assert(min_ade <= 'A' && max_ade >= 'z' && width > 0 && distances[3] > 0);
     assert(vqt_fontinfo(handle, NULL, NULL, NULL, NULL, NULL));
     graf_mkstate(&mx, &my, &buttons, &keys);
@@ -222,15 +234,15 @@ int main(int argc, char **argv)
     assert(wind_get(window, WF_WXYWH, &x, &y, &w, &h));
     assert(x == 40 && y == 50 && w == 210 && h == 160);
     assert(wind_find(50, 70) == window);
-    assert(wind_calc(WC_WORK, NAME | CLOSER | MOVER,
-        40, 50, 210, 160, &x, &y, &w, &h));
+    assert(wind_calc(WC_WORK, NAME | CLOSER | MOVER, 40, 50, 210, 160, &x, &y,
+                     &w, &h));
     assert(w > 0 && h > 0 && w <= 210 && h < 160);
     keyboard_roundtrip();
     assert(wind_update(BEG_UPDATE));
     vs_clip(handle, 1, clip);
     vsf_color(handle, BLACK);
     v_bar(handle, clip);
-    v_gtext(handle, 30, 50, (const BYTE *) "RPC");
+    v_gtext(handle, 30, 50, (const BYTE *)"RPC");
     assert(vqt_extent(handle, "RPC", extent));
     assert(extent[2] > 0);
     vs_clip(handle, 0, NULL);
@@ -242,11 +254,11 @@ int main(int argc, char **argv)
         int status;
         assert(child >= 0);
         if (child == 0) {
-            execl(argv[0], argv[0], "menu-client", (char *) NULL);
+            execl(argv[0], argv[0], "menu-client", (char *)NULL);
             _exit(127);
         }
         assert(waitpid(child, &status, 0) == child && WIFEXITED(status) &&
-            WEXITSTATUS(status) == 0);
+               WEXITSTATUS(status) == 0);
         assert(wind_set(window, WF_WXYWH, 50, 60, 200, 150));
     }
     assert(wind_close(window) && wind_delete(window));

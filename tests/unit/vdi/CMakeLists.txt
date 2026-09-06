@@ -12,10 +12,10 @@ add_executable(test_vdi
     ${PROJECT_SOURCE_DIR}/src/vdi/primitives.c
     ${PROJECT_SOURCE_DIR}/src/vdi/raster.c
     ${PROJECT_SOURCE_DIR}/src/vdi/text.c
-    ${PROJECT_SOURCE_DIR}/src/vdi/_core.c
-    ${PROJECT_SOURCE_DIR}/src/vdi/_cursor.c
-    ${PROJECT_SOURCE_DIR}/src/vdi/_fonts.c
-    ${PROJECT_SOURCE_DIR}/src/vdi/_surface.c
+    ${PROJECT_SOURCE_DIR}/src/vdi/vdi_core.c
+    ${PROJECT_SOURCE_DIR}/src/vdi/cursor.c
+    ${PROJECT_SOURCE_DIR}/src/vdi/fonts.c
+    ${PROJECT_SOURCE_DIR}/src/vdi/surface.c
 )
 
 add_dependencies(test_vdi gem_runtime_fonts gem_runtime_cursors)

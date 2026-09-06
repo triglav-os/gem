@@ -1,15 +1,22 @@
+/*
+ * Exercises a legacy menu tree and message-driven window redraws.
+ *
+ * MIT License (see: LICENSE)
+ * Copyright (C) 2026 tomaz stih
+ */
+
 #include <gem.h>
 #include <stdio.h>
 #include <string.h>
 
 WORD appl_id;
 VDI_HANDLE vdi_handle;
-WORD work_in[11] = {1,1,1,1,1,1,1,1,1,1,2};
+WORD work_in[11] = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2};
 WORD work_out[57];
 WORD win_handle;
 char message[80] = "Select a menu item...";
 
-#define MENU_ID 0  /* We'll build a simple menu tree manually */
+#define MENU_ID 0 /* We'll build a simple menu tree manually */
 #define TITLE_DESK 2
 #define TITLE_FILE 3
 #define TITLE_HELP 4
@@ -23,26 +30,29 @@ char message[80] = "Select a menu item...";
 /* Simple menu tree (TITLE + ITEMs) */
 OBJECT menu_tree[] = {
     /* Root */
-    {-1,1,3, G_IBOX, NONE, NORMAL, 0L, 0,0,0,0},
+    {-1, 1, 16, G_IBOX, NONE, NORMAL, 0L, 0, 0, 0, 0},
     /* Menu bar */
-    {0,2,2, G_BOX, NONE, NORMAL, 0x1100L, 0,0,80,1},
+    {16, 15, 15, G_BOX, NONE, NORMAL, 0x1100L, 0, 0, 80, 1},
     /* Titles */
-    {1, -1,-1, G_TITLE, NONE, NORMAL, (long)" Desk ", 0,0,6,1},
-    {1, -1,-1, G_TITLE, NONE, NORMAL, (long)" File ", 6,0,6,1},
-    {1, -1,-1, G_TITLE, NONE, NORMAL, (long)" Help ",12,0,6,1},
+    {3, -1, -1, G_TITLE, NONE, NORMAL, (long)" Desk ", 0, 0, 6, 1},
+    {4, -1, -1, G_TITLE, NONE, NORMAL, (long)" File ", 6, 0, 6, 1},
+    {15, -1, -1, G_TITLE, NONE, NORMAL, (long)" Help ", 12, 0, 6, 1},
     /* Desk menu */
-    {0,6,8, G_BOX, NONE, NORMAL, 0x1100L, 0,0,20,4},
-    {5, 7,7, G_STRING, NONE, NORMAL, (long)"  About... ", 0,0,20,1},
-    {5, 8,8, G_STRING, NONE, NORMAL, (long)"  ------------ ", 0,1,20,1},
-    {5, -1,-1, G_STRING, NONE, NORMAL, (long)"  Quit     ", 0,2,20,1},
+    {9, 6, 8, G_BOX, NONE, NORMAL, 0x1100L, 0, 0, 20, 4},
+    {7, -1, -1, G_STRING, NONE, NORMAL, (long)"  About... ", 0, 0, 20, 1},
+    {8, -1, -1, G_STRING, NONE, NORMAL, (long)"  ------------ ", 0, 1, 20, 1},
+    {5, -1, -1, G_STRING, NONE, NORMAL, (long)"  Quit     ", 0, 2, 20, 1},
     /* File menu */
-    {0,10,12, G_BOX, NONE, NORMAL, 0x1100L, 0,0,20,3},
-    {9, 11,11, G_STRING, NONE, NORMAL, (long)"  Open     ", 0,0,20,1},
-    {9, 12,12, G_STRING, NONE, NORMAL, (long)"  Save     ", 0,1,20,1},
-    {9, -1,-1, G_STRING, NONE, NORMAL, (long)"  Exit     ", 0,2,20,1},
+    {13, 10, 12, G_BOX, NONE, NORMAL, 0x1100L, 0, 0, 20, 3},
+    {11, -1, -1, G_STRING, NONE, NORMAL, (long)"  Open     ", 0, 0, 20, 1},
+    {12, -1, -1, G_STRING, NONE, NORMAL, (long)"  Save     ", 0, 1, 20, 1},
+    {9, -1, -1, G_STRING, NONE, NORMAL, (long)"  Exit     ", 0, 2, 20, 1},
     /* Help menu */
-    {0,14,14, G_BOX, NONE, NORMAL, 0x1100L, 0,0,20,1},
-    {13,-1,-1, G_STRING, LASTOB, NORMAL, (long)"  About GEM Demo ", 0,0,20,1},
+    {16, 14, 14, G_BOX, NONE, NORMAL, 0x1100L, 0, 0, 20, 1},
+    {13, -1, -1, G_STRING, NONE, NORMAL, (long)"  About GEM Demo ", 0, 0, 20,
+     1},
+    {1, 2, 4, G_IBOX, NONE, NORMAL, 0L, 0, 0, 80, 1},
+    {0, 5, 13, G_IBOX, LASTOB, NORMAL, 0L, 0, 0, 0, 0},
 };
 
 /* Forward declarations */
@@ -54,10 +64,11 @@ void handle_menu(int title, int item);
 int main(void)
 {
     WORD msg[8];
-    GRECT work, full;
+    GRECT full;
 
     appl_id = appl_init();
-    if (appl_id < 0) return -1;
+    if (appl_id < 0)
+        return -1;
 
     /* Open VDI workstation */
     vdi_handle = graf_handle();
@@ -65,15 +76,17 @@ int main(void)
 
     /* Create window */
     wind_get(0, WF_WORKXYWH, &full.g_x, &full.g_y, &full.g_w, &full.g_h);
-    win_handle = wind_create(NAME|CLOSER|FULLER|MOVER|SIZER, full.g_x, full.g_y, full.g_w, full.g_h);
+    win_handle = wind_create(NAME | CLOSER | FULLER | MOVER | SIZER, full.g_x,
+                             full.g_y, full.g_w, full.g_h);
     if (win_handle < 0) {
         v_clsvwk(vdi_handle);
         appl_exit();
         return -1;
     }
 
-    wind_set(win_handle, WF_NAME, "GEM Menu Demo", 0, 0);
-    wind_open(win_handle, full.g_x+20, full.g_y+20, full.g_w-40, full.g_h-60);
+    wind_set_str(win_handle, WF_NAME, "GEM Menu Demo");
+    wind_open(win_handle, full.g_x + 20, full.g_y + 20, full.g_w - 40,
+              full.g_h - 60);
 
     /* Attach menu */
     menu_bar(menu_tree, 1);
@@ -84,7 +97,7 @@ int main(void)
 
         switch (msg[0]) {
             case WM_REDRAW:
-                redraw_window((GRECT *) &msg[4]);
+                redraw_window((GRECT *)&msg[4]);
                 break;
 
             case WM_CLOSED:
@@ -92,42 +105,42 @@ int main(void)
 
             case WM_MOVED:
             case WM_SIZED:
-                wind_set(win_handle, WF_CURRXYWH, msg[4], msg[5], msg[6], msg[7]);
+                wind_set(win_handle, WF_CURRXYWH, msg[4], msg[5], msg[6],
+                         msg[7]);
                 break;
 
             case WM_TOPPED:
                 wind_set(win_handle, WF_TOP, 0, 0, 0, 0);
                 break;
 
-            case WM_FULLED:
-            {
+            case WM_FULLED: {
                 GRECT current;
                 GRECT previous;
                 GRECT full_work;
 
                 wind_get(win_handle, WF_CURRXYWH, &current.g_x, &current.g_y,
-                    &current.g_w, &current.g_h);
+                         &current.g_w, &current.g_h);
                 wind_get(win_handle, WF_PXYWH, &previous.g_x, &previous.g_y,
-                    &previous.g_w, &previous.g_h);
+                         &previous.g_w, &previous.g_h);
                 wind_get(win_handle, WF_FXYWH, &full_work.g_x, &full_work.g_y,
-                    &full_work.g_w, &full_work.g_h);
+                         &full_work.g_w, &full_work.g_h);
 
                 if (current.g_x == full_work.g_x &&
                     current.g_y == full_work.g_y &&
                     current.g_w == full_work.g_w &&
                     current.g_h == full_work.g_h) {
                     wind_set(win_handle, WF_CURRXYWH, previous.g_x,
-                        previous.g_y, previous.g_w, previous.g_h);
+                             previous.g_y, previous.g_w, previous.g_h);
                 } else {
                     wind_set(win_handle, WF_CURRXYWH, full_work.g_x,
-                        full_work.g_y, full_work.g_w, full_work.g_h);
+                             full_work.g_y, full_work.g_w, full_work.g_h);
                 }
                 break;
             }
 
             case MN_SELECTED:
                 handle_menu(msg[3], msg[4]);
-                menu_tnormal(menu_tree, msg[3], 1);  /* Deselect title */
+                menu_tnormal(menu_tree, msg[3], 1); /* Deselect title */
                 break;
         }
     }
@@ -153,20 +166,20 @@ void redraw_window(GRECT *clip)
     WORD y1;
 
     wind_update(BEG_UPDATE);
-    wind_get(win_handle, WF_WORKXYWH,
-        &work.g_x, &work.g_y, &work.g_w, &work.g_h);
-    wind_get(win_handle, WF_FIRSTXYWH,
-        &visible.g_x, &visible.g_y, &visible.g_w, &visible.g_h);
+    wind_get(win_handle, WF_WORKXYWH, &work.g_x, &work.g_y, &work.g_w,
+             &work.g_h);
+    wind_get(win_handle, WF_FIRSTXYWH, &visible.g_x, &visible.g_y, &visible.g_w,
+             &visible.g_h);
 
     while (visible.g_w > 0 && visible.g_h > 0) {
         x0 = visible.g_x;
         y0 = visible.g_y;
-        x1 = (WORD) (visible.g_x + visible.g_w - 1);
-        y1 = (WORD) (visible.g_y + visible.g_h - 1);
+        x1 = (WORD)(visible.g_x + visible.g_w - 1);
+        y1 = (WORD)(visible.g_y + visible.g_h - 1);
 
         if (clip != NULL) {
-            WORD clip_x1 = (WORD) (clip->g_x + clip->g_w - 1);
-            WORD clip_y1 = (WORD) (clip->g_y + clip->g_h - 1);
+            WORD clip_x1 = (WORD)(clip->g_x + clip->g_w - 1);
+            WORD clip_y1 = (WORD)(clip->g_y + clip->g_h - 1);
 
             if (x0 < clip->g_x) {
                 x0 = clip->g_x;
@@ -195,12 +208,13 @@ void redraw_window(GRECT *clip)
             pxy[3] = y1;
             vr_recfl(vdi_handle, pxy);
 
-            v_gtext(vdi_handle, (WORD) (work.g_x + 10),
-                (WORD) (work.g_y + 20), message);
+            vst_color(vdi_handle, WHITE);
+            v_gtext(vdi_handle, (WORD)(work.g_x + 10), (WORD)(work.g_y + 20),
+                    message);
         }
 
-        wind_get(win_handle, WF_NEXTXYWH,
-            &visible.g_x, &visible.g_y, &visible.g_w, &visible.g_h);
+        wind_get(win_handle, WF_NEXTXYWH, &visible.g_x, &visible.g_y,
+                 &visible.g_w, &visible.g_h);
     }
 
     vs_clip(vdi_handle, 0, NULL);
@@ -213,8 +227,8 @@ void redraw_message_area(void)
     GRECT work;
     GRECT dirty;
 
-    wind_get(win_handle, WF_WORKXYWH,
-        &work.g_x, &work.g_y, &work.g_w, &work.g_h);
+    wind_get(win_handle, WF_WORKXYWH, &work.g_x, &work.g_y, &work.g_w,
+             &work.g_h);
     dirty.g_x = work.g_x;
     dirty.g_y = work.g_y;
     dirty.g_w = work.g_w;
@@ -226,7 +240,7 @@ void handle_menu(int title, int item)
 {
     char buf[64];
 
-    (void) buf;
+    (void)buf;
 
     /* Find which menu was selected */
     if (title == TITLE_DESK) {

@@ -2,8 +2,13 @@
 
 This note is intentionally about classic Atari ST-visible GEM behavior.
 It excludes `proc_`, multitasking, and Atari-specific internals.
-The question is simple: what is still missing before this port feels
-compatible enough for a 1.0 aimed at normal GEM software?
+It tracks behavior that still needs compatibility work or explicit verification
+for normal GEM software.
+
+Reviewed against the source layout on 2026-09-06. This is a compatibility
+worklist, not a list of failing tests. The [transport](../architecture/API_TRANSPORT.md)
+exports all declared AES/VDI APIs; native semantics can still be partial.
+See [latest results](../tests/LATEST.md) for executed checks.
 
 ## Current Position
 
@@ -276,7 +281,7 @@ Can defer:
 - Printer-oriented features
 - Deep alpha-console fidelity
 
-## Bottom Line
+## Compatibility priorities
 
 The project is already past the "missing major subsystems" phase.
 For 1.0, the real gap is fidelity, not breadth.

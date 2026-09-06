@@ -2,34 +2,12 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "Configure CMake",
-            "type": "shell",
-            "command": "cmake",
-            "args": [
-                "-S",
-                ".",
-                "-B",
-                "build"
-            ],
+            "label": "Build GEM and samples",
+            "type": "process",
+            "command": "make",
             "options": {
                 "cwd": "${workspaceFolder}"
             },
-            "problemMatcher": []
-        },
-        {
-            "label": "Build Desktop",
-            "type": "shell",
-            "command": "cmake",
-            "args": [
-                "--build",
-                "build",
-                "--target",
-                "desktop"
-            ],
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "dependsOn": "Configure CMake",
             "problemMatcher": [
                 "$gcc"
             ],
@@ -39,57 +17,17 @@
             }
         },
         {
-            "label": "Build Desktop Stack",
-            "type": "shell",
-            "command": "cmake",
+            "label": "Start GEM sample session",
+            "type": "process",
+            "command": "python3",
             "args": [
-                "--build",
-                "build",
-                "--target",
-                "gemd",
-                "desktop",
-                "terminal",
-                "calc",
-                "clock_gemd"
+                "-B",
+                "${workspaceFolder}/tools/scripts/sample_session.py",
+                "start"
             ],
+            "dependsOn": "Build GEM and samples",
             "options": {
                 "cwd": "${workspaceFolder}"
-            },
-            "dependsOn": "Configure CMake",
-            "problemMatcher": [
-                "$gcc"
-            ]
-        },
-        {
-            "label": "Build Menu Demo",
-            "type": "shell",
-            "command": "cmake",
-            "args": [
-                "--build",
-                "build",
-                "--target",
-                "gemd",
-                "menu_demo"
-            ],
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "dependsOn": "Configure CMake",
-            "problemMatcher": [
-                "$gcc"
-            ]
-        },
-        {
-            "label": "Start gemd",
-            "type": "shell",
-            "command": "${workspaceFolder}/tools/start-gemd.sh",
-            "options": {
-                "cwd": "${workspaceFolder}",
-                "env": {
-                    "GEM_RASTA_FRAMEBUFFER": "/tmp/rasta.fb",
-                    "GEM_RASTA_HOST": "127.0.0.1",
-                    "GEM_RASTA_PORT": "5000"
-                }
             },
             "problemMatcher": [],
             "presentation": {
@@ -99,40 +37,17 @@
             }
         },
         {
-            "label": "Start rasta viewer",
-            "type": "shell",
-            "command": "${workspaceFolder}/tools/start-rasta.sh",
+            "label": "Stop GEM sample session",
+            "type": "process",
+            "command": "python3",
+            "args": [
+                "-B",
+                "${workspaceFolder}/tools/scripts/sample_session.py",
+                "stop"
+            ],
             "options": {
-                "cwd": "${workspaceFolder}",
-                "env": {
-                    "GEM_RASTA_PORT": "5000"
-                }
+                "cwd": "${workspaceFolder}"
             },
-            "problemMatcher": [],
-            "presentation": {
-                "reveal": "always",
-                "panel": "dedicated",
-                "clear": false
-            }
-        },
-        {
-            "label": "Build + Start gemd",
-            "dependsOn": [
-                "Build Menu Demo",
-                "Start rasta viewer",
-                "Start gemd"
-            ],
-            "dependsOrder": "sequence",
-            "problemMatcher": []
-        },
-        {
-            "label": "Build Desktop Session",
-            "dependsOn": [
-                "Build Desktop Stack",
-                "Start rasta viewer",
-                "Start gemd"
-            ],
-            "dependsOrder": "sequence",
             "problemMatcher": []
         }
     ]

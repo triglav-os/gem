@@ -1,122 +1,27 @@
 {
     "version": "0.2.0",
-    "compounds": [
-        {
-            "name": "Debug Menu Demo (gemd + 2 apps)",
-            "preLaunchTask": "Build + Start gemd",
-            "configurations": [
-                "Debug Menu Demo A",
-                "Debug Menu Demo B"
-            ],
-            "stopAll": true
-        }
-    ],
     "configurations": [
         {
-            "name": "Debug Desktop",
+            "name": "GEM \u2014 all samples",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/bin/core/desktop",
+            "program": "${workspaceFolder}/bin/core/gemd",
+            "cwd": "${workspaceFolder}",
             "args": [],
             "stopAtEntry": false,
-            "cwd": "${workspaceFolder}",
-            "environment": [
-                {
-                    "name": "GEM_RASTA_FRAMEBUFFER",
-                    "value": "/tmp/rasta.fb"
-                },
-                {
-                    "name": "GEM_RASTA_HOST",
-                    "value": "127.0.0.1"
-                },
-                {
-                    "name": "GEM_RASTA_PORT",
-                    "value": "5000"
-                }
-            ],
             "externalConsole": false,
-            "miDebuggerArgs": "-iex \"set debuginfod enabled off\"",
             "MIMode": "gdb",
-            "miDebuggerPath": "${workspaceFolder}/tools/gdb-no-debuginfod.sh",
-            "preLaunchTask": "Build Desktop Session",
+            "miDebuggerPath": "${workspaceFolder}/tools/scripts/sample_debugger.py",
+            "miDebuggerArgs": "-iex \"set debuginfod enabled off\"",
+            "preLaunchTask": "Start GEM sample session",
+            "postDebugTask": "Stop GEM sample session",
             "setupCommands": [
                 {
-                    "description": "Enable async MI so Pause/interrupt works while the target is running",
-                    "text": "-gdb-set mi-async on",
-                    "ignoreFailures": true
-                },
-                {
-                    "description": "Enable pretty-printing for gdb",
                     "text": "-enable-pretty-printing",
                     "ignoreFailures": true
                 },
                 {
-                    "description": "Disable pagination in gdb",
-                    "text": "set pagination off",
-                    "ignoreFailures": true
-                }
-            ]
-        },
-        {
-            "name": "Debug Menu Demo A",
-            "type": "cppdbg",
-            "request": "launch",
-            "program": "${workspaceFolder}/bin/demos/menu_demo",
-            "args": [
-                "A"
-            ],
-            "stopAtEntry": false,
-            "cwd": "${workspaceFolder}",
-            "externalConsole": false,
-            "miDebuggerArgs": "-iex \"set debuginfod enabled off\"",
-            "MIMode": "gdb",
-            "miDebuggerPath": "${workspaceFolder}/tools/gdb-no-debuginfod.sh",
-            "setupCommands": [
-                {
-                    "description": "Enable async MI so Pause/interrupt works while the target is running",
-                    "text": "-gdb-set mi-async on",
-                    "ignoreFailures": true
-                },
-                {
-                    "description": "Enable pretty-printing for gdb",
-                    "text": "-enable-pretty-printing",
-                    "ignoreFailures": true
-                },
-                {
-                    "description": "Disable pagination in gdb",
-                    "text": "set pagination off",
-                    "ignoreFailures": true
-                }
-            ]
-        },
-        {
-            "name": "Debug Menu Demo B",
-            "type": "cppdbg",
-            "request": "launch",
-            "program": "${workspaceFolder}/bin/demos/menu_demo",
-            "args": [
-                "B"
-            ],
-            "stopAtEntry": false,
-            "cwd": "${workspaceFolder}",
-            "externalConsole": false,
-            "miDebuggerArgs": "-iex \"set debuginfod enabled off\"",
-            "MIMode": "gdb",
-            "miDebuggerPath": "${workspaceFolder}/tools/gdb-no-debuginfod.sh",
-            "setupCommands": [
-                {
-                    "description": "Enable async MI so Pause/interrupt works while the target is running",
-                    "text": "-gdb-set mi-async on",
-                    "ignoreFailures": true
-                },
-                {
-                    "description": "Enable pretty-printing for gdb",
-                    "text": "-enable-pretty-printing",
-                    "ignoreFailures": true
-                },
-                {
-                    "description": "Disable pagination in gdb",
-                    "text": "set pagination off",
+                    "text": "-gdb-set pagination off",
                     "ignoreFailures": true
                 }
             ]

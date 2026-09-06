@@ -2,7 +2,7 @@
 
 This note describes the classic GEM bitmap font format that VDI and
 GDOS-style code expect. It also explains how that differs from the
-temporary built-in font currently used by this project.
+hosted loader and renderer used by this project.
 
 ## GEM Bitmap Font Header
 
@@ -160,16 +160,20 @@ Linux port, it is safest to treat imported GEM font files as a defined
 file format that should be parsed deliberately rather than by casting
 raw bytes directly onto in-memory structs.
 
-## Project Direction
+## Current implementation
 
-The current VDI implementation in
-[src/vdi/_vdi.c](/home/tstih/data/triglav-os/gem/src/vdi/_vdi.c) still
-uses a tiny built-in fallback font for bring-up. That is acceptable as
-a bootstrap mechanism, but it is not the correct long-term GEM design.
+The loader, font registry and glyph renderer are in
+[src/vdi/fonts.c](../../src/vdi/fonts.c). Bundled `.fnt` files live in
+`src/resources/fonts/`; the build copies them to `bin/resources/fonts/`, and
+`make sdk` exports them under `bin/sdk/share/gem/fonts/`.
 
-The right long-term direction is:
+The loader parses file fields and validates table, glyph and bitmap bounds.
+It loads GEM bitmap font data and uses its metrics and offsets; the earlier
+bring-up description of a tiny fallback in `_vdi.c` no longer describes the
+code. Public font/text entry points are in
+[src/vdi/text.c](../../src/vdi/text.c).
 
-- keep font rendering behind private `_vdi` helpers,
-- replace per-pixel glyph plotting with packed monochrome glyph blits,
-- load or embed real GEM-compatible bitmap font data,
-- use GEM metrics and offsets instead of a hand-written fixed font.
+Demo2 displays loaded fonts, and other [UAT demos](../tests/UAT.md) exercise
+font selection and metrics. Font parsing has additional unit coverage. Those
+checks do not imply scalable fonts, complete text effects, rotation or full
+historical justification semantics; see the [compatibility notes](GAP_ANALYSIS.md).

@@ -6,10 +6,11 @@
  * Copyright (C) 2026 tomaz stih
  */
 #define _POSIX_C_SOURCE 200809L
-#include "../../src/aes/_aes.h"
+#include "../../../src/aes/aes_internal.h"
 #include "platform/raster.h"
 
 #include <assert.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -39,7 +40,7 @@ static void framebuffer_paths(void)
     assert(unlink(path) == 0);
     assert(gem_raster_init(80, 80, GEM_RASTER_MONO1));
     assert(stat(path, &st) == 0 && st.st_size == 800 &&
-        (st.st_mode & 0777) == 0600);
+           (st.st_mode & 0777) == 0600);
     memset(gem_raster_surface()->pixels, 0x5a, 800);
     gem_raster_present();
     file = fopen(path, "rb");
@@ -48,8 +49,18 @@ static void framebuffer_paths(void)
     assert(unlink(path) == 0);
     file = fopen(path, "wb");
     assert(file && fclose(file) == 0);
+    gem_raster_present_rect(0, 0, 1, 1);
+    file = fopen(path, "rb");
+    assert(file && fseek(file, 799, SEEK_SET) == 0 && fgetc(file) == 0x5a);
+    assert(fclose(file) == 0);
+    assert(truncate(path, 0) == 0);
+    gem_raster_present_rect(0, 0, 1, 1);
+    file = fopen(path, "rb");
+    assert(file && fseek(file, 799, SEEK_SET) == 0 && fgetc(file) == 0x5a);
+    assert(fclose(file) == 0);
+    gem_raster_present_rect(INT_MAX, INT_MAX, INT_MAX, INT_MAX);
+    gem_raster_present_rect(INT_MIN, INT_MIN, INT_MAX, INT_MAX);
     assert(gem_raster_resync());
-    gem_raster_present();
     file = fopen(path, "rb");
     assert(file && fgetc(file) == 0x5a && fclose(file) == 0);
     gem_raster_shutdown();
@@ -60,40 +71,53 @@ static void application_ids(void)
 {
     WORD first = appl_init(), last, wrapped;
     assert(first == 1);
-    _aes.next_app_id = 32767;
+    aes_state.next_app_id = 32767;
     last = appl_init();
     wrapped = appl_init();
     assert(last == 32767 && wrapped == 2);
-    assert(_aes_find_app_by_id(first) && _aes_find_app_by_id(last));
+    assert(aes_find_app_by_id(first) && aes_find_app_by_id(last));
     assert(appl_exit());
-    _aes.current_app_id = last;
+    aes_state.current_app_id = last;
     assert(appl_exit());
-    _aes.current_app_id = first;
+    aes_state.current_app_id = first;
     assert(appl_exit());
 }
 
 static void selector_patterns(void)
 {
-    static const struct {const char *pattern, *name; int matches;} cases[] = {
-        {"", "", 1}, {"", "a", 0}, {"*", "", 1}, {"?", "", 0},
-        {"?", "a", 1}, {"?", "ab", 0}, {"*.TXT", "notes.txt", 1},
-        {"*.txt", "notes.png", 0}, {"a*b*c", "axbyc", 1},
-        {"a*b*c", "axbycd", 0}, {"**a***?*", "AB", 1},
-        {"*ab*ab", "abab", 1}, {"*ab*ab", "aba", 0},
-        {"*.?", "name.c", 1}, {"*.?", "name.cpp", 0}
-    };
+    static const struct {
+        const char *pattern, *name;
+        int matches;
+    } cases[] = {{"", "", 1},
+                 {"", "a", 0},
+                 {"*", "", 1},
+                 {"?", "", 0},
+                 {"?", "a", 1},
+                 {"?", "ab", 0},
+                 {"*.TXT", "notes.txt", 1},
+                 {"*.txt", "notes.png", 0},
+                 {"a*b*c", "axbyc", 1},
+                 {"a*b*c", "axbycd", 0},
+                 {"**a***?*", "AB", 1},
+                 {"*ab*ab", "abab", 1},
+                 {"*ab*ab", "aba", 0},
+                 {"*.?", "name.c", 1},
+                 {"*.?", "name.cpp", 0}};
     char hostile[202], name[201];
     for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i)
-        assert(_aes_fsel_match_pattern(cases[i].pattern, cases[i].name) ==
-            cases[i].matches);
+        assert(aes_fsel_match_pattern(cases[i].pattern, cases[i].name) ==
+               cases[i].matches);
     for (size_t i = 0; i < 100; ++i) {
-        hostile[i * 2] = '*'; hostile[i * 2 + 1] = 'a';
+        hostile[i * 2] = '*';
+        hostile[i * 2 + 1] = 'a';
     }
-    hostile[200] = 'b'; hostile[201] = '\0';
-    memset(name, 'a', 200); name[200] = '\0';
-    assert(!_aes_fsel_match_pattern(hostile, name));
+    hostile[200] = 'b';
+    hostile[201] = '\0';
+    memset(name, 'a', 200);
+    name[200] = '\0';
+    assert(!aes_fsel_match_pattern(hostile, name));
     hostile[200] = '*';
-    assert(_aes_fsel_match_pattern(hostile, name));
+    assert(aes_fsel_match_pattern(hostile, name));
 }
 
 int main(void)
@@ -101,6 +125,7 @@ int main(void)
     framebuffer_paths();
     application_ids();
     selector_patterns();
-    puts("hostile framebuffer paths, viewer replacement and app-id rollover passed");
+    puts("hostile framebuffer paths, viewer replacement and app-id rollover "
+         "passed");
     return 0;
 }

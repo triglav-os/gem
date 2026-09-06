@@ -50,12 +50,12 @@ typedef struct demo31_state {
 
 static WORD appl_id;
 static VDI_HANDLE vdi_handle;
-static WORD work_in[11] = {1,1,1,1,1,1,1,1,1,1,2};
+static WORD work_in[11] = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2};
 static WORD work_out[57];
 
 static char *line_at(demo31_state_t *state, WORD row)
 {
-    return state->cells + (size_t) row * (DEMO31_MAX_COLS + 1);
+    return state->cells + (size_t)row * (DEMO31_MAX_COLS + 1);
 }
 
 static WORD clamp_word(WORD value, WORD low, WORD high)
@@ -74,7 +74,7 @@ static WORD max_offset(WORD total, WORD visible)
     if (visible >= total) {
         return 0;
     }
-    return (WORD) (total - visible);
+    return (WORD)(total - visible);
 }
 
 static WORD slider_size(WORD total, WORD visible)
@@ -91,7 +91,7 @@ static WORD slider_size(WORD total, WORD visible)
     if (size > 1000) {
         size = 1000;
     }
-    return (WORD) size;
+    return (WORD)size;
 }
 
 static WORD slider_pos(WORD offset, WORD total, WORD visible)
@@ -101,7 +101,7 @@ static WORD slider_pos(WORD offset, WORD total, WORD visible)
     if (limit <= 0) {
         return 0;
     }
-    return (WORD) ((1000L * offset) / limit);
+    return (WORD)((1000L * offset) / limit);
 }
 
 static WORD offset_from_slider(WORD slider, WORD total, WORD visible)
@@ -112,22 +112,22 @@ static WORD offset_from_slider(WORD slider, WORD total, WORD visible)
     if (limit <= 0) {
         return 0;
     }
-    return (WORD) ((slider * (LONG) limit + 500L) / 1000L);
+    return (WORD)((slider * (LONG)limit + 500L) / 1000L);
 }
 
 static void clear_line(demo31_state_t *state, WORD row)
 {
     char *line = line_at(state, row);
 
-    memset(line, 0, (size_t) DEMO31_MAX_COLS + 1u);
+    memset(line, 0, (size_t)DEMO31_MAX_COLS + 1u);
 }
 
 static void scroll_lines_up(demo31_state_t *state)
 {
-    size_t line_size = (size_t) DEMO31_MAX_COLS + 1u;
+    size_t line_size = (size_t)DEMO31_MAX_COLS + 1u;
 
     memmove(state->cells, state->cells + line_size,
-        line_size * (DEMO31_MAX_LINES - 1));
+            line_size * (DEMO31_MAX_LINES - 1));
     memset(state->cells + line_size * (DEMO31_MAX_LINES - 1), 0, line_size);
     if (state->cursor_row > 0) {
         --state->cursor_row;
@@ -152,7 +152,7 @@ static void ensure_row(demo31_state_t *state, WORD row)
         for (i = state->total_rows; i <= row; ++i) {
             clear_line(state, i);
         }
-        state->total_rows = (WORD) (row + 1);
+        state->total_rows = (WORD)(row + 1);
     }
 }
 
@@ -162,7 +162,7 @@ static void recompute_max_line_len(demo31_state_t *state)
     WORD best = 0;
 
     for (row = 0; row < state->total_rows; ++row) {
-        WORD len = (WORD) strlen(line_at(state, row));
+        WORD len = (WORD)strlen(line_at(state, row));
 
         if (len > best) {
             best = len;
@@ -185,7 +185,7 @@ static void set_char_at_cursor(demo31_state_t *state, char ch)
 
     ensure_row(state, state->cursor_row);
     line = line_at(state, state->cursor_row);
-    len = (WORD) strlen(line);
+    len = (WORD)strlen(line);
     if (state->cursor_col > len) {
         for (i = len; i < state->cursor_col; ++i) {
             line[i] = ' ';
@@ -196,8 +196,8 @@ static void set_char_at_cursor(demo31_state_t *state, char ch)
     if (state->cursor_col >= len) {
         line[state->cursor_col + 1] = '\0';
     }
-    if ((WORD) strlen(line) > state->max_line_len) {
-        state->max_line_len = (WORD) strlen(line);
+    if ((WORD)strlen(line) > state->max_line_len) {
+        state->max_line_len = (WORD)strlen(line);
     }
     ++state->cursor_col;
 }
@@ -229,43 +229,42 @@ static void process_shell_byte(demo31_state_t *state, unsigned char byte)
     }
 
     switch (byte) {
-    case 0x1b:
-        esc_state = 1;
-        break;
-    case '\r':
-        state->cursor_col = 0;
-        break;
-    case '\n':
-        newline(state);
-        break;
-    case '\b':
-        if (state->cursor_col > 0) {
-            --state->cursor_col;
-        }
-        break;
-    case '\t':
-        do {
-            set_char_at_cursor(state, ' ');
-        } while ((state->cursor_col & 7) != 0);
-        break;
-    default:
-        if (byte >= 32 && byte <= 126) {
-            set_char_at_cursor(state, (char) byte);
-        }
-        break;
+        case 0x1b:
+            esc_state = 1;
+            break;
+        case '\r':
+            state->cursor_col = 0;
+            break;
+        case '\n':
+            newline(state);
+            break;
+        case '\b':
+            if (state->cursor_col > 0) {
+                --state->cursor_col;
+            }
+            break;
+        case '\t':
+            do {
+                set_char_at_cursor(state, ' ');
+            } while ((state->cursor_col & 7) != 0);
+            break;
+        default:
+            if (byte >= 32 && byte <= 126) {
+                set_char_at_cursor(state, (char)byte);
+            }
+            break;
     }
 }
 
 static void sync_layout(demo31_state_t *state)
 {
-    wind_get(state->handle, WF_WORKXYWH,
-        &state->work.g_x, &state->work.g_y,
-        &state->work.g_w, &state->work.g_h);
+    wind_get(state->handle, WF_WORKXYWH, &state->work.g_x, &state->work.g_y,
+             &state->work.g_w, &state->work.g_h);
 
-    state->visible_rows = (WORD) ((state->work.g_h - 2 * DEMO31_MARGIN) /
-        state->row_h);
-    state->visible_cols = (WORD) ((state->work.g_w - 2 * DEMO31_MARGIN) /
-        state->cell_w);
+    state->visible_rows =
+        (WORD)((state->work.g_h - 2 * DEMO31_MARGIN) / state->row_h);
+    state->visible_cols =
+        (WORD)((state->work.g_w - 2 * DEMO31_MARGIN) / state->cell_w);
     if (state->visible_rows < 1) {
         state->visible_rows = 1;
     }
@@ -273,29 +272,33 @@ static void sync_layout(demo31_state_t *state)
         state->visible_cols = 1;
     }
 
-    state->scroll_row = clamp_word(state->scroll_row, 0,
-        max_offset(state->total_rows, state->visible_rows));
-    state->scroll_col = clamp_word(state->scroll_col, 0,
-        max_offset(state->max_line_len, state->visible_cols));
+    state->scroll_row =
+        clamp_word(state->scroll_row, 0,
+                   max_offset(state->total_rows, state->visible_rows));
+    state->scroll_col =
+        clamp_word(state->scroll_col, 0,
+                   max_offset(state->max_line_len, state->visible_cols));
 }
 
 static void update_window_controls(demo31_state_t *state)
 {
     wind_set_str(state->handle, WF_NAME, "Terminal");
     wind_set(state->handle, WF_VSLSIZ,
-        slider_size(state->total_rows, state->visible_rows), 0, 0, 0);
+             slider_size(state->total_rows, state->visible_rows), 0, 0, 0);
     wind_set(state->handle, WF_HSLSIZ,
-        slider_size(state->max_line_len, state->visible_cols), 0, 0, 0);
-    wind_set(state->handle, WF_VSLIDE,
+             slider_size(state->max_line_len, state->visible_cols), 0, 0, 0);
+    wind_set(
+        state->handle, WF_VSLIDE,
         slider_pos(state->scroll_row, state->total_rows, state->visible_rows),
         0, 0, 0);
-    wind_set(state->handle, WF_HSLIDE,
+    wind_set(
+        state->handle, WF_HSLIDE,
         slider_pos(state->scroll_col, state->max_line_len, state->visible_cols),
         0, 0, 0);
 }
 
-static int cursor_rect_for_position(demo31_state_t *state, WORD row,
-                                    WORD col, GRECT *rect)
+static int cursor_rect_for_position(demo31_state_t *state, WORD row, WORD col,
+                                    GRECT *rect)
 {
     WORD cell_row;
     WORD cell_col;
@@ -307,12 +310,12 @@ static int cursor_rect_for_position(demo31_state_t *state, WORD row,
         return 0;
     }
 
-    cell_row = (WORD) (row - state->scroll_row);
-    cell_col = (WORD) (col - state->scroll_col);
-    rect->g_x = (WORD) (state->work.g_x + DEMO31_MARGIN +
-        cell_col * state->cell_w);
-    rect->g_y = (WORD) (state->work.g_y + DEMO31_MARGIN +
-        cell_row * state->row_h);
+    cell_row = (WORD)(row - state->scroll_row);
+    cell_col = (WORD)(col - state->scroll_col);
+    rect->g_x =
+        (WORD)(state->work.g_x + DEMO31_MARGIN + cell_col * state->cell_w);
+    rect->g_y =
+        (WORD)(state->work.g_y + DEMO31_MARGIN + cell_row * state->row_h);
     rect->g_w = state->cell_w;
     rect->g_h = state->row_h;
     return 1;
@@ -320,8 +323,8 @@ static int cursor_rect_for_position(demo31_state_t *state, WORD row,
 
 static int cursor_rect(demo31_state_t *state, GRECT *rect)
 {
-    return cursor_rect_for_position(state, state->cursor_row,
-        state->cursor_col, rect);
+    return cursor_rect_for_position(state, state->cursor_row, state->cursor_col,
+                                    rect);
 }
 
 static int row_range_dirty_rect(demo31_state_t *state, WORD first_row,
@@ -338,24 +341,24 @@ static int row_range_dirty_rect(demo31_state_t *state, WORD first_row,
     }
 
     top_row = (first_row > state->scroll_row) ? first_row : state->scroll_row;
-    bottom_row = (last_row <
-        (WORD) (state->scroll_row + state->visible_rows)) ?
-        last_row : (WORD) (state->scroll_row + state->visible_rows);
+    bottom_row = (last_row < (WORD)(state->scroll_row + state->visible_rows))
+                     ? last_row
+                     : (WORD)(state->scroll_row + state->visible_rows);
     if (bottom_row < top_row) {
         return 0;
     }
 
-    y0 = (WORD) (state->work.g_y + DEMO31_MARGIN +
-        (top_row - state->scroll_row) * state->row_h);
-    y1 = (WORD) (state->work.g_y + DEMO31_MARGIN +
-        (bottom_row - state->scroll_row + 1) * state->row_h - 1);
+    y0 = (WORD)(state->work.g_y + DEMO31_MARGIN +
+                (top_row - state->scroll_row) * state->row_h);
+    y1 = (WORD)(state->work.g_y + DEMO31_MARGIN +
+                (bottom_row - state->scroll_row + 1) * state->row_h - 1);
     if (y1 > state->work.g_y + state->work.g_h - 1) {
-        y1 = (WORD) (state->work.g_y + state->work.g_h - 1);
+        y1 = (WORD)(state->work.g_y + state->work.g_h - 1);
     }
     rect->g_x = state->work.g_x;
     rect->g_y = y0;
     rect->g_w = state->work.g_w;
-    rect->g_h = (WORD) (y1 - y0 + 1);
+    rect->g_h = (WORD)(y1 - y0 + 1);
     return rect->g_h > 0;
 }
 
@@ -376,18 +379,18 @@ static void union_dirty(GRECT *target, const GRECT *add)
 
     x0 = (target->g_x < add->g_x) ? target->g_x : add->g_x;
     y0 = (target->g_y < add->g_y) ? target->g_y : add->g_y;
-    x1 = ((WORD) (target->g_x + target->g_w - 1) >
-        (WORD) (add->g_x + add->g_w - 1)) ?
-        (WORD) (target->g_x + target->g_w - 1) :
-        (WORD) (add->g_x + add->g_w - 1);
-    y1 = ((WORD) (target->g_y + target->g_h - 1) >
-        (WORD) (add->g_y + add->g_h - 1)) ?
-        (WORD) (target->g_y + target->g_h - 1) :
-        (WORD) (add->g_y + add->g_h - 1);
+    x1 = ((WORD)(target->g_x + target->g_w - 1) >
+          (WORD)(add->g_x + add->g_w - 1))
+             ? (WORD)(target->g_x + target->g_w - 1)
+             : (WORD)(add->g_x + add->g_w - 1);
+    y1 = ((WORD)(target->g_y + target->g_h - 1) >
+          (WORD)(add->g_y + add->g_h - 1))
+             ? (WORD)(target->g_y + target->g_h - 1)
+             : (WORD)(add->g_y + add->g_h - 1);
     target->g_x = x0;
     target->g_y = y0;
-    target->g_w = (WORD) (x1 - x0 + 1);
-    target->g_h = (WORD) (y1 - y0 + 1);
+    target->g_w = (WORD)(x1 - x0 + 1);
+    target->g_h = (WORD)(y1 - y0 + 1);
 }
 
 static void draw_terminal(demo31_state_t *state, const GRECT *dirty)
@@ -399,20 +402,20 @@ static void draw_terminal(demo31_state_t *state, const GRECT *dirty)
 
     wind_update(BEG_UPDATE);
     v_hide_c(vdi_handle);
-    wind_get(state->handle, WF_FIRSTXYWH,
-        &box.g_x, &box.g_y, &box.g_w, &box.g_h);
+    wind_get(state->handle, WF_FIRSTXYWH, &box.g_x, &box.g_y, &box.g_w,
+             &box.g_h);
     while (box.g_w > 0 && box.g_h > 0) {
         WORD x0 = box.g_x;
         WORD y0 = box.g_y;
-        WORD x1 = (WORD) (box.g_x + box.g_w - 1);
-        WORD y1 = (WORD) (box.g_y + box.g_h - 1);
+        WORD x1 = (WORD)(box.g_x + box.g_w - 1);
+        WORD y1 = (WORD)(box.g_y + box.g_h - 1);
         WORD clip_xy[4];
         WORD fill_xy[4];
         WORD row;
 
         if (dirty != NULL) {
-            WORD dx1 = (WORD) (dirty->g_x + dirty->g_w - 1);
-            WORD dy1 = (WORD) (dirty->g_y + dirty->g_h - 1);
+            WORD dx1 = (WORD)(dirty->g_x + dirty->g_w - 1);
+            WORD dy1 = (WORD)(dirty->g_y + dirty->g_h - 1);
 
             if (x0 < dirty->g_x) {
                 x0 = dirty->g_x;
@@ -434,66 +437,65 @@ static void draw_terminal(demo31_state_t *state, const GRECT *dirty)
             clip_xy[2] = x1;
             clip_xy[3] = y1;
             vs_clip(vdi_handle, 1, clip_xy);
-            (void) vswr_mode(vdi_handle, MD_REPLACE);
+            (void)vswr_mode(vdi_handle, MD_REPLACE);
 
             fill_xy[0] = state->work.g_x;
             fill_xy[1] = state->work.g_y;
-            fill_xy[2] = (WORD) (state->work.g_x + state->work.g_w - 1);
-            fill_xy[3] = (WORD) (state->work.g_y + state->work.g_h - 1);
+            fill_xy[2] = (WORD)(state->work.g_x + state->work.g_w - 1);
+            fill_xy[3] = (WORD)(state->work.g_y + state->work.g_h - 1);
             vsf_color(vdi_handle, WHITE);
             vr_recfl(vdi_handle, fill_xy);
 
             vst_color(vdi_handle, BLACK);
             for (row = 0; row <= state->visible_rows; ++row) {
-                WORD logical_row = (WORD) (state->scroll_row + row);
-                WORD row_top = (WORD) (state->work.g_y + DEMO31_MARGIN +
-                    row * state->row_h);
-                WORD row_bottom = (WORD) (row_top + state->row_h - 1);
+                WORD logical_row = (WORD)(state->scroll_row + row);
+                WORD row_top = (WORD)(state->work.g_y + DEMO31_MARGIN +
+                                      row * state->row_h);
+                WORD row_bottom = (WORD)(row_top + state->row_h - 1);
                 WORD text_y;
                 char view[DEMO31_MAX_COLS + 1];
                 char *line;
                 WORD len;
 
-                if (dirty != NULL &&
-                    (row_bottom < dirty->g_y ||
-                    row_top > dirty->g_y + dirty->g_h - 1)) {
+                if (dirty != NULL && (row_bottom < dirty->g_y ||
+                                      row_top > dirty->g_y + dirty->g_h - 1)) {
                     continue;
                 }
                 if (logical_row >= state->total_rows) {
                     break;
                 }
                 line = line_at(state, logical_row);
-                len = (WORD) strlen(line);
+                len = (WORD)strlen(line);
                 if (state->scroll_col >= len) {
                     view[0] = '\0';
                 } else {
                     strncpy(view, line + state->scroll_col,
-                        (size_t) state->visible_cols);
+                            (size_t)state->visible_cols);
                     view[state->visible_cols] = '\0';
                 }
 
-                text_y = (WORD) (state->work.g_y + DEMO31_MARGIN +
-                    row * state->row_h + state->text_ascent);
-                v_gtext(vdi_handle,
-                    (WORD) (state->work.g_x + DEMO31_MARGIN),
-                    text_y,
-                    (CONST BYTE *) view);
+                text_y = (WORD)(state->work.g_y + DEMO31_MARGIN +
+                                row * state->row_h + state->text_ascent);
+                v_gtext(vdi_handle, (WORD)(state->work.g_x + DEMO31_MARGIN),
+                        text_y, (CONST BYTE *)view);
             }
 
             {
                 GRECT cursor;
 
                 if (cursor_rect(state, &cursor) != 0) {
-                    WORD dirty_x1 = (dirty != NULL) ?
-                        (WORD) (dirty->g_x + dirty->g_w - 1) : 0;
-                    WORD dirty_y1 = (dirty != NULL) ?
-                        (WORD) (dirty->g_y + dirty->g_h - 1) : 0;
+                    WORD dirty_x1 = (dirty != NULL)
+                                        ? (WORD)(dirty->g_x + dirty->g_w - 1)
+                                        : 0;
+                    WORD dirty_y1 = (dirty != NULL)
+                                        ? (WORD)(dirty->g_y + dirty->g_h - 1)
+                                        : 0;
 
                     if (dirty == NULL ||
                         !(cursor.g_x + cursor.g_w - 1 < dirty->g_x ||
-                        cursor.g_x > dirty_x1 ||
-                        cursor.g_y + cursor.g_h - 1 < dirty->g_y ||
-                        cursor.g_y > dirty_y1)) {
+                          cursor.g_x > dirty_x1 ||
+                          cursor.g_y + cursor.g_h - 1 < dirty->g_y ||
+                          cursor.g_y > dirty_y1)) {
                         WORD cursor_xy[4];
                         WORD text_y;
                         char glyph[2] = {' ', '\0'};
@@ -501,21 +503,21 @@ static void draw_terminal(demo31_state_t *state, const GRECT *dirty)
 
                         cursor_xy[0] = cursor.g_x;
                         cursor_xy[1] = cursor.g_y;
-                        cursor_xy[2] = (WORD) (cursor.g_x + cursor.g_w - 1);
-                        cursor_xy[3] = (WORD) (cursor.g_y + cursor.g_h - 1);
+                        cursor_xy[2] = (WORD)(cursor.g_x + cursor.g_w - 1);
+                        cursor_xy[3] = (WORD)(cursor.g_y + cursor.g_h - 1);
                         vsf_color(vdi_handle, BLACK);
                         vr_recfl(vdi_handle, cursor_xy);
 
                         if (state->cursor_row < state->total_rows) {
                             line = line_at(state, state->cursor_row);
-                            if (state->cursor_col < (WORD) strlen(line)) {
+                            if (state->cursor_col < (WORD)strlen(line)) {
                                 glyph[0] = line[state->cursor_col];
                             }
                         }
                         vst_color(vdi_handle, WHITE);
-                        text_y = (WORD) (cursor.g_y + state->text_ascent);
+                        text_y = (WORD)(cursor.g_y + state->text_ascent);
                         v_gtext(vdi_handle, cursor.g_x, text_y,
-                            (CONST BYTE *) glyph);
+                                (CONST BYTE *)glyph);
                         vst_color(vdi_handle, BLACK);
                     }
                 }
@@ -523,8 +525,8 @@ static void draw_terminal(demo31_state_t *state, const GRECT *dirty)
             vs_clip(vdi_handle, 0, clip_xy);
         }
 
-        wind_get(state->handle, WF_NEXTXYWH,
-            &box.g_x, &box.g_y, &box.g_w, &box.g_h);
+        wind_get(state->handle, WF_NEXTXYWH, &box.g_x, &box.g_y, &box.g_w,
+                 &box.g_h);
     }
     v_show_c(vdi_handle, 0);
     wind_update(END_UPDATE);
@@ -551,7 +553,9 @@ static int process_shell_output(demo31_state_t *state, GRECT *dirty)
 
     sync_layout(state);
     was_at_bottom = (state->scroll_row >=
-        max_offset(state->total_rows, state->visible_rows)) ? 1 : 0;
+                     max_offset(state->total_rows, state->visible_rows))
+                        ? 1
+                        : 0;
     old_cursor_row = state->cursor_row;
     first_changed_row = state->cursor_row;
     last_changed_row = state->cursor_row;
@@ -567,7 +571,7 @@ static int process_shell_output(demo31_state_t *state, GRECT *dirty)
         }
         changed = 1;
         for (i = 0; i < count; ++i) {
-            process_shell_byte(state, (unsigned char) buf[i]);
+            process_shell_byte(state, (unsigned char)buf[i]);
             if (state->cursor_row < first_changed_row) {
                 first_changed_row = state->cursor_row;
             }
@@ -599,7 +603,7 @@ static int process_shell_output(demo31_state_t *state, GRECT *dirty)
             last_changed_row = state->cursor_row;
         }
         if (row_range_dirty_rect(state, first_changed_row, last_changed_row,
-                &rect) != 0) {
+                                 &rect) != 0) {
             union_dirty(dirty, &rect);
         }
         if (cursor_rect(state, &cursor_dirty) != 0) {
@@ -610,8 +614,7 @@ static int process_shell_output(demo31_state_t *state, GRECT *dirty)
 }
 
 static int process_shell_output_until_quiet(demo31_state_t *state,
-                                            uint32_t timeout_ms,
-                                            GRECT *dirty)
+                                            uint32_t timeout_ms, GRECT *dirty)
 {
     uint32_t start = gem_os_ticks_ms();
     int changed = 0;
@@ -630,7 +633,7 @@ static int process_shell_output_until_quiet(demo31_state_t *state,
             }
             continue;
         }
-        if ((uint32_t) (gem_os_ticks_ms() - start) >= timeout_ms) {
+        if ((uint32_t)(gem_os_ticks_ms() - start) >= timeout_ms) {
             break;
         }
         gem_os_sleep_ms(1u);
@@ -648,28 +651,28 @@ static void send_key(demo31_state_t *state, WORD key)
     }
 
     switch (key & 0xff) {
-    case 8:
-    case 127:
-        ch = 127;
-        break;
-    case 13:
-        ch = '\n';
-        break;
-    case 27:
-        ch = 27;
-        break;
-    default:
-        ch = (unsigned char) (key & 0xff);
-        break;
+        case 8:
+        case 127:
+            ch = 127;
+            break;
+        case 13:
+            ch = '\n';
+            break;
+        case 27:
+            ch = 27;
+            break;
+        default:
+            ch = (unsigned char)(key & 0xff);
+            break;
     }
 
-    (void) gem_os_pty_write(&state->pty, &ch, 1);
+    (void)gem_os_pty_write(&state->pty, &ch, 1);
 }
 
 static void handle_arrow(demo31_state_t *state, WORD arrow_code)
 {
-    WORD row_page = (WORD) (state->visible_rows - 1);
-    WORD col_page = (WORD) (state->visible_cols - 4);
+    WORD row_page = (WORD)(state->visible_rows - 1);
+    WORD col_page = (WORD)(state->visible_cols - 4);
 
     if (row_page < 1) {
         row_page = 1;
@@ -679,40 +682,48 @@ static void handle_arrow(demo31_state_t *state, WORD arrow_code)
     }
 
     switch (arrow_code) {
-    case WA_UPPAGE:
-        state->scroll_row = clamp_word((WORD) (state->scroll_row - row_page), 0,
-            max_offset(state->total_rows, state->visible_rows));
-        break;
-    case WA_DNPAGE:
-        state->scroll_row = clamp_word((WORD) (state->scroll_row + row_page), 0,
-            max_offset(state->total_rows, state->visible_rows));
-        break;
-    case WA_UPLINE:
-        state->scroll_row = clamp_word((WORD) (state->scroll_row - 1), 0,
-            max_offset(state->total_rows, state->visible_rows));
-        break;
-    case WA_DNLINE:
-        state->scroll_row = clamp_word((WORD) (state->scroll_row + 1), 0,
-            max_offset(state->total_rows, state->visible_rows));
-        break;
-    case WA_LFPAGE:
-        state->scroll_col = clamp_word((WORD) (state->scroll_col - col_page), 0,
-            max_offset(state->max_line_len, state->visible_cols));
-        break;
-    case WA_RTPAGE:
-        state->scroll_col = clamp_word((WORD) (state->scroll_col + col_page), 0,
-            max_offset(state->max_line_len, state->visible_cols));
-        break;
-    case WA_LFLINE:
-        state->scroll_col = clamp_word((WORD) (state->scroll_col - 1), 0,
-            max_offset(state->max_line_len, state->visible_cols));
-        break;
-    case WA_RTLINE:
-        state->scroll_col = clamp_word((WORD) (state->scroll_col + 1), 0,
-            max_offset(state->max_line_len, state->visible_cols));
-        break;
-    default:
-        break;
+        case WA_UPPAGE:
+            state->scroll_row =
+                clamp_word((WORD)(state->scroll_row - row_page), 0,
+                           max_offset(state->total_rows, state->visible_rows));
+            break;
+        case WA_DNPAGE:
+            state->scroll_row =
+                clamp_word((WORD)(state->scroll_row + row_page), 0,
+                           max_offset(state->total_rows, state->visible_rows));
+            break;
+        case WA_UPLINE:
+            state->scroll_row =
+                clamp_word((WORD)(state->scroll_row - 1), 0,
+                           max_offset(state->total_rows, state->visible_rows));
+            break;
+        case WA_DNLINE:
+            state->scroll_row =
+                clamp_word((WORD)(state->scroll_row + 1), 0,
+                           max_offset(state->total_rows, state->visible_rows));
+            break;
+        case WA_LFPAGE:
+            state->scroll_col = clamp_word(
+                (WORD)(state->scroll_col - col_page), 0,
+                max_offset(state->max_line_len, state->visible_cols));
+            break;
+        case WA_RTPAGE:
+            state->scroll_col = clamp_word(
+                (WORD)(state->scroll_col + col_page), 0,
+                max_offset(state->max_line_len, state->visible_cols));
+            break;
+        case WA_LFLINE:
+            state->scroll_col = clamp_word(
+                (WORD)(state->scroll_col - 1), 0,
+                max_offset(state->max_line_len, state->visible_cols));
+            break;
+        case WA_RTLINE:
+            state->scroll_col = clamp_word(
+                (WORD)(state->scroll_col + 1), 0,
+                max_offset(state->max_line_len, state->visible_cols));
+            break;
+        default:
+            break;
     }
     state->auto_follow = 0;
 }
@@ -723,13 +734,12 @@ static int init_terminal(demo31_state_t *state)
     char cwd[GEM_OS_PATH_MAX];
 
     memset(state, 0, sizeof(*state));
-    state->cells = gem_os_alloc((size_t) DEMO31_MAX_LINES *
-        (DEMO31_MAX_COLS + 1u));
+    state->cells =
+        gem_os_alloc((size_t)DEMO31_MAX_LINES * (DEMO31_MAX_COLS + 1u));
     if (state->cells == NULL) {
         return 0;
     }
-    memset(state->cells, 0, (size_t) DEMO31_MAX_LINES *
-        (DEMO31_MAX_COLS + 1u));
+    memset(state->cells, 0, (size_t)DEMO31_MAX_LINES * (DEMO31_MAX_COLS + 1u));
 
     vdi_handle = graf_handle(&state->char_w, &state->char_h, NULL, NULL);
     v_opnvwk(work_in, &vdi_handle, work_out);
@@ -741,9 +751,9 @@ static int init_terminal(demo31_state_t *state)
     }
 
     memset(distances, 0, sizeof(distances));
-    (void) vqt_fontinfo(vdi_handle, NULL, NULL, distances, &state->cell_w, NULL);
+    (void)vqt_fontinfo(vdi_handle, NULL, NULL, distances, &state->cell_w, NULL);
     state->cell_h = distances[3];
-    state->text_ascent = (WORD) (distances[1] + 2);
+    state->text_ascent = (WORD)(distances[1] + 2);
     if (state->cell_w <= 0) {
         state->cell_w = state->char_w;
     }
@@ -753,7 +763,7 @@ static int init_terminal(demo31_state_t *state)
     if (state->text_ascent <= 0 || state->text_ascent > state->cell_h) {
         state->text_ascent = state->char_h;
     }
-    state->row_h = (WORD) (state->cell_h - DEMO31_ROW_TIGHTEN);
+    state->row_h = (WORD)(state->cell_h - DEMO31_ROW_TIGHTEN);
     if (state->row_h < state->text_ascent) {
         state->row_h = state->text_ascent;
     }
@@ -801,9 +811,10 @@ int main(void)
     }
 
     wind_get(0, WF_WORKXYWH, &desk.g_x, &desk.g_y, &desk.g_w, &desk.g_h);
-    state.handle = wind_create(NAME | CLOSER | MOVER | SIZER |
-        UPARROW | DNARROW | VSLIDE | LFARROW | RTARROW | HSLIDE,
-        (WORD) (desk.g_x + 36), (WORD) (desk.g_y + 28), 560, 320);
+    state.handle =
+        wind_create(NAME | CLOSER | MOVER | SIZER | UPARROW | DNARROW | VSLIDE |
+                        LFARROW | RTARROW | HSLIDE,
+                    (WORD)(desk.g_x + 36), (WORD)(desk.g_y + 28), 560, 320);
     if (state.handle <= 0) {
         shutdown_terminal(&state);
         v_clsvwk(vdi_handle);
@@ -811,12 +822,12 @@ int main(void)
         return 1;
     }
 
-    wind_open(state.handle,
-        (WORD) (desk.g_x + 36), (WORD) (desk.g_y + 28), 560, 320);
-    (void) process_shell_output(&state, NULL);
+    wind_open(state.handle, (WORD)(desk.g_x + 36), (WORD)(desk.g_y + 28), 560,
+              320);
+    (void)process_shell_output(&state, NULL);
     sync_layout(&state);
-    (void) gem_os_pty_resize(&state.pty, (uint16_t) state.visible_cols,
-        (uint16_t) state.visible_rows);
+    (void)gem_os_pty_resize(&state.pty, (uint16_t)state.visible_cols,
+                            (uint16_t)state.visible_rows);
     draw_terminal(&state, NULL);
 
     while (done == 0) {
@@ -828,17 +839,15 @@ int main(void)
         WORD kr = 0;
         WORD br = 0;
         int redraw_full = 0;
-        event = evnt_multi(MU_MESAG | MU_KEYBD | MU_TIMER,
-            0, 0, 0,
-            0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0,
-            msg, 0, DEMO31_TIMER_MS, &mx, &my, &mb, &ks, &kr, &br);
+        event = evnt_multi(MU_MESAG | MU_KEYBD | MU_TIMER, 0, 0, 0, 0, 0, 0, 0,
+                           0, 0, 0, 0, 0, 0, msg, 0, DEMO31_TIMER_MS, &mx, &my,
+                           &mb, &ks, &kr, &br);
 
-        (void) mx;
-        (void) my;
-        (void) mb;
-        (void) ks;
-        (void) br;
+        (void)mx;
+        (void)my;
+        (void)mb;
+        (void)ks;
+        (void)br;
 
         if (process_shell_output(&state, &dirty) != 0) {
             draw_terminal(&state, &dirty);
@@ -852,8 +861,8 @@ int main(void)
                 done = 1;
             } else {
                 send_key(&state, kr);
-                if (process_shell_output_until_quiet(&state,
-                        DEMO31_KEY_FLUSH_MS, &dirty) != 0) {
+                if (process_shell_output_until_quiet(
+                        &state, DEMO31_KEY_FLUSH_MS, &dirty) != 0) {
                     draw_terminal(&state, &dirty);
                 }
             }
@@ -861,54 +870,53 @@ int main(void)
 
         if ((event & MU_MESAG) != 0) {
             switch (msg[0]) {
-            case WM_REDRAW:
-            {
-                GRECT dirty;
+                case WM_REDRAW: {
+                    GRECT dirty;
 
-                dirty.g_x = msg[4];
-                dirty.g_y = msg[5];
-                dirty.g_w = msg[6];
-                dirty.g_h = msg[7];
-                draw_terminal(&state, &dirty);
-                break;
-            }
-            case WM_TOPPED:
-                wind_set(state.handle, WF_TOP, 0, 0, 0, 0);
-                break;
-            case WM_CLOSED:
-                done = 1;
-                break;
-            case WM_MOVED:
-            case WM_SIZED:
-                wind_set(state.handle, WF_CURRXYWH,
-                    msg[4], msg[5], msg[6], msg[7]);
-                sync_layout(&state);
-                (void) gem_os_pty_resize(&state.pty,
-                    (uint16_t) state.visible_cols,
-                    (uint16_t) state.visible_rows);
-                if (state.auto_follow != 0) {
-                    follow_bottom(&state);
+                    dirty.g_x = msg[4];
+                    dirty.g_y = msg[5];
+                    dirty.g_w = msg[6];
+                    dirty.g_h = msg[7];
+                    draw_terminal(&state, &dirty);
+                    break;
                 }
-                redraw_full = 1;
-                break;
-            case WM_ARROWED:
-                handle_arrow(&state, msg[4]);
-                redraw_full = 1;
-                break;
-            case WM_VSLID:
-                state.scroll_row = offset_from_slider(msg[4],
-                    state.total_rows, state.visible_rows);
-                state.auto_follow = 0;
-                redraw_full = 1;
-                break;
-            case WM_HSLID:
-                state.scroll_col = offset_from_slider(msg[4],
-                    state.max_line_len, state.visible_cols);
-                state.auto_follow = 0;
-                redraw_full = 1;
-                break;
-            default:
-                break;
+                case WM_TOPPED:
+                    wind_set(state.handle, WF_TOP, 0, 0, 0, 0);
+                    break;
+                case WM_CLOSED:
+                    done = 1;
+                    break;
+                case WM_MOVED:
+                case WM_SIZED:
+                    wind_set(state.handle, WF_CURRXYWH, msg[4], msg[5], msg[6],
+                             msg[7]);
+                    sync_layout(&state);
+                    (void)gem_os_pty_resize(&state.pty,
+                                            (uint16_t)state.visible_cols,
+                                            (uint16_t)state.visible_rows);
+                    if (state.auto_follow != 0) {
+                        follow_bottom(&state);
+                    }
+                    redraw_full = 1;
+                    break;
+                case WM_ARROWED:
+                    handle_arrow(&state, msg[4]);
+                    redraw_full = 1;
+                    break;
+                case WM_VSLID:
+                    state.scroll_row = offset_from_slider(
+                        msg[4], state.total_rows, state.visible_rows);
+                    state.auto_follow = 0;
+                    redraw_full = 1;
+                    break;
+                case WM_HSLID:
+                    state.scroll_col = offset_from_slider(
+                        msg[4], state.max_line_len, state.visible_cols);
+                    state.auto_follow = 0;
+                    redraw_full = 1;
+                    break;
+                default:
+                    break;
             }
         }
 

@@ -15,41 +15,44 @@
 
 WORD appl_id;
 VDI_HANDLE vdi_handle;
-WORD work_in[11] = {1,1,1,1,1,1,1,1,1,1,2};
+WORD work_in[11] = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2};
 WORD work_out[57];
 WORD win_handle;
 char message[96] = "Choose a menu item to begin.";
 WORD option_checked = 0;
 
-#define TITLE_FILE           3
-#define TITLE_OPTIONS        4
-#define TITLE_HELP           5
-#define ITEM_FILE_ABOUT      8
-#define ITEM_FILE_QUIT       10
-#define ITEM_OPTIONS_TOGGLE  12
-#define ITEM_OPTIONS_RESET   13
-#define ITEM_HELP_KEYS       15
-#define ITEM_HELP_ABOUT      16
+#define TITLE_FILE 3
+#define TITLE_OPTIONS 4
+#define TITLE_HELP 5
+#define ITEM_FILE_ABOUT 8
+#define ITEM_FILE_QUIT 10
+#define ITEM_OPTIONS_TOGGLE 12
+#define ITEM_OPTIONS_RESET 13
+#define ITEM_HELP_KEYS 15
+#define ITEM_HELP_ABOUT 16
 
 OBJECT menu_tree[] = {
-    {-1, 1, 3, G_IBOX, NONE, NORMAL, 0L, 0, 0, 0, 0},
-    {0, 2, 2, G_BOX, NONE, NORMAL, 0x1100L, 0, 0, 80, 1},
+    {-1, 1, 6, G_IBOX, NONE, NORMAL, 0L, 0, 0, 0, 0},
+    {6, 2, 2, G_BOX, NONE, NORMAL, 0x1100L, 0, 0, 80, 1},
     {1, 3, 5, G_IBOX, NONE, NORMAL, 0L, 0, 0, 80, 1},
-    {2, -1, -1, G_TITLE, NONE, NORMAL, (LONG) " File ", 0, 0, 6, 1},
-    {2, -1, -1, G_TITLE, NONE, NORMAL, (LONG) " Options ", 6, 0, 9, 1},
+    {4, -1, -1, G_TITLE, NONE, NORMAL, (LONG) " File ", 0, 0, 6, 1},
+    {5, -1, -1, G_TITLE, NONE, NORMAL, (LONG) " Options ", 6, 0, 9, 1},
     {2, -1, -1, G_TITLE, NONE, NORMAL, (LONG) " Help ", 15, 0, 6, 1},
-    {0, 7, 16, G_IBOX, NONE, NORMAL, 0L, 0, 0, 0, 0},
-    {6, 8, 10, G_BOX, NONE, NORMAL, 0x1100L, 0, 0, 20, 4},
-    {7, -1, -1, G_STRING, NONE, NORMAL, (LONG) "  About Demo 22 ", 0, 0, 20, 1},
-    {7, -1, -1, G_STRING, NONE, NORMAL, (LONG) "  ------------ ", 0, 1, 20, 1},
+    {0, 7, 14, G_IBOX, NONE, NORMAL, 0L, 0, 0, 0, 0},
+    {11, 8, 10, G_BOX, NONE, NORMAL, 0x1100L, 0, 0, 20, 4},
+    {9, -1, -1, G_STRING, NONE, NORMAL, (LONG) "  About Demo 22 ", 0, 0, 20, 1},
+    {10, -1, -1, G_STRING, NONE, NORMAL, (LONG) "  ------------ ", 0, 1, 20, 1},
     {7, -1, -1, G_STRING, NONE, NORMAL, (LONG) "  Quit \t^Q", 0, 2, 20, 1},
-    {6, 12, 13, G_BOX, NONE, NORMAL, 0x1100L, 0, 0, 20, 3},
-    {11, -1, -1, G_STRING, NONE, NORMAL, (LONG) "  Toggle option ", 0, 0, 20, 1},
-    {11, -1, -1, G_STRING, NONE, NORMAL, (LONG) "  Reset defaults ", 0, 1, 20, 1},
+    {14, 12, 13, G_BOX, NONE, NORMAL, 0x1100L, 0, 0, 20, 3},
+    {13, -1, -1, G_STRING, NONE, NORMAL, (LONG) "  Toggle option ", 0, 0, 20,
+     1},
+    {11, -1, -1, G_STRING, NONE, NORMAL, (LONG) "  Reset defaults ", 0, 1, 20,
+     1},
     {6, 15, 16, G_BOX, NONE, NORMAL, 0x1100L, 0, 0, 24, 3},
-    {14, -1, -1, G_STRING, NONE, NORMAL, (LONG) "  Esc closes app \tEsc", 0, 0, 24, 1},
-    {14, -1, -1, G_STRING, LASTOB, NORMAL, (LONG) "  About GEM Demo \tF1", 0, 1, 24, 1}
-};
+    {16, -1, -1, G_STRING, NONE, NORMAL, (LONG) "  Esc closes app \tEsc", 0, 0,
+     24, 1},
+    {14, -1, -1, G_STRING, LASTOB, NORMAL, (LONG) "  About GEM Demo \tF1", 0, 1,
+     24, 1}};
 
 void redraw_window(GRECT *clip);
 void redraw_message_area(void);
@@ -69,17 +72,17 @@ int main(void)
     v_opnvwk(work_in, &vdi_handle, work_out);
 
     wind_get(0, WF_WORKXYWH, &full.g_x, &full.g_y, &full.g_w, &full.g_h);
-    win_handle = wind_create(NAME | CLOSER | FULLER | MOVER | SIZER,
-        full.g_x, full.g_y, full.g_w, full.g_h);
+    win_handle = wind_create(NAME | CLOSER | FULLER | MOVER | SIZER, full.g_x,
+                             full.g_y, full.g_w, full.g_h);
     if (win_handle < 0) {
         v_clsvwk(vdi_handle);
         appl_exit();
         return -1;
     }
 
-    wind_set(win_handle, WF_NAME, "Demo 22 Main Menu", 0, 0);
-    wind_open(win_handle, full.g_x + 20, full.g_y + 20,
-        full.g_w - 80, full.g_h - 80);
+    wind_set_str(win_handle, WF_NAME, "Demo 22 Main Menu");
+    wind_open(win_handle, full.g_x + 20, full.g_y + 20, full.g_w - 80,
+              full.g_h - 80);
 
     menu_click(1, 1);
     menu_bar(menu_tree, 1);
@@ -89,52 +92,52 @@ int main(void)
         evnt_mesag(msg);
 
         switch (msg[0]) {
-        case WM_REDRAW:
-            redraw_window((GRECT *) &msg[4]);
-            break;
+            case WM_REDRAW:
+                redraw_window((GRECT *)&msg[4]);
+                break;
 
-        case WM_CLOSED:
-            goto cleanup;
+            case WM_CLOSED:
+                goto cleanup;
 
-        case WM_MOVED:
-        case WM_SIZED:
-            wind_set(win_handle, WF_CURRXYWH,
-                msg[4], msg[5], msg[6], msg[7]);
-            break;
+            case WM_MOVED:
+            case WM_SIZED:
+                wind_set(win_handle, WF_CURRXYWH, msg[4], msg[5], msg[6],
+                         msg[7]);
+                break;
 
-        case WM_TOPPED:
-            wind_set(win_handle, WF_TOP, 0, 0, 0, 0);
-            break;
+            case WM_TOPPED:
+                wind_set(win_handle, WF_TOP, 0, 0, 0, 0);
+                break;
 
-        case WM_FULLED:
-        {
-            GRECT current;
-            GRECT previous;
-            GRECT full_work;
+            case WM_FULLED: {
+                GRECT current;
+                GRECT previous;
+                GRECT full_work;
 
-            wind_get(win_handle, WF_CURRXYWH, &current.g_x, &current.g_y,
-                &current.g_w, &current.g_h);
-            wind_get(win_handle, WF_PXYWH, &previous.g_x, &previous.g_y,
-                &previous.g_w, &previous.g_h);
-            wind_get(win_handle, WF_FXYWH, &full_work.g_x, &full_work.g_y,
-                &full_work.g_w, &full_work.g_h);
+                wind_get(win_handle, WF_CURRXYWH, &current.g_x, &current.g_y,
+                         &current.g_w, &current.g_h);
+                wind_get(win_handle, WF_PXYWH, &previous.g_x, &previous.g_y,
+                         &previous.g_w, &previous.g_h);
+                wind_get(win_handle, WF_FXYWH, &full_work.g_x, &full_work.g_y,
+                         &full_work.g_w, &full_work.g_h);
 
-            if (current.g_x == full_work.g_x && current.g_y == full_work.g_y &&
-                current.g_w == full_work.g_w &&
-                current.g_h == full_work.g_h) {
-                wind_set(win_handle, WF_CURRXYWH, previous.g_x, previous.g_y,
-                    previous.g_w, previous.g_h);
-            } else {
-                wind_set(win_handle, WF_CURRXYWH, full_work.g_x,
-                    full_work.g_y, full_work.g_w, full_work.g_h);
+                if (current.g_x == full_work.g_x &&
+                    current.g_y == full_work.g_y &&
+                    current.g_w == full_work.g_w &&
+                    current.g_h == full_work.g_h) {
+                    wind_set(win_handle, WF_CURRXYWH, previous.g_x,
+                             previous.g_y, previous.g_w, previous.g_h);
+                } else {
+                    wind_set(win_handle, WF_CURRXYWH, full_work.g_x,
+                             full_work.g_y, full_work.g_w, full_work.g_h);
+                }
+                break;
             }
-            break;
-        }
 
-        case MN_SELECTED:
-            handle_menu(msg[3], msg[4]);
-            menu_tnormal(menu_tree, msg[3], 1);
-            break;
+            case MN_SELECTED:
+                handle_menu(msg[3], msg[4]);
+                menu_tnormal(menu_tree, msg[3], 1);
+                break;
         }
     }
 
@@ -159,20 +162,20 @@ void redraw_window(GRECT *clip)
     WORD y1;
 
     wind_update(BEG_UPDATE);
-    wind_get(win_handle, WF_WORKXYWH,
-        &work.g_x, &work.g_y, &work.g_w, &work.g_h);
-    wind_get(win_handle, WF_FIRSTXYWH,
-        &visible.g_x, &visible.g_y, &visible.g_w, &visible.g_h);
+    wind_get(win_handle, WF_WORKXYWH, &work.g_x, &work.g_y, &work.g_w,
+             &work.g_h);
+    wind_get(win_handle, WF_FIRSTXYWH, &visible.g_x, &visible.g_y, &visible.g_w,
+             &visible.g_h);
 
     while (visible.g_w > 0 && visible.g_h > 0) {
         x0 = visible.g_x;
         y0 = visible.g_y;
-        x1 = (WORD) (visible.g_x + visible.g_w - 1);
-        y1 = (WORD) (visible.g_y + visible.g_h - 1);
+        x1 = (WORD)(visible.g_x + visible.g_w - 1);
+        y1 = (WORD)(visible.g_y + visible.g_h - 1);
 
         if (clip != NULL) {
-            WORD clip_x1 = (WORD) (clip->g_x + clip->g_w - 1);
-            WORD clip_y1 = (WORD) (clip->g_y + clip->g_h - 1);
+            WORD clip_x1 = (WORD)(clip->g_x + clip->g_w - 1);
+            WORD clip_y1 = (WORD)(clip->g_y + clip->g_h - 1);
 
             if (x0 < clip->g_x) {
                 x0 = clip->g_x;
@@ -201,18 +204,19 @@ void redraw_window(GRECT *clip)
             pxy[3] = y1;
             vr_recfl(vdi_handle, pxy);
 
-            v_gtext(vdi_handle, (WORD) (work.g_x + 10),
-                (WORD) (work.g_y + 20),
-                "Demo 22 enables the main menu bar.");
-            v_gtext(vdi_handle, (WORD) (work.g_x + 10),
-                (WORD) (work.g_y + 36),
-                "Use File, Options, and Help above.");
-            v_gtext(vdi_handle, (WORD) (work.g_x + 10),
-                (WORD) (work.g_y + 60), message);
+            vst_color(vdi_handle, WHITE);
+            v_gtext(vdi_handle, (WORD)(work.g_x + 10), (WORD)(work.g_y + 20),
+                    "Demo 22 enables the main menu bar.");
+            vst_color(vdi_handle, WHITE);
+            v_gtext(vdi_handle, (WORD)(work.g_x + 10), (WORD)(work.g_y + 36),
+                    "Use File, Options, and Help above.");
+            vst_color(vdi_handle, WHITE);
+            v_gtext(vdi_handle, (WORD)(work.g_x + 10), (WORD)(work.g_y + 60),
+                    message);
         }
 
-        wind_get(win_handle, WF_NEXTXYWH,
-            &visible.g_x, &visible.g_y, &visible.g_w, &visible.g_h);
+        wind_get(win_handle, WF_NEXTXYWH, &visible.g_x, &visible.g_y,
+                 &visible.g_w, &visible.g_h);
     }
 
     vs_clip(vdi_handle, 0, NULL);
@@ -225,8 +229,8 @@ void redraw_message_area(void)
     GRECT work;
     GRECT dirty;
 
-    wind_get(win_handle, WF_WORKXYWH,
-        &work.g_x, &work.g_y, &work.g_w, &work.g_h);
+    wind_get(win_handle, WF_WORKXYWH, &work.g_x, &work.g_y, &work.g_w,
+             &work.g_h);
     dirty.g_x = work.g_x;
     dirty.g_y = work.g_y;
     dirty.g_w = work.g_w;

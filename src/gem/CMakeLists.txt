@@ -1,4 +1,11 @@
+file(GLOB gem_vdi_sources CONFIGURE_DEPENDS client_vdi_*.c client_aes_*.c)
 add_library(gem SHARED
+    ${gem_vdi_sources}
+    bitmap_size.c
+    vdi_validate.c
+    tree_pack.c
+    tree_decode.c
+    aes_validate.c
     client.c
     client_queries.c
     protocol.c

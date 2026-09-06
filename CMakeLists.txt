@@ -16,12 +16,16 @@ endif()
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS OFF)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+if(POLICY CMP0135)
+    cmake_policy(SET CMP0135 NEW)
+endif()
 
 set(GEM_OUTPUT_ROOT ${PROJECT_SOURCE_DIR}/bin CACHE PATH
     "Runtime output root (use a separate tree for backend diagnostics)")
 set(GEM_CORE_DIR ${GEM_OUTPUT_ROOT}/core)
 set(GEM_LIBRARY_DIR ${GEM_OUTPUT_ROOT}/lib)
-set(GEM_APPS_DIR ${GEM_OUTPUT_ROOT}/apps)
+set(GEM_SAMPLES_DIR ${GEM_OUTPUT_ROOT}/samples)
 set(GEM_DEMOS_DIR ${GEM_OUTPUT_ROOT}/demos)
 set(GEM_RESOURCES_DIR ${GEM_OUTPUT_ROOT}/resources)
 set(GEM_TOOLS_DIR ${GEM_OUTPUT_ROOT}/tools)
@@ -29,7 +33,7 @@ set(GEM_TOOLS_DIR ${GEM_OUTPUT_ROOT}/tools)
 file(MAKE_DIRECTORY
     ${GEM_CORE_DIR}
     ${GEM_LIBRARY_DIR}
-    ${GEM_APPS_DIR}
+    ${GEM_SAMPLES_DIR}
     ${GEM_DEMOS_DIR}
     ${GEM_RESOURCES_DIR}
     ${GEM_TOOLS_DIR}
@@ -47,26 +51,25 @@ set(CMAKE_INSTALL_RPATH "$ORIGIN/../lib")
 file(GLOB gem_runtime_font_files CONFIGURE_DEPENDS
     ${PROJECT_SOURCE_DIR}/src/resources/fonts/*.fnt)
 
-add_custom_target(gem_runtime_fonts ALL
-    COMMAND ${CMAKE_COMMAND} -E remove_directory
-        ${GEM_RESOURCES_DIR}/fonts
-    COMMAND ${CMAKE_COMMAND} -E make_directory
-        ${GEM_RESOURCES_DIR}/fonts
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        ${gem_runtime_font_files}
-        ${GEM_RESOURCES_DIR}/fonts
-    COMMENT "Copying GEM runtime fonts into bin/resources/fonts"
-)
+set(gem_font_outputs)
+foreach(font IN LISTS gem_runtime_font_files)
+    get_filename_component(name "${font}" NAME)
+    set(output "${GEM_RESOURCES_DIR}/fonts/${name}")
+    add_custom_command(OUTPUT "${output}"
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${GEM_RESOURCES_DIR}/fonts"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different "${font}" "${output}"
+        DEPENDS "${font}" VERBATIM)
+    list(APPEND gem_font_outputs "${output}")
+endforeach()
+add_custom_target(gem_runtime_fonts ALL DEPENDS ${gem_font_outputs})
+
+if(GEM_PLATFORM STREQUAL "rasta" OR BUILD_TESTING)
+    include(tools/scripts/rasta.cmake)
+endif()
 
 add_subdirectory(lib/platform/rasta)
 add_subdirectory(lib/platform/linux)
-add_subdirectory(lib/musashi)
-add_subdirectory(lib/fat12)
-add_subdirectory(lib/msa)
-add_subdirectory(lib/prg)
 add_subdirectory(tools/resgen)
-add_subdirectory(tools/msa)
-add_subdirectory(tools/stout)
 add_subdirectory(src/vdi)
 add_subdirectory(src/aes)
 add_subdirectory(src/gem)
@@ -74,9 +77,10 @@ add_subdirectory(src/gemd)
 if(EXISTS ${PROJECT_SOURCE_DIR}/src/rcs/CMakeLists.txt)
     add_subdirectory(src/rcs)
 endif()
-add_subdirectory(src/desktop)
-add_subdirectory(src/apps)
-add_subdirectory(tests)
+add_subdirectory(samples)
+if(BUILD_TESTING)
+    add_subdirectory(tests)
+endif()
 
 set(GEMIX_ROOT ${PROJECT_SOURCE_DIR}/bin/gemix)
 set(GEMIX_BIN ${GEMIX_ROOT}/bin)
@@ -89,7 +93,7 @@ add_custom_target(gemix_package
     COMMAND ${CMAKE_COMMAND} -E make_directory ${GEMIX_BIN}
     COMMAND ${CMAKE_COMMAND} -E make_directory ${GEMIX_LIB}
     COMMAND ${CMAKE_COMMAND} -E make_directory ${GEMIX_INCLUDE}
-    COMMAND ${CMAKE_COMMAND} -E make_directory ${GEMIX_SHARE}/fonts
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${GEMIX_SHARE}/fonts ${GEMIX_ROOT}/bin/data
     COMMAND ${CMAKE_COMMAND} -E copy
         $<TARGET_FILE:gemd> ${GEMIX_BIN}/
     COMMAND ${CMAKE_COMMAND} -E copy
@@ -119,20 +123,39 @@ add_custom_target(gemix_package
         ${PROJECT_SOURCE_DIR}/include/gem/vdi.h ${GEMIX_INCLUDE}/gem/
     COMMAND ${CMAKE_COMMAND} -E copy
         ${PROJECT_SOURCE_DIR}/include/gem/portab.h ${GEMIX_INCLUDE}/gem/
+    COMMAND ${CMAKE_COMMAND} -E copy
+        ${PROJECT_SOURCE_DIR}/include/gem/os.h ${GEMIX_INCLUDE}/gem/
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${GEMIX_INCLUDE}/platform
+    COMMAND ${CMAKE_COMMAND} -E copy
+        ${PROJECT_SOURCE_DIR}/include/platform/os.h ${GEMIX_INCLUDE}/platform/
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         ${GEM_RESOURCES_DIR}/fonts ${GEMIX_SHARE}/fonts
     COMMAND ${CMAKE_COMMAND} -E copy
         ${GEM_RESOURCES_DIR}/cursors.rsc ${GEMIX_SHARE}/
     COMMAND ${CMAKE_COMMAND} -E copy
-        ${GEM_RESOURCES_DIR}/desktop_icons.rsc ${GEMIX_SHARE}/
+        ${GEM_SAMPLES_DIR}/data/desktop_icons.rsc ${GEMIX_ROOT}/bin/data/
     COMMAND ${CMAKE_COMMAND} -E copy
-        ${GEM_RESOURCES_DIR}/clock_numbers.rsc ${GEMIX_SHARE}/
+        ${GEM_SAMPLES_DIR}/data/clock_numbers.rsc ${GEMIX_ROOT}/bin/data/
     COMMAND ${CMAKE_COMMAND}
         -DGEMIX_ROOT=${GEMIX_ROOT}
-        -P ${PROJECT_SOURCE_DIR}/tools/package-gemix.cmake
+        -P ${PROJECT_SOURCE_DIR}/tools/scripts/package-gemix.cmake
     DEPENDS
         gemd desktop terminal calc_gemd clock_gemd
         gem_runtime_fonts gem_runtime_cursors
         gem_runtime_desktop_icons gem_runtime_clock_numbers
     COMMENT "Assembling the Gemix Linux deployment tree"
 )
+
+add_custom_target(gem_sdk
+    COMMAND ${CMAKE_COMMAND}
+        -DGEM_PLATFORM=${GEM_PLATFORM}
+        -DSDK_ROOT=${GEM_OUTPUT_ROOT}/sdk
+        -DSOURCE_ROOT=${PROJECT_SOURCE_DIR}
+        -DRESOURCE_ROOT=${GEM_RESOURCES_DIR}
+        -DRESGEN=$<TARGET_FILE:resgen>
+        "-DGEM_LIBRARIES=$<TARGET_FILE:gem>;$<TARGET_FILE:aes>;$<TARGET_FILE:vdi>;$<TARGET_FILE:platform_linux>;$<TARGET_FILE:rasta>"
+        -P ${PROJECT_SOURCE_DIR}/tools/scripts/gem_sdk.cmake
+    DEPENDS gem aes vdi platform_linux rasta gem_runtime_fonts
+        gem_runtime_cursors gem_runtime_alert_icons resgen
+    COMMENT "Exporting the public GEM SDK"
+    VERBATIM)

@@ -1,173 +1,55 @@
 # GEM for Linux
 
-This project ports the Digital Research GEM user interface to Linux. It
-provides VDI, AES, the `gemd` shared display server, `libgem` clients, a
-desktop, and example applications.
+GEM for Linux provides a classic graphical desktop with windows, menus,
+dialogs, a terminal, calculator and clock. Applications share a display
+server, with either a Rasta viewer or a native Linux framebuffer display.
 
-## Security and multi-application hardening (2026-09-05)
+![GEM desktop with file manager, calculator, clock and terminal](docs/images/screenshots/gem_desktop_2026_09_06.png)
 
-The hosted server now checks peer identity and window ownership, isolates
-client drawing state, validates menu graphs, and bounds stalled connections
-and update locks. Standard dialog waits service other clients and unwind on
-requester disconnect. Font parsing and Rasta framebuffer/input paths also
-have additional checks. Public AES/VDI interfaces remain unchanged.
+## Build
 
-See [Hosted GEM security and safety](docs/SECURITY.md) for deployment rules,
-service limits, the five passing hosted tests, and explicit remaining trust
-boundaries. Run as an ordinary user with private socket/framebuffer paths;
-this is hardening of a shared desktop, not a sandbox for hostile applications.
-
-## Native gallery proxy verification (2026-09-05)
-
-The modal-frame follow-up returns the actual window flags for `WF_KIND`
-instead of falling through to work-area coordinates. Untitled `form_alert`
-panels use a four-pixel black/white/black/black (`1011`) enclosure. Real-server
-regressions check the query and all four alert edges. Public AES/VDI APIs
-are unchanged. Native's matching direct/proxy suites each pass six tests,
-including actual Rasta input through its application loop for both text
-modes, clipboard buttons/shortcuts and input after dialog closure.
-
-Native can link only `libgem`, with a separate Rasta-backed `gemd` process
-owning AES/VDI. Both processes accept the private `GEMD_SOCKET` environment
-variable (default `/tmp/gemd.sock`) and must share file-selector and scrap
-paths. No public AES/VDI headers, signatures, opcodes or structures were
-changed for this verification.
-
-The client now marshals `fsel_input`, `graf_mkstate`, `scrp_read`, `scrp_write`,
-`vqt_fontinfo`, `v_hide_c` and `v_show_c`. File buffers, font arrays and mouse
-outputs are copied back into client memory; process pointers are not used for
-these outputs. The existing menu transport relocates supported title/string
-objects in server-owned memory. Menu replacement, hiding and disconnected
-client cleanup detach that memory from AES before freeing it. A regression
-reproduced a server heap-use-after-free when a menu-owning client disappeared;
-that path now passes with AddressSanitizer.
-
-RPC dispatch checks exact request lengths, polyline counts and menu indices,
-counts and supported object types before accessing payloads. The client
-disconnects on an unexpected reply size/magic instead of leaving the stream
-misaligned, and a broken socket no longer kills it with SIGPIPE. The current
-private protocol remains a same-host ABI protocol, not a cross-endian or
-cross-architecture network format. This verifies the calls used by Native;
-it does not claim wrappers for every AES/VDI entry point. In particular,
-client-side `objc_*` rendering still has its documented limited object set.
-
-`test_gem_rpc` runs against a private server through `tests/rpc/run.sh`.
-It checks metrics, geometry, drawing, scrap state across reconnects, fragmented
-headers, rejected short requests/invalid counts, menu replacement and abrupt
-client exit. It also drives the server's Rasta HID socket to check modifier
-bursts and held-button state across queued redraw replies. `evnt_multi` now
-fills pointer/button/modifier outputs on that message path; zero-filled proxy
-replies previously invented mouse edges in clients. Build the `gemd` and
-`test_gem_rpc` targets, then run
-`ctest --test-dir <build-directory> -R test_gem_rpc --output-on-failure`.
-The visual Native gallery pass additionally checks file acceptance/cancellation,
-editing, combo choices, dialogs, collections, tables, splitters and menu Exit.
-Directory activation by mouse or OK now immediately redraws the selector;
-previously the directory changed but its old listing remained visible.
-Regional and title redraws preserve pending presentation inside an outer
-`wind_update` transaction. Native uses this to close a window and repaint its
-exposed content before publishing, without an intermediate desktop flash.
-These fixes change implementation only, not public AES/VDI interfaces.
-Desktop and window-frame damage shares the client's higher-window subtraction.
-The desktop checker is filled only in exposed fragments; hidden window frames
-and fully obscured client redraw notifications are skipped. Native's opening
-regression checks intermediate pixels for modal/modeless windows fully above
-their owner and partly above desktop, and fails against the preceding runtime.
-All five hosted CTests pass, including VDI and public-header checks. The
-VDI test host implements the regional-present callback used by the renderer.
-
-## Dependencies
-
-- Linux with GCC and CMake 3.20 or newer
-- Linux framebuffer (`fbdev`) and evdev headers for the native backend
-- Access to `/dev/fb0` and the required `/dev/input/event*` devices
-
-## Hosted development build
-
-The default backend uses the Rasta viewer:
+Requires Linux, GCC/G++, GNU Make, CMake 3.20+, Git, Python 3, pkg-config,
+SDL2 development files and ImageMagick. The build downloads and verifies a
+pinned Rasta and Musashi source archives into ignored `build/` storage.
+Subsequent builds reuse them; no separate checkouts are needed.
+From the repository root:
 
 ```sh
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
-cmake --build build -j"$(nproc)"
+make
+make tests    # optional; results in docs/tests/LATEST.md
 ```
 
-Use VS Code F5 to run the desktop development session.
+Alternatively, `make container` builds and tests using Docker; the host needs
+Docker and GNU Make instead of the compiler dependencies. The first build
+needs internet access. See the [build guide](docs/guides/HOSTED_DEVELOPMENT.md).
 
-`GEM_OUTPUT_ROOT` is a CMake cache path (default: `bin`). Set it to an
-isolated directory when validating runtime changes without replacing an
-existing deployment. For example, `-DGEM_OUTPUT_ROOT=/absolute/path/to/build/runtime`
-keeps the libraries and generated resources together there.
+## Run
 
-The rasta backend draws into a private packed surface and publishes completed
-VDI updates to the mapped viewer framebuffer. AES pattern/inversion helpers
-respect the VDI clip, and bitmap copies mark their destination as dirty.
-AES paints the desktop checker when it first acquires its workstation,
-before showing the cursor; a fresh session does not depend on window
-movement to initialize the surrounding background. VDI-only applications
-retain their plain initial surface.
-The synchronous file selector restores exposed caller regions from a
-pre-dialog snapshot while it is moved. It uses the hosted paper/ink colors,
-font-centered buttons, one parent-directory entry, and a typeable filename;
-suggested filenames are preserved even when they do not exist yet. These
-are implementation changes; the public AES and VDI interfaces are unchanged.
-
-File-selector buttons invert while held and activate on release inside the
-same button. Closing the top window refreshes the complete newly active
-title, including portions outside the closed window's footprint. Removing a
-menu restores its desktop strip. Saved-region restoration records damage and
-requests presentation; nested partial redraws preserve the outer batch's
-pending presentation so dismissed popups do not leave fragments behind.
-
-## Native Linux and Gemix package
-
-Configure the native Linux framebuffer/evdev backend as a Release build
-and assemble the relocatable Gemix deployment:
+Start these commands in three separate terminals, in order. Wait for gemd
+to report that it is listening before starting the desktop:
 
 ```sh
-cmake -S . -B build \
-    -DCMAKE_BUILD_TYPE=Release \
-    -DGEM_PLATFORM=linux
+./bin/tools/rasta --inverse --port 5000
+./bin/core/gemd
+./bin/samples/desktop
+```
+
+Alternatively, press F5 with **GEM — all samples** in VS Code to start the
+desktop and every sample together. See the
+[hosted development guide](docs/guides/HOSTED_DEVELOPMENT.md) for setup and the
+[samples guide](docs/guides/SAMPLES.md) for SDK builds.
+
+## Install
+
+Build the native Linux deployment package:
+
+```sh
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DGEM_PLATFORM=linux
 cmake --build build --target gemix_package -j"$(nproc)"
 ```
 
-The result is in `bin/gemix`:
-
-```text
-bin/gemix/
-├── bin/        gemd, desktop, terminal, calculator, and clock
-├── include/    public GEM application headers
-├── lib/        libgem and the private gemd runtime libraries
-└── share/gem/  fonts and runtime resources
-```
-
-Copy the complete `bin/gemix` directory to the target Linux system. The
-account running Gemix needs read/write access to the framebuffer and
-read access to the required evdev devices.
-
-The distribution should set the resource directory, start `gemd`, wait
-for its Unix socket, and then start the desktop:
-
-```sh
-export GEM_RESOURCE_DIR=/opt/gemix/share/gem
-export GEM_LINUX_FB=/dev/fb0
-# Optional: select exact devices instead of automatic evdev discovery.
-export GEM_LINUX_INPUT=/dev/input/event1,/dev/input/event4
-
-/opt/gemix/bin/gemd &
-while [ ! -S /tmp/gemd.sock ]; do sleep 0.02; done
-exec /opt/gemix/bin/desktop
-```
-
-Applications include `<gem.h>` or `<gem/gem.h>` and link only against
-`libgem.so`. `libgem` communicates with `gemd` through
-`/tmp/gemd.sock`.
-
-To restore the normal Rasta-based F5 development configuration:
-
-```sh
-cmake -S . -B build \
-    -DCMAKE_BUILD_TYPE=Debug \
-    -DGEM_PLATFORM=rasta
-```
-
-See `docs/GEMIX_LINUX.md` for device selection and deployment details.
+Copy the complete `bin/gemix` directory to your installation location,
+for example `/opt/gemix`. Native operation requires access to Linux
+framebuffer and input devices. Follow the
+[installation and startup guide](docs/guides/GEMIX_LINUX.md) to select devices,
+set resource paths and start the installed desktop.

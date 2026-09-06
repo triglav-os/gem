@@ -8,7 +8,8 @@
  */
 
 #define _GNU_SOURCE
-#include "_gem.h"
+#include "gem_protocol.h"
+#include "gem/gemd.h"
 
 #include "platform/os.h"
 
@@ -28,18 +29,24 @@ WORD ptsout[256] __attribute__((weak));
 WORD global[15];
 
 static int g_gem_socket = -1;
+static OBJECT *client_menu;
+
+WORD gem_client_menu_changed(OBJECT *tree)
+{
+    return tree == client_menu ? menu_bar(tree, 1) : 1;
+}
 
 static void gem_rpc_disconnect(void)
 {
     if (g_gem_socket >= 0) {
-        (void) close(g_gem_socket);
+        (void)close(g_gem_socket);
         g_gem_socket = -1;
     }
 }
 
 static int gem_rpc_send_all(int fd, const void *buf, size_t size)
 {
-    const uint8_t *cursor = (const uint8_t *) buf;
+    const uint8_t *cursor = (const uint8_t *)buf;
 
     while (size > 0u) {
         ssize_t rc = send(fd, cursor, size, MSG_NOSIGNAL);
@@ -51,15 +58,15 @@ static int gem_rpc_send_all(int fd, const void *buf, size_t size)
             gem_rpc_disconnect();
             return 0;
         }
-        cursor += (size_t) rc;
-        size -= (size_t) rc;
+        cursor += (size_t)rc;
+        size -= (size_t)rc;
     }
     return 1;
 }
 
 static int gem_rpc_recv_all(int fd, void *buf, size_t size)
 {
-    uint8_t *cursor = (uint8_t *) buf;
+    uint8_t *cursor = (uint8_t *)buf;
 
     while (size > 0u) {
         ssize_t rc = recv(fd, cursor, size, 0);
@@ -71,8 +78,8 @@ static int gem_rpc_recv_all(int fd, void *buf, size_t size)
             gem_rpc_disconnect();
             return 0;
         }
-        cursor += (size_t) rc;
-        size -= (size_t) rc;
+        cursor += (size_t)rc;
+        size -= (size_t)rc;
     }
     return 1;
 }
@@ -96,17 +103,17 @@ static int gem_rpc_connect(void)
     memset(&addr, 0, sizeof(addr));
     addr.sun_family = AF_UNIX;
     if (strlen(gem_rpc_socket_path()) >= sizeof(addr.sun_path)) {
-        (void) close(fd);
+        (void)close(fd);
         return 0;
     }
     strcpy(addr.sun_path, gem_rpc_socket_path());
-    if (connect(fd, (const struct sockaddr *) &addr, sizeof(addr)) != 0) {
-        (void) close(fd);
+    if (connect(fd, (const struct sockaddr *)&addr, sizeof(addr)) != 0) {
+        (void)close(fd);
         return 0;
     }
     if (getsockopt(fd, SOL_SOCKET, SO_PEERCRED, &peer, &peer_size) != 0 ||
         peer.uid != geteuid()) {
-        (void) close(fd);
+        (void)close(fd);
         return 0;
     }
 
@@ -114,25 +121,24 @@ static int gem_rpc_connect(void)
     return 1;
 }
 
-int gem_rpc_call(gem_rpc_opcode_t opcode,
-                 const void *request,
-                 uint32_t request_size,
-                 int32_t *status,
-                 void *response,
+int gem_rpc_call(gem_rpc_opcode_t opcode, const void *request,
+                 uint32_t request_size, int32_t *status, void *response,
                  uint32_t response_size)
 {
     gem_rpc_header_t header;
     gem_rpc_reply_t reply;
 
-    if (request_size > GEM_RPC_PAYLOAD_MAX || response_size > GEM_RPC_PAYLOAD_MAX ||
-        (request_size && !request) || (response_size && !response)) return 0;
+    if (request_size > GEM_RPC_PAYLOAD_MAX ||
+        response_size > GEM_RPC_PAYLOAD_MAX || (request_size && !request) ||
+        (response_size && !response))
+        return 0;
     if (!gem_rpc_connect()) {
         return 0;
     }
 
     header.magic = GEM_RPC_MAGIC;
     header.version = GEM_RPC_VERSION;
-    header.opcode = (uint16_t) opcode;
+    header.opcode = (uint16_t)opcode;
     header.size = request_size;
 
     if (!gem_rpc_send_all(g_gem_socket, &header, sizeof(header))) {
@@ -143,8 +149,21 @@ int gem_rpc_call(gem_rpc_opcode_t opcode,
             return 0;
         }
     }
-    if (!gem_rpc_recv_all(g_gem_socket, &reply, sizeof(reply))) {
-        return 0;
+    for (;;) {
+        if (!gem_rpc_recv_all(g_gem_socket, &reply, sizeof(reply)))
+            return 0;
+        if (reply.magic != GEM_RPC_MAGIC || reply.status != INT32_MIN)
+            break;
+        PARMBLK parm;
+        if (opcode != GEM_RPC_AES_TREE || reply.size != sizeof(parm) ||
+            !gem_rpc_recv_all(g_gem_socket, &parm, sizeof(parm))) {
+            gem_rpc_disconnect();
+            return 0;
+        }
+        LONG result = gem_client_user_callback(&parm);
+        if (!gem_rpc_call(GEM_RPC_CALLBACK_DONE, &result, sizeof(result), NULL,
+                          NULL, 0))
+            return 0;
     }
     if (reply.magic != GEM_RPC_MAGIC) {
         gem_rpc_disconnect();
@@ -172,8 +191,8 @@ WORD appl_init(void)
     if (!gem_rpc_call(GEM_RPC_APPL_INIT, NULL, 0u, &status, NULL, 0u)) {
         return 0;
     }
-    global[2] = (WORD) status;
-    return (WORD) status;
+    global[2] = (WORD)status;
+    return (WORD)status;
 }
 
 WORD appl_exit(void)
@@ -185,7 +204,7 @@ WORD appl_exit(void)
     }
     gem_rpc_disconnect();
     global[2] = 0;
-    return (WORD) status;
+    return (WORD)status;
 }
 
 WORD evnt_mesag(WORD msg[8])
@@ -194,9 +213,10 @@ WORD evnt_mesag(WORD msg[8])
     gem_rpc_words8_t rsp;
 
     memset(&rsp, 0, sizeof(rsp));
-    FOREVER {
+    FOREVER
+    {
         if (!gem_rpc_call(GEM_RPC_EVNT_MESAG, NULL, 0u, &status, &rsp,
-                sizeof(rsp))) {
+                          sizeof(rsp))) {
             return 0;
         }
         if (status != 0) {
@@ -209,36 +229,17 @@ WORD evnt_mesag(WORD msg[8])
     }
 }
 
-WORD evnt_multi(UWORD flags,
-                UWORD bclk,
-                UWORD bmsk,
-                UWORD bst,
-                UWORD m1flags,
-                WORD m1x,
-                WORD m1y,
-                WORD m1w,
-                WORD m1h,
-                UWORD m2flags,
-                WORD m2x,
-                WORD m2y,
-                WORD m2w,
-                WORD m2h,
-                WORD mepbuff[8],
-                UWORD tlc,
-                UWORD thc,
-                WORD *pmx,
-                WORD *pmy,
-                WORD *pmb,
-                WORD *pks,
-                WORD *pkr,
-                WORD *pbr)
+WORD evnt_multi(UWORD flags, UWORD bclk, UWORD bmsk, UWORD bst, UWORD m1flags,
+                WORD m1x, WORD m1y, WORD m1w, WORD m1h, UWORD m2flags, WORD m2x,
+                WORD m2y, WORD m2w, WORD m2h, WORD mepbuff[8], UWORD tlc,
+                UWORD thc, WORD *pmx, WORD *pmy, WORD *pmb, WORD *pks,
+                WORD *pkr, WORD *pbr)
 {
     enum { GEM_EVENT_RPC_SLICE_MS = 2 };
     int32_t status = 0;
     gem_rpc_evnt_multi_req_t req;
     gem_rpc_evnt_multi_rsp_t rsp;
-    uint32_t requested_timeout = (uint32_t) tlc |
-        ((uint32_t) thc << 16);
+    uint32_t requested_timeout = (uint32_t)tlc | ((uint32_t)thc << 16);
     uint32_t timer_start = gem_os_ticks_ms();
 
     memset(&req, 0, sizeof(req));
@@ -260,12 +261,14 @@ WORD evnt_multi(UWORD flags,
     for (;;) {
         if ((flags & MU_TIMER) != 0u) {
             uint32_t elapsed = gem_os_ticks_ms() - timer_start;
-            uint32_t remaining = (elapsed < requested_timeout) ?
-                requested_timeout - elapsed : 0u;
-            uint32_t slice = (remaining < GEM_EVENT_RPC_SLICE_MS) ?
-                remaining : GEM_EVENT_RPC_SLICE_MS;
+            uint32_t remaining = (elapsed < requested_timeout)
+                                     ? requested_timeout - elapsed
+                                     : 0u;
+            uint32_t slice = (remaining < GEM_EVENT_RPC_SLICE_MS)
+                                 ? remaining
+                                 : GEM_EVENT_RPC_SLICE_MS;
 
-            req.tlc = (UWORD) slice;
+            req.tlc = (UWORD)slice;
             req.thc = 0;
         } else {
             req.tlc = tlc;
@@ -273,15 +276,18 @@ WORD evnt_multi(UWORD flags,
         }
 
         memset(&rsp, 0, sizeof(rsp));
-        if (!gem_rpc_call(GEM_RPC_EVNT_MULTI, &req, sizeof(req), &status,
-                &rsp, sizeof(rsp))) {
+        if (!gem_rpc_call(GEM_RPC_EVNT_MULTI, &req, sizeof(req), &status, &rsp,
+                          sizeof(rsp))) {
             return 0;
         }
         if ((flags & MU_TIMER) == 0u || rsp.event != MU_TIMER ||
-            (uint32_t) (gem_os_ticks_ms() - timer_start) >=
-                requested_timeout) {
+            (uint32_t)(gem_os_ticks_ms() - timer_start) >= requested_timeout) {
+            if (rsp.event == 0)
+                gem_os_sleep_ms(1u);
             break;
         }
+        /* Waiting belongs in this client, never in the shared server. */
+        gem_os_sleep_ms(1u);
     }
 
     if (mepbuff != NULL) {
@@ -315,7 +321,7 @@ WORD graf_handle(WORD *charw, WORD *charh, WORD *boxw, WORD *boxh)
 
     memset(&rsp, 0, sizeof(rsp));
     if (!gem_rpc_call(GEM_RPC_GRAF_HANDLE, NULL, 0u, &status, &rsp,
-            sizeof(rsp))) {
+                      sizeof(rsp))) {
         return 0;
     }
     if (charw != NULL) {
@@ -330,21 +336,24 @@ WORD graf_handle(WORD *charw, WORD *charh, WORD *boxw, WORD *boxh)
     if (boxh != NULL) {
         *boxh = rsp.values[3];
     }
-    return (WORD) status;
+    return (WORD)status;
 }
 
 WORD graf_mouse(WORD mode, void *form)
 {
     int32_t status = 0;
-    gem_rpc_graf_mouse_req_t req;
+    gem_rpc_graf_mouse_req_t req = {0};
 
-    (void) form;
+    if (mode == 255 && form) {
+        req.has_form = 1;
+        memcpy(&req.form, form, sizeof(req.form));
+    }
     req.mode = mode;
-    if (!gem_rpc_call(GEM_RPC_GRAF_MOUSE, &req, sizeof(req), &status,
-            NULL, 0u)) {
+    if (!gem_rpc_call(GEM_RPC_GRAF_MOUSE, &req, sizeof(req), &status, NULL,
+                      0u)) {
         return 0;
     }
-    return (WORD) status;
+    return (WORD)status;
 }
 
 WORD form_alert(WORD defbut, char *astring)
@@ -357,11 +366,11 @@ WORD form_alert(WORD defbut, char *astring)
     if (astring != NULL) {
         strncpy(req.text, astring, sizeof(req.text) - 1u);
     }
-    if (!gem_rpc_call(GEM_RPC_FORM_ALERT, &req, sizeof(req), &status,
-            NULL, 0u)) {
+    if (!gem_rpc_call(GEM_RPC_FORM_ALERT, &req, sizeof(req), &status, NULL,
+                      0u)) {
         return 0;
     }
-    return (WORD) status;
+    return (WORD)status;
 }
 
 VOID v_opnvwk(WORD work_in[11], VDI_HANDLE *handle, WORD work_out[57])
@@ -370,13 +379,24 @@ VOID v_opnvwk(WORD work_in[11], VDI_HANDLE *handle, WORD work_out[57])
     gem_rpc_opnvwk_req_t req;
     gem_rpc_opnvwk_rsp_t rsp;
 
+    if (global[2] == 0) {
+        int32_t granted = 0;
+        if (!appl_init() ||
+            !gem_rpc_call(GEM_RPC_VDI_STANDALONE, NULL, 0, &granted, NULL, 0) ||
+            !granted) {
+            if (handle)
+                *handle = 0;
+            return;
+        }
+    }
+
     memset(&req, 0, sizeof(req));
     memset(&rsp, 0, sizeof(rsp));
     if (work_in != NULL) {
         memcpy(req.work_in, work_in, sizeof(req.work_in));
     }
     if (!gem_rpc_call(GEM_RPC_V_OPNVWK, &req, sizeof(req), &status, &rsp,
-            sizeof(rsp))) {
+                      sizeof(rsp))) {
         if (handle != NULL) {
             *handle = 0;
         }
@@ -399,7 +419,7 @@ VOID v_clsvwk(VDI_HANDLE handle)
     gem_rpc_handle_req_t req;
 
     req.handle = handle;
-    (void) gem_rpc_call(GEM_RPC_V_CLSVWK, &req, sizeof(req), &status, NULL, 0u);
+    (void)gem_rpc_call(GEM_RPC_V_CLSVWK, &req, sizeof(req), &status, NULL, 0u);
 }
 
 VOID v_clrwk(VDI_HANDLE handle)
@@ -408,7 +428,7 @@ VOID v_clrwk(VDI_HANDLE handle)
     gem_rpc_handle_req_t req;
 
     req.handle = handle;
-    (void) gem_rpc_call(GEM_RPC_V_CLRWK, &req, sizeof(req), &status, NULL, 0u);
+    (void)gem_rpc_call(GEM_RPC_V_CLRWK, &req, sizeof(req), &status, NULL, 0u);
 }
 
 WORD v_updwk(WORD handle)
@@ -420,7 +440,7 @@ WORD v_updwk(WORD handle)
     if (!gem_rpc_call(GEM_RPC_V_UPDWK, &req, sizeof(req), &status, NULL, 0u)) {
         return 0;
     }
-    return (WORD) status;
+    return (WORD)status;
 }
 
 VOID vsf_color(WORD handle, WORD color)
@@ -430,8 +450,7 @@ VOID vsf_color(WORD handle, WORD color)
 
     req.handle = handle;
     req.color = color;
-    (void) gem_rpc_call(GEM_RPC_VSF_COLOR, &req, sizeof(req), &status,
-        NULL, 0u);
+    (void)gem_rpc_call(GEM_RPC_VSF_COLOR, &req, sizeof(req), &status, NULL, 0u);
 }
 
 WORD vsl_type(WORD handle, WORD style)
@@ -441,11 +460,10 @@ WORD vsl_type(WORD handle, WORD style)
 
     req.handle = handle;
     req.value = style;
-    if (!gem_rpc_call(GEM_RPC_VSL_TYPE, &req, sizeof(req), &status,
-            NULL, 0u)) {
+    if (!gem_rpc_call(GEM_RPC_VSL_TYPE, &req, sizeof(req), &status, NULL, 0u)) {
         return 0;
     }
-    return (WORD) status;
+    return (WORD)status;
 }
 
 WORD vsl_width(WORD handle, WORD width)
@@ -455,11 +473,11 @@ WORD vsl_width(WORD handle, WORD width)
 
     req.handle = handle;
     req.value = width;
-    if (!gem_rpc_call(GEM_RPC_VSL_WIDTH, &req, sizeof(req), &status,
-            NULL, 0u)) {
+    if (!gem_rpc_call(GEM_RPC_VSL_WIDTH, &req, sizeof(req), &status, NULL,
+                      0u)) {
         return 0;
     }
-    return (WORD) status;
+    return (WORD)status;
 }
 
 VOID vsl_color(WORD handle, WORD color)
@@ -469,8 +487,7 @@ VOID vsl_color(WORD handle, WORD color)
 
     req.handle = handle;
     req.color = color;
-    (void) gem_rpc_call(GEM_RPC_VSL_COLOR, &req, sizeof(req), &status,
-        NULL, 0u);
+    (void)gem_rpc_call(GEM_RPC_VSL_COLOR, &req, sizeof(req), &status, NULL, 0u);
 }
 
 WORD vsf_interior(WORD handle, WORD style)
@@ -480,11 +497,11 @@ WORD vsf_interior(WORD handle, WORD style)
 
     req.handle = handle;
     req.value = style;
-    if (!gem_rpc_call(GEM_RPC_VSF_INTERIOR, &req, sizeof(req), &status,
-            NULL, 0u)) {
+    if (!gem_rpc_call(GEM_RPC_VSF_INTERIOR, &req, sizeof(req), &status, NULL,
+                      0u)) {
         return 0;
     }
-    return (WORD) status;
+    return (WORD)status;
 }
 
 WORD vsf_style(WORD handle, WORD style)
@@ -494,11 +511,11 @@ WORD vsf_style(WORD handle, WORD style)
 
     req.handle = handle;
     req.value = style;
-    if (!gem_rpc_call(GEM_RPC_VSF_STYLE, &req, sizeof(req), &status,
-            NULL, 0u)) {
+    if (!gem_rpc_call(GEM_RPC_VSF_STYLE, &req, sizeof(req), &status, NULL,
+                      0u)) {
         return 0;
     }
-    return (WORD) status;
+    return (WORD)status;
 }
 
 WORD vsf_perimeter(WORD handle, WORD per_vis)
@@ -508,11 +525,11 @@ WORD vsf_perimeter(WORD handle, WORD per_vis)
 
     req.handle = handle;
     req.value = per_vis;
-    if (!gem_rpc_call(GEM_RPC_VSF_PERIMETER, &req, sizeof(req), &status,
-            NULL, 0u)) {
+    if (!gem_rpc_call(GEM_RPC_VSF_PERIMETER, &req, sizeof(req), &status, NULL,
+                      0u)) {
         return 0;
     }
-    return (WORD) status;
+    return (WORD)status;
 }
 
 WORD vswr_mode(WORD handle, WORD mode)
@@ -522,11 +539,11 @@ WORD vswr_mode(WORD handle, WORD mode)
 
     req.handle = handle;
     req.value = mode;
-    if (!gem_rpc_call(GEM_RPC_VSWR_MODE, &req, sizeof(req), &status,
-            NULL, 0u)) {
+    if (!gem_rpc_call(GEM_RPC_VSWR_MODE, &req, sizeof(req), &status, NULL,
+                      0u)) {
         return 0;
     }
-    return (WORD) status;
+    return (WORD)status;
 }
 
 WORD vst_font(WORD handle, WORD font)
@@ -536,11 +553,10 @@ WORD vst_font(WORD handle, WORD font)
 
     req.handle = handle;
     req.value = font;
-    if (!gem_rpc_call(GEM_RPC_VST_FONT, &req, sizeof(req), &status,
-            NULL, 0u)) {
+    if (!gem_rpc_call(GEM_RPC_VST_FONT, &req, sizeof(req), &status, NULL, 0u)) {
         return 0;
     }
-    return (WORD) status;
+    return (WORD)status;
 }
 
 VOID vst_color(WORD handle, WORD color)
@@ -550,8 +566,7 @@ VOID vst_color(WORD handle, WORD color)
 
     req.handle = handle;
     req.color = color;
-    (void) gem_rpc_call(GEM_RPC_VST_COLOR, &req, sizeof(req), &status,
-        NULL, 0u);
+    (void)gem_rpc_call(GEM_RPC_VST_COLOR, &req, sizeof(req), &status, NULL, 0u);
 }
 
 VOID vs_clip(WORD handle, WORD clip_flag, WORD xy[4])
@@ -565,7 +580,7 @@ VOID vs_clip(WORD handle, WORD clip_flag, WORD xy[4])
     if (xy != NULL) {
         memcpy(req.xy, xy, sizeof(req.xy));
     }
-    (void) gem_rpc_call(GEM_RPC_VS_CLIP, &req, sizeof(req), &status, NULL, 0u);
+    (void)gem_rpc_call(GEM_RPC_VS_CLIP, &req, sizeof(req), &status, NULL, 0u);
 }
 
 VOID v_pline(VDI_HANDLE handle, WORD count, CONST WORD *pxy)
@@ -577,15 +592,15 @@ VOID v_pline(VDI_HANDLE handle, WORD count, CONST WORD *pxy)
     memset(&req, 0, sizeof(req));
     req.handle = handle;
     req.count = count;
-    values = (count > 0) ? (size_t) count * 2u : 0u;
+    values = (count > 0) ? (size_t)count * 2u : 0u;
     if (values > sizeof(req.pxy) / sizeof(req.pxy[0])) {
         values = sizeof(req.pxy) / sizeof(req.pxy[0]);
-        req.count = (WORD) (values / 2u);
+        req.count = (WORD)(values / 2u);
     }
     if (pxy != NULL && values > 0u) {
         memcpy(req.pxy, pxy, values * sizeof(req.pxy[0]));
     }
-    (void) gem_rpc_call(GEM_RPC_V_PLINE, &req, sizeof(req), &status, NULL, 0u);
+    (void)gem_rpc_call(GEM_RPC_V_PLINE, &req, sizeof(req), &status, NULL, 0u);
 }
 
 VOID v_fillarea(WORD handle, WORD count, WORD xy[])
@@ -597,16 +612,16 @@ VOID v_fillarea(WORD handle, WORD count, WORD xy[])
     memset(&req, 0, sizeof(req));
     req.handle = handle;
     req.count = count;
-    values = (count > 0) ? (size_t) count * 2u : 0u;
+    values = (count > 0) ? (size_t)count * 2u : 0u;
     if (values > sizeof(req.pxy) / sizeof(req.pxy[0])) {
         values = sizeof(req.pxy) / sizeof(req.pxy[0]);
-        req.count = (WORD) (values / 2u);
+        req.count = (WORD)(values / 2u);
     }
     if (xy != NULL && values > 0u) {
         memcpy(req.pxy, xy, values * sizeof(req.pxy[0]));
     }
-    (void) gem_rpc_call(GEM_RPC_V_FILLAREA, &req, sizeof(req), &status,
-        NULL, 0u);
+    (void)gem_rpc_call(GEM_RPC_V_FILLAREA, &req, sizeof(req), &status, NULL,
+                       0u);
 }
 
 VOID v_bar(VDI_HANDLE handle, CONST WORD xy[4])
@@ -619,7 +634,7 @@ VOID v_bar(VDI_HANDLE handle, CONST WORD xy[4])
     if (xy != NULL) {
         memcpy(req.xy, xy, sizeof(req.xy));
     }
-    (void) gem_rpc_call(GEM_RPC_V_BAR, &req, sizeof(req), &status, NULL, 0u);
+    (void)gem_rpc_call(GEM_RPC_V_BAR, &req, sizeof(req), &status, NULL, 0u);
 }
 
 VOID vr_recfl(WORD handle, WORD pxy[4])
@@ -632,7 +647,7 @@ VOID vr_recfl(WORD handle, WORD pxy[4])
     if (pxy != NULL) {
         memcpy(req.xy, pxy, sizeof(req.xy));
     }
-    (void) gem_rpc_call(GEM_RPC_VR_RECFL, &req, sizeof(req), &status, NULL, 0u);
+    (void)gem_rpc_call(GEM_RPC_VR_RECFL, &req, sizeof(req), &status, NULL, 0u);
 }
 
 VOID v_gtext(VDI_HANDLE handle, WORD x, WORD y, CONST BYTE *text)
@@ -645,9 +660,9 @@ VOID v_gtext(VDI_HANDLE handle, WORD x, WORD y, CONST BYTE *text)
     req.x = x;
     req.y = y;
     if (text != NULL) {
-        strncpy(req.text, (const char *) text, sizeof(req.text) - 1u);
+        strncpy(req.text, (const char *)text, sizeof(req.text) - 1u);
     }
-    (void) gem_rpc_call(GEM_RPC_V_GTEXT, &req, sizeof(req), &status, NULL, 0u);
+    (void)gem_rpc_call(GEM_RPC_V_GTEXT, &req, sizeof(req), &status, NULL, 0u);
 }
 
 WORD vqt_extent(WORD handle, char *string, WORD extent[8])
@@ -663,13 +678,13 @@ WORD vqt_extent(WORD handle, char *string, WORD extent[8])
         strncpy(req.text, string, sizeof(req.text) - 1u);
     }
     if (!gem_rpc_call(GEM_RPC_VQT_EXTENT, &req, sizeof(req), &status, &rsp,
-            sizeof(rsp))) {
+                      sizeof(rsp))) {
         return 0;
     }
     if (extent != NULL) {
         memcpy(extent, rsp.extent, sizeof(rsp.extent));
     }
-    return (WORD) status;
+    return (WORD)status;
 }
 
 VOID v_rbox(WORD handle, WORD xy[4])
@@ -703,11 +718,11 @@ WORD wind_create(UWORD kind, WORD x, WORD y, WORD w, WORD h)
     req.y = y;
     req.w = w;
     req.h = h;
-    if (!gem_rpc_call(GEM_RPC_WIND_CREATE, &req, sizeof(req), &status,
-            NULL, 0u)) {
+    if (!gem_rpc_call(GEM_RPC_WIND_CREATE, &req, sizeof(req), &status, NULL,
+                      0u)) {
         return 0;
     }
-    return (WORD) status;
+    return (WORD)status;
 }
 
 WORD wind_open(WORD handle, WORD x, WORD y, WORD w, WORD h)
@@ -720,11 +735,11 @@ WORD wind_open(WORD handle, WORD x, WORD y, WORD w, WORD h)
     req.y = y;
     req.w = w;
     req.h = h;
-    if (!gem_rpc_call(GEM_RPC_WIND_OPEN, &req, sizeof(req), &status,
-            NULL, 0u)) {
+    if (!gem_rpc_call(GEM_RPC_WIND_OPEN, &req, sizeof(req), &status, NULL,
+                      0u)) {
         return 0;
     }
-    return (WORD) status;
+    return (WORD)status;
 }
 
 WORD wind_close(WORD handle)
@@ -733,11 +748,11 @@ WORD wind_close(WORD handle)
     gem_rpc_handle_req_t req;
 
     req.handle = handle;
-    if (!gem_rpc_call(GEM_RPC_WIND_CLOSE, &req, sizeof(req), &status,
-            NULL, 0u)) {
+    if (!gem_rpc_call(GEM_RPC_WIND_CLOSE, &req, sizeof(req), &status, NULL,
+                      0u)) {
         return 0;
     }
-    return (WORD) status;
+    return (WORD)status;
 }
 
 WORD wind_delete(WORD handle)
@@ -746,11 +761,11 @@ WORD wind_delete(WORD handle)
     gem_rpc_handle_req_t req;
 
     req.handle = handle;
-    if (!gem_rpc_call(GEM_RPC_WIND_DELETE, &req, sizeof(req), &status,
-            NULL, 0u)) {
+    if (!gem_rpc_call(GEM_RPC_WIND_DELETE, &req, sizeof(req), &status, NULL,
+                      0u)) {
         return 0;
     }
-    return (WORD) status;
+    return (WORD)status;
 }
 
 WORD wind_get(WORD handle, WORD field, WORD *w1, WORD *w2, WORD *w3, WORD *w4)
@@ -763,7 +778,7 @@ WORD wind_get(WORD handle, WORD field, WORD *w1, WORD *w2, WORD *w3, WORD *w4)
     req.field = field;
     memset(&rsp, 0, sizeof(rsp));
     if (!gem_rpc_call(GEM_RPC_WIND_GET, &req, sizeof(req), &status, &rsp,
-            sizeof(rsp))) {
+                      sizeof(rsp))) {
         return 0;
     }
     if (w1 != NULL) {
@@ -778,7 +793,7 @@ WORD wind_get(WORD handle, WORD field, WORD *w1, WORD *w2, WORD *w3, WORD *w4)
     if (w4 != NULL) {
         *w4 = rsp.w4;
     }
-    return (WORD) status;
+    return (WORD)status;
 }
 
 WORD wind_set(WORD handle, WORD field, WORD w1, WORD w2, WORD w3, WORD w4)
@@ -792,11 +807,10 @@ WORD wind_set(WORD handle, WORD field, WORD w1, WORD w2, WORD w3, WORD w4)
     req.w2 = w2;
     req.w3 = w3;
     req.w4 = w4;
-    if (!gem_rpc_call(GEM_RPC_WIND_SET, &req, sizeof(req), &status,
-            NULL, 0u)) {
+    if (!gem_rpc_call(GEM_RPC_WIND_SET, &req, sizeof(req), &status, NULL, 0u)) {
         return 0;
     }
-    return (WORD) status;
+    return (WORD)status;
 }
 
 WORD wind_set_str(WORD handle, WORD field, const char *text)
@@ -810,11 +824,11 @@ WORD wind_set_str(WORD handle, WORD field, const char *text)
     if (text != NULL) {
         strncpy(req.text, text, sizeof(req.text) - 1u);
     }
-    if (!gem_rpc_call(GEM_RPC_WIND_SET_STR, &req, sizeof(req), &status,
-            NULL, 0u)) {
+    if (!gem_rpc_call(GEM_RPC_WIND_SET_STR, &req, sizeof(req), &status, NULL,
+                      0u)) {
         return 0;
     }
-    return (WORD) status;
+    return (WORD)status;
 }
 
 WORD wind_find(WORD x, WORD y)
@@ -824,11 +838,11 @@ WORD wind_find(WORD x, WORD y)
 
     req.x = x;
     req.y = y;
-    if (!gem_rpc_call(GEM_RPC_WIND_FIND, &req, sizeof(req), &status,
-            NULL, 0u)) {
+    if (!gem_rpc_call(GEM_RPC_WIND_FIND, &req, sizeof(req), &status, NULL,
+                      0u)) {
         return 0;
     }
-    return (WORD) status;
+    return (WORD)status;
 }
 
 WORD wind_update(WORD flag)
@@ -837,11 +851,11 @@ WORD wind_update(WORD flag)
     gem_rpc_wind_update_req_t req;
 
     req.flag = flag;
-    if (!gem_rpc_call(GEM_RPC_WIND_UPDATE, &req, sizeof(req), &status,
-            NULL, 0u)) {
+    if (!gem_rpc_call(GEM_RPC_WIND_UPDATE, &req, sizeof(req), &status, NULL,
+                      0u)) {
         return 0;
     }
-    return (WORD) status;
+    return (WORD)status;
 }
 
 WORD wind_calc(WORD type, UWORD kind, WORD inx, WORD iny, WORD inw, WORD inh,
@@ -859,7 +873,7 @@ WORD wind_calc(WORD type, UWORD kind, WORD inx, WORD iny, WORD inw, WORD inh,
     req.inh = inh;
     memset(&rsp, 0, sizeof(rsp));
     if (!gem_rpc_call(GEM_RPC_WIND_CALC, &req, sizeof(req), &status, &rsp,
-            sizeof(rsp))) {
+                      sizeof(rsp))) {
         return 0;
     }
     if (outx != NULL) {
@@ -874,14 +888,16 @@ WORD wind_calc(WORD type, UWORD kind, WORD inx, WORD iny, WORD inw, WORD inh,
     if (outh != NULL) {
         *outh = rsp.outh;
     }
-    return (WORD) status;
+    return (WORD)status;
 }
 
-static void gem_menu_tree_extent_visit(const OBJECT *tree, WORD object,
-    uint8_t visited[GEM_RPC_MENU_MAX_OBJECTS], WORD *extent)
+static void
+gem_menu_tree_extent_visit(const OBJECT *tree, WORD object,
+                           uint8_t visited[GEM_RPC_MENU_MAX_OBJECTS],
+                           WORD *extent)
 {
-    if (tree == NULL || visited == NULL || extent == NULL ||
-        object < ROOT || object >= (WORD) GEM_RPC_MENU_MAX_OBJECTS) {
+    if (tree == NULL || visited == NULL || extent == NULL || object < ROOT ||
+        object >= (WORD)GEM_RPC_MENU_MAX_OBJECTS) {
         return;
     }
     if (visited[object] != 0u) {
@@ -916,6 +932,7 @@ static WORD gem_menu_tree_extent(const OBJECT *tree)
 
 WORD menu_bar(OBJECT *tree, WORD show)
 {
+    client_menu = show ? tree : NULL;
     int32_t status = 0;
     gem_rpc_menu_bar_req_t req;
     WORD extent;
@@ -928,20 +945,21 @@ WORD menu_bar(OBJECT *tree, WORD show)
     memset(&req, 0, sizeof(req));
     req.show = show;
     if (show == 0) {
-        if (!gem_rpc_call(GEM_RPC_MENU_BAR, &req, sizeof(req), &status,
-                NULL, 0)) return 0;
-        return (WORD) status;
+        if (!gem_rpc_call(GEM_RPC_MENU_BAR, &req, sizeof(req), &status, NULL,
+                          0))
+            return 0;
+        return (WORD)status;
     }
     extent = gem_menu_tree_extent(tree);
-    req.object_count = (WORD) (extent + 1);
-    if (req.object_count > (WORD) GEM_RPC_MENU_MAX_OBJECTS) {
-        req.object_count = (WORD) GEM_RPC_MENU_MAX_OBJECTS;
+    req.object_count = (WORD)(extent + 1);
+    if (req.object_count > (WORD)GEM_RPC_MENU_MAX_OBJECTS) {
+        req.object_count = (WORD)GEM_RPC_MENU_MAX_OBJECTS;
     }
-    memcpy(req.objects, tree,
-        (size_t) req.object_count * sizeof(OBJECT));
+    memcpy(req.objects, tree, (size_t)req.object_count * sizeof(OBJECT));
 
     for (i = 0; i < req.object_count &&
-            req.string_count < (WORD) GEM_RPC_MENU_MAX_STRINGS; ++i) {
+                req.string_count < (WORD)GEM_RPC_MENU_MAX_STRINGS;
+         ++i) {
         const char *text;
 
         if (tree[i].ob_type != G_TITLE && tree[i].ob_type != G_STRING) {
@@ -950,18 +968,17 @@ WORD menu_bar(OBJECT *tree, WORD show)
         if ((tree[i].ob_flags & INDIRECT) != 0 || tree[i].ob_spec == 0) {
             continue;
         }
-        text = (const char *) (intptr_t) tree[i].ob_spec;
+        text = (const char *)(intptr_t)tree[i].ob_spec;
         req.strings[req.string_count].object = i;
         strncpy(req.strings[req.string_count].text, text,
-            sizeof(req.strings[req.string_count].text) - 1u);
+                sizeof(req.strings[req.string_count].text) - 1u);
         ++req.string_count;
     }
 
-    if (!gem_rpc_call(GEM_RPC_MENU_BAR, &req, sizeof(req), &status,
-            NULL, 0u)) {
+    if (!gem_rpc_call(GEM_RPC_MENU_BAR, &req, sizeof(req), &status, NULL, 0u)) {
         return 0;
     }
-    return (WORD) status;
+    return (WORD)status;
 }
 
 WORD menu_tnormal(OBJECT *tree, WORD title, WORD normal)
@@ -969,14 +986,14 @@ WORD menu_tnormal(OBJECT *tree, WORD title, WORD normal)
     int32_t status = 0;
     gem_rpc_menu_tnormal_req_t req;
 
-    (void) tree;
+    (void)tree;
     req.title = title;
     req.normal = normal;
-    if (!gem_rpc_call(GEM_RPC_MENU_TNORMAL, &req, sizeof(req), &status,
-            NULL, 0u)) {
+    if (!gem_rpc_call(GEM_RPC_MENU_TNORMAL, &req, sizeof(req), &status, NULL,
+                      0u)) {
         return 0;
     }
-    return (WORD) status;
+    return (WORD)status;
 }
 
 WORD menu_click(WORD click, WORD setit)
@@ -986,9 +1003,9 @@ WORD menu_click(WORD click, WORD setit)
 
     req.click = click;
     req.setit = setit;
-    if (!gem_rpc_call(GEM_RPC_MENU_CLICK, &req, sizeof(req), &status,
-            NULL, 0u)) {
+    if (!gem_rpc_call(GEM_RPC_MENU_CLICK, &req, sizeof(req), &status, NULL,
+                      0u)) {
         return 0;
     }
-    return (WORD) status;
+    return (WORD)status;
 }

@@ -3,6 +3,6 @@ BUILD_DIR ?= $(abspath ../build)
 all:
 	$(MAKE) -C .. all
 run:
-	ctest --test-dir $(BUILD_DIR) --output-on-failure
+	python3 -B report.py --build $(BUILD_DIR)
 unit integration uat:
-	ctest --test-dir $(BUILD_DIR) --output-on-failure -L $@
+	$(MAKE) -C $@ run BUILD_DIR=$(BUILD_DIR)

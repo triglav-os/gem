@@ -13,13 +13,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-enum {
-    D27_ROOT = 0,
-    D27_TEXT,
-    D27_OK,
-    D27_CANCEL,
-    D27_OBJECT_COUNT
-};
+enum { D27_ROOT = 0, D27_TEXT, D27_OK, D27_CANCEL, D27_OBJECT_COUNT };
 
 #define D27_STRING_COUNT 3
 
@@ -47,11 +41,8 @@ static int write_zeroes(FILE *stream, size_t count)
 
 static int write_resource(FILE *stream)
 {
-    static const char *strings[D27_STRING_COUNT] = {
-        "Loaded from demo27.rsc",
-        "OK",
-        "Cancel"
-    };
+    static const char *strings[D27_STRING_COUNT] = {"Loaded from demo27.rsc",
+                                                    "OK", "Cancel"};
     RSHDR header;
     WORD trindex[1];
     OBJECT objects[D27_OBJECT_COUNT];
@@ -66,15 +57,15 @@ static int write_resource(FILE *stream)
     memset(objects, 0, sizeof(objects));
 
     header.rsh_vrsn = 0;
-    header.rsh_trindex = (WORD) sizeof(RSHDR);
-    header.rsh_object = (WORD) align_up(
-        header.rsh_trindex + sizeof(trindex), sizeof(void *));
-    header.rsh_tedinfo = (WORD) (header.rsh_object + sizeof(objects));
+    header.rsh_trindex = (WORD)sizeof(RSHDR);
+    header.rsh_object =
+        (WORD)align_up(header.rsh_trindex + sizeof(trindex), sizeof(void *));
+    header.rsh_tedinfo = (WORD)(header.rsh_object + sizeof(objects));
     header.rsh_iconblk = header.rsh_tedinfo;
     header.rsh_bitblk = header.rsh_iconblk;
     header.rsh_frstr = header.rsh_bitblk;
-    header.rsh_string = (WORD) align_up(header.rsh_frstr, sizeof(LONG));
-    header.rsh_imdata = (WORD) (header.rsh_string + sizeof(string_offsets));
+    header.rsh_string = (WORD)align_up(header.rsh_frstr, sizeof(LONG));
+    header.rsh_imdata = (WORD)(header.rsh_string + sizeof(string_offsets));
     header.rsh_frimg = header.rsh_imdata;
     header.rsh_nobs = D27_OBJECT_COUNT;
     header.rsh_ntree = 1;
@@ -89,17 +80,17 @@ static int write_resource(FILE *stream)
     for (i = 0; i < D27_STRING_COUNT; ++i) {
         size_t len = strlen(strings[i]) + 1u;
 
-        string_offsets[i] = (LONG) strings_start;
+        string_offsets[i] = (LONG)strings_start;
         strings_start += len;
         string_bytes += len;
     }
-    header.rsh_rssize = (WORD) strings_start;
+    header.rsh_rssize = (WORD)strings_start;
 
     objects[D27_ROOT].ob_next = NIL;
     objects[D27_ROOT].ob_head = D27_TEXT;
     objects[D27_ROOT].ob_tail = D27_CANCEL;
     objects[D27_ROOT].ob_type = G_BOX;
-    objects[D27_ROOT].ob_flags = LASTOB;
+    objects[D27_ROOT].ob_flags = NONE;
     objects[D27_ROOT].ob_state = NORMAL;
     objects[D27_ROOT].ob_spec = 0;
     objects[D27_ROOT].ob_x = 0;
@@ -135,7 +126,7 @@ static int write_resource(FILE *stream)
     objects[D27_CANCEL].ob_head = NIL;
     objects[D27_CANCEL].ob_tail = NIL;
     objects[D27_CANCEL].ob_type = G_BUTTON;
-    objects[D27_CANCEL].ob_flags = SELECTABLE | EXIT;
+    objects[D27_CANCEL].ob_flags = LASTOB | SELECTABLE | EXIT;
     objects[D27_CANCEL].ob_state = NORMAL;
     objects[D27_CANCEL].ob_spec = string_offsets[2];
     objects[D27_CANCEL].ob_x = 152;
@@ -158,11 +149,11 @@ static int write_resource(FILE *stream)
 
     if (fwrite(&header, sizeof(header), 1, stream) != 1 ||
         fwrite(trindex, sizeof(trindex), 1, stream) != 1 ||
-        !write_zeroes(stream, (size_t) header.rsh_object -
-            (sizeof(header) + sizeof(trindex))) ||
+        !write_zeroes(stream, (size_t)header.rsh_object -
+                                  (sizeof(header) + sizeof(trindex))) ||
         fwrite(objects, sizeof(objects), 1, stream) != 1 ||
-        !write_zeroes(stream, (size_t) header.rsh_string -
-            (header.rsh_object + sizeof(objects))) ||
+        !write_zeroes(stream, (size_t)header.rsh_string -
+                                  (header.rsh_object + sizeof(objects))) ||
         fwrite(string_offsets, sizeof(string_offsets), 1, stream) != 1 ||
         fwrite(string_block, string_bytes, 1, stream) != 1) {
         free(string_block);
@@ -175,32 +166,13 @@ static int write_resource(FILE *stream)
 
 int main(int argc, char **argv)
 {
-    FILE *sample_file;
-    FILE *bin_file;
-
-    if (argc != 3) {
+    if (argc != 2)
         return 1;
-    }
-
-    sample_file = fopen(argv[1], "wb");
-    if (sample_file == NULL) {
+    FILE *stream = fopen(argv[1], "wb");
+    if (!stream)
         return 1;
-    }
-    if (!write_resource(sample_file)) {
-        fclose(sample_file);
-        return 1;
-    }
-    fclose(sample_file);
-
-    bin_file = fopen(argv[2], "wb");
-    if (bin_file == NULL) {
-        return 1;
-    }
-    if (!write_resource(bin_file)) {
-        fclose(bin_file);
-        return 1;
-    }
-    fclose(bin_file);
-
-    return 0;
+    int ok = write_resource(stream);
+    if (fclose(stream))
+        ok = 0;
+    return ok ? 0 : 1;
 }

@@ -44,3 +44,27 @@ endif()
 
 get_property(local_tests DIRECTORY PROPERTY TESTS)
 set_tests_properties(${local_tests} PROPERTIES LABELS integration)
+
+add_executable(test_vdi_rpc test_vdi_rpc.c)
+target_link_libraries(test_vdi_rpc PRIVATE gem)
+target_compile_options(test_vdi_rpc PRIVATE -Wall -Wextra -pedantic -UNDEBUG
+    $<$<CONFIG:Debug>:-g;-fsanitize=address,undefined>)
+target_link_options(test_vdi_rpc PRIVATE $<$<CONFIG:Debug>:-fsanitize=address,undefined>)
+set_target_properties(test_vdi_rpc PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${GEM_OUTPUT_ROOT}/tests)
+add_test(NAME test_vdi_rpc COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/run.sh
+    $<TARGET_FILE:gemd> $<TARGET_FILE:test_vdi_rpc>)
+set_tests_properties(test_vdi_rpc PROPERTIES LABELS integration TIMEOUT 30
+    RESOURCE_LOCK gem_rpc_hid
+    ENVIRONMENT "GEM_RESOURCE_DIR=${GEM_RESOURCES_DIR};ASAN_OPTIONS=detect_leaks=0;UBSAN_OPTIONS=halt_on_error=1")
+
+add_executable(test_aes_rpc test_aes_rpc.c)
+target_link_libraries(test_aes_rpc PRIVATE gem)
+target_compile_options(test_aes_rpc PRIVATE -Wall -Wextra -pedantic -UNDEBUG
+    $<$<CONFIG:Debug>:-g;-fsanitize=address,undefined>)
+target_link_options(test_aes_rpc PRIVATE $<$<CONFIG:Debug>:-fsanitize=address,undefined>)
+set_target_properties(test_aes_rpc PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${GEM_OUTPUT_ROOT}/tests)
+add_test(NAME test_aes_rpc COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/run.sh
+    $<TARGET_FILE:gemd> $<TARGET_FILE:test_aes_rpc>)
+set_tests_properties(test_aes_rpc PROPERTIES LABELS integration TIMEOUT 30
+    RESOURCE_LOCK gem_rpc_hid
+    ENVIRONMENT "GEM_RESOURCE_DIR=${GEM_RESOURCES_DIR};ASAN_OPTIONS=detect_leaks=0;UBSAN_OPTIONS=halt_on_error=1")

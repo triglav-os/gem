@@ -73,18 +73,18 @@ static void rasta_hid_trace(const char *fmt, ...)
 static uint16_t rasta_modifier_mask(uint16_t key)
 {
     switch (key) {
-    case 224u:
-    case 228u:
-        return rasta_mod_ctrl;
-    case 225u:
-        return rasta_mod_lshift;
-    case 229u:
-        return rasta_mod_rshift;
-    case 226u:
-    case 230u:
-        return rasta_mod_alt;
-    default:
-        return 0u;
+        case 224u:
+        case 228u:
+            return rasta_mod_ctrl;
+        case 225u:
+            return rasta_mod_lshift;
+        case 229u:
+            return rasta_mod_rshift;
+        case 226u:
+        case 230u:
+            return rasta_mod_alt;
+        default:
+            return 0u;
     }
 }
 
@@ -99,73 +99,72 @@ static uint16_t rasta_key_to_gem(uint16_t key, uint16_t mods)
     int shifted = rasta_shift_active(mods);
 
     if (key >= 4u && key <= 29u) {
-        ascii = (uint8_t) ((shifted != 0 ? 'A' : 'a') +
-            (char) (key - 4u));
+        ascii = (uint8_t)((shifted != 0 ? 'A' : 'a') + (char)(key - 4u));
     } else if (key >= 30u && key <= 38u) {
         static const char unshifted_digits[] = "123456789";
         static const char shifted_digits[] = "!@#$%^&*(";
 
-        ascii = (uint8_t) ((shifted != 0 ? shifted_digits :
-            unshifted_digits)[key - 30u]);
+        ascii = (uint8_t)((shifted != 0 ? shifted_digits
+                                        : unshifted_digits)[key - 30u]);
     } else {
         switch (key) {
-        case 39u:
-            ascii = (uint8_t) ((shifted != 0) ? ')' : '0');
-            break;
-        case 40u:
-            ascii = '\n';
-            break;
-        case 41u:
-            ascii = 27u;
-            break;
-        case 42u:
-            ascii = '\b';
-            break;
-        case 43u:
-            ascii = '\t';
-            break;
-        case 44u:
-            ascii = ' ';
-            break;
-        case 45u:
-            ascii = (uint8_t) ((shifted != 0) ? '_' : '-');
-            break;
-        case 46u:
-            ascii = (uint8_t) ((shifted != 0) ? '+' : '=');
-            break;
-        case 47u:
-            ascii = (uint8_t) ((shifted != 0) ? '{' : '[');
-            break;
-        case 48u:
-            ascii = (uint8_t) ((shifted != 0) ? '}' : ']');
-            break;
-        case 49u:
-            ascii = (uint8_t) ((shifted != 0) ? '|' : '\\');
-            break;
-        case 51u:
-            ascii = (uint8_t) ((shifted != 0) ? ':' : ';');
-            break;
-        case 52u:
-            ascii = (uint8_t) ((shifted != 0) ? '"' : '\'');
-            break;
-        case 53u:
-            ascii = (uint8_t) ((shifted != 0) ? '~' : '`');
-            break;
-        case 54u:
-            ascii = (uint8_t) ((shifted != 0) ? '<' : ',');
-            break;
-        case 55u:
-            ascii = (uint8_t) ((shifted != 0) ? '>' : '.');
-            break;
-        case 56u:
-            ascii = (uint8_t) ((shifted != 0) ? '?' : '/');
-            break;
-        default:
-            break;
+            case 39u:
+                ascii = (uint8_t)((shifted != 0) ? ')' : '0');
+                break;
+            case 40u:
+                ascii = '\n';
+                break;
+            case 41u:
+                ascii = 27u;
+                break;
+            case 42u:
+                ascii = '\b';
+                break;
+            case 43u:
+                ascii = '\t';
+                break;
+            case 44u:
+                ascii = ' ';
+                break;
+            case 45u:
+                ascii = (uint8_t)((shifted != 0) ? '_' : '-');
+                break;
+            case 46u:
+                ascii = (uint8_t)((shifted != 0) ? '+' : '=');
+                break;
+            case 47u:
+                ascii = (uint8_t)((shifted != 0) ? '{' : '[');
+                break;
+            case 48u:
+                ascii = (uint8_t)((shifted != 0) ? '}' : ']');
+                break;
+            case 49u:
+                ascii = (uint8_t)((shifted != 0) ? '|' : '\\');
+                break;
+            case 51u:
+                ascii = (uint8_t)((shifted != 0) ? ':' : ';');
+                break;
+            case 52u:
+                ascii = (uint8_t)((shifted != 0) ? '"' : '\'');
+                break;
+            case 53u:
+                ascii = (uint8_t)((shifted != 0) ? '~' : '`');
+                break;
+            case 54u:
+                ascii = (uint8_t)((shifted != 0) ? '<' : ',');
+                break;
+            case 55u:
+                ascii = (uint8_t)((shifted != 0) ? '>' : '.');
+                break;
+            case 56u:
+                ascii = (uint8_t)((shifted != 0) ? '?' : '/');
+                break;
+            default:
+                break;
         }
     }
 
-    return (uint16_t) (((key & 0xffu) << 8) | ascii);
+    return (uint16_t)(((key & 0xffu) << 8) | ascii);
 }
 
 static const char *rasta_framebuffer_path(void)
@@ -218,7 +217,7 @@ static uint16_t rasta_port(void)
         return 5000u;
     }
 
-    return (uint16_t) port;
+    return (uint16_t)port;
 }
 
 static uint16_t rasta_scale(void)
@@ -239,7 +238,7 @@ static uint16_t rasta_scale(void)
         return 1u;
     }
 
-    return (uint16_t) scale;
+    return (uint16_t)scale;
 }
 
 static const char *rasta_cursor_mode(void)
@@ -297,7 +296,7 @@ static int set_nonblocking(int fd)
 
 static uint16_t ntoh_i16(int16_t value)
 {
-    return ntohs((uint16_t) value);
+    return ntohs((uint16_t)value);
 }
 
 static int receive_message(struct rasta_input_message *message)
@@ -316,14 +315,14 @@ static int receive_message(struct rasta_input_message *message)
         return -1;
     }
 
-    if (received != (ssize_t) sizeof(*message)) {
+    if (received != (ssize_t)sizeof(*message)) {
         return 0;
     }
     memcpy(message, packet, sizeof(*message));
 
     message->msgid = ntohs(message->msgid);
-    message->par1 = (int16_t) ntoh_i16(message->par1);
-    message->par2 = (int16_t) ntoh_i16(message->par2);
+    message->par1 = (int16_t)ntoh_i16(message->par1);
+    message->par2 = (int16_t)ntoh_i16(message->par2);
     return 1;
 }
 
@@ -357,34 +356,36 @@ static char *build_subscription_payload(void)
         }
     }
 
-    prefix_length = snprintf(NULL, 0,
+    prefix_length = snprintf(
+        NULL, 0,
         "--width %u --height %u --bpp 1 --scale %u --cursor %s --inverse %s "
         "--framebuffer \"",
-        (unsigned) surface->width, (unsigned) surface->height,
-        (unsigned) scale, cursor_mode, inverse_mode);
+        (unsigned)surface->width, (unsigned)surface->height, (unsigned)scale,
+        cursor_mode, inverse_mode);
     if (prefix_length < 0) {
         errno = EOVERFLOW;
         return NULL;
     }
 
-    total_length = (size_t) prefix_length + escaped_length + 2u;
+    total_length = (size_t)prefix_length + escaped_length + 2u;
     payload = calloc(1u, total_length);
     if (payload == NULL) {
         return NULL;
     }
 
-    prefix_length = snprintf(payload, total_length,
+    prefix_length = snprintf(
+        payload, total_length,
         "--width %u --height %u --bpp 1 --scale %u --cursor %s --inverse %s "
         "--framebuffer \"",
-        (unsigned) surface->width, (unsigned) surface->height,
-        (unsigned) scale, cursor_mode, inverse_mode);
-    if (prefix_length < 0 || (size_t) prefix_length >= total_length) {
+        (unsigned)surface->width, (unsigned)surface->height, (unsigned)scale,
+        cursor_mode, inverse_mode);
+    if (prefix_length < 0 || (size_t)prefix_length >= total_length) {
         free(payload);
         errno = EOVERFLOW;
         return NULL;
     }
 
-    cursor = payload + (size_t) prefix_length;
+    cursor = payload + (size_t)prefix_length;
     while (*path != '\0') {
         if (*path == '"' || *path == '\\') {
             *cursor++ = '\\';
@@ -397,14 +398,14 @@ static char *build_subscription_payload(void)
 }
 
 static void fill_mouse_move(gem_hid_event_t *evt,
-    const struct rasta_input_message *message)
+                            const struct rasta_input_message *message)
 {
     evt->type = GEM_HID_MOUSE_MOVE;
     evt->flags = g_button_flags;
     evt->x = message->par1;
     evt->y = message->par2;
-    evt->dx = (int16_t) (message->par1 - g_mouse_x);
-    evt->dy = (int16_t) (message->par2 - g_mouse_y);
+    evt->dx = (int16_t)(message->par1 - g_mouse_x);
+    evt->dy = (int16_t)(message->par2 - g_mouse_y);
     evt->button = 0u;
     evt->key = 0u;
     evt->mod = 0u;
@@ -414,20 +415,21 @@ static void fill_mouse_move(gem_hid_event_t *evt,
 }
 
 static void fill_button_event(gem_hid_event_t *evt, uint16_t button,
-    int pressed, const struct rasta_input_message *message)
+                              int pressed,
+                              const struct rasta_input_message *message)
 {
     if (pressed != 0) {
-        g_button_flags = (uint16_t) (g_button_flags | button);
+        g_button_flags = (uint16_t)(g_button_flags | button);
     } else {
-        g_button_flags = (uint16_t) (g_button_flags & (uint16_t) ~button);
+        g_button_flags = (uint16_t)(g_button_flags & (uint16_t)~button);
     }
 
     evt->type = GEM_HID_MOUSE_BUTTON;
     evt->flags = g_button_flags;
     evt->x = message->par1;
     evt->y = message->par2;
-    evt->dx = (int16_t) (message->par1 - g_mouse_x);
-    evt->dy = (int16_t) (message->par2 - g_mouse_y);
+    evt->dx = (int16_t)(message->par1 - g_mouse_x);
+    evt->dy = (int16_t)(message->par2 - g_mouse_y);
     evt->button = button;
     evt->key = 0u;
     evt->mod = 0u;
@@ -437,21 +439,22 @@ static void fill_button_event(gem_hid_event_t *evt, uint16_t button,
 }
 
 static void fill_key_event(gem_hid_event_t *evt,
-    const struct rasta_input_message *message, int pressed)
+                           const struct rasta_input_message *message,
+                           int pressed)
 {
-    uint16_t key = (uint16_t) message->par1;
+    uint16_t key = (uint16_t)message->par1;
     uint16_t modifier = rasta_modifier_mask(key);
 
     if (modifier != 0u) {
         if (pressed != 0) {
-            g_key_mods = (uint16_t) (g_key_mods | modifier);
+            g_key_mods = (uint16_t)(g_key_mods | modifier);
         } else {
-            g_key_mods = (uint16_t) (g_key_mods & (uint16_t) ~modifier);
+            g_key_mods = (uint16_t)(g_key_mods & (uint16_t)~modifier);
         }
     }
 
     evt->type = GEM_HID_KEY;
-    evt->flags = (uint16_t) ((pressed != 0) ? 1u : 0u);
+    evt->flags = (uint16_t)((pressed != 0) ? 1u : 0u);
     evt->x = g_mouse_x;
     evt->y = g_mouse_y;
     evt->dx = 0;
@@ -459,46 +462,45 @@ static void fill_key_event(gem_hid_event_t *evt,
     evt->button = 0u;
     evt->key = rasta_key_to_gem(key, g_key_mods);
     evt->mod = g_key_mods;
-    rasta_hid_trace("key raw=%u pressed=%d gem=0x%04x ascii=%u scan=%u mod=0x%04x",
-        (unsigned) key, pressed, evt->key,
-        (unsigned) (evt->key & 0xffu),
-        (unsigned) ((evt->key >> 8) & 0xffu),
-        (unsigned) evt->mod);
+    rasta_hid_trace(
+        "key raw=%u pressed=%d gem=0x%04x ascii=%u scan=%u mod=0x%04x",
+        (unsigned)key, pressed, evt->key, (unsigned)(evt->key & 0xffu),
+        (unsigned)((evt->key >> 8) & 0xffu), (unsigned)evt->mod);
 }
 
 static int translate_message(gem_hid_event_t *evt,
-    const struct rasta_input_message *message)
+                             const struct rasta_input_message *message)
 {
     switch (message->msgid) {
-    case rasta_msg_key_down:
-        fill_key_event(evt, message, 1);
-        return 1;
-    case rasta_msg_key_up:
-        fill_key_event(evt, message, 0);
-        return 1;
-    case rasta_msg_mouse_move:
-        fill_mouse_move(evt, message);
-        return 1;
-    case rasta_msg_mouse_left_down:
-        fill_button_event(evt, GEM_HID_BUTTON_LEFT, 1, message);
-        return 1;
-    case rasta_msg_mouse_left_up:
-        fill_button_event(evt, GEM_HID_BUTTON_LEFT, 0, message);
-        return 1;
-    case rasta_msg_mouse_middle_down:
-        fill_button_event(evt, GEM_HID_BUTTON_MIDDLE, 1, message);
-        return 1;
-    case rasta_msg_mouse_middle_up:
-        fill_button_event(evt, GEM_HID_BUTTON_MIDDLE, 0, message);
-        return 1;
-    case rasta_msg_mouse_right_down:
-        fill_button_event(evt, GEM_HID_BUTTON_RIGHT, 1, message);
-        return 1;
-    case rasta_msg_mouse_right_up:
-        fill_button_event(evt, GEM_HID_BUTTON_RIGHT, 0, message);
-        return 1;
-    default:
-        return 0;
+        case rasta_msg_key_down:
+            fill_key_event(evt, message, 1);
+            return 1;
+        case rasta_msg_key_up:
+            fill_key_event(evt, message, 0);
+            return 1;
+        case rasta_msg_mouse_move:
+            fill_mouse_move(evt, message);
+            return 1;
+        case rasta_msg_mouse_left_down:
+            fill_button_event(evt, GEM_HID_BUTTON_LEFT, 1, message);
+            return 1;
+        case rasta_msg_mouse_left_up:
+            fill_button_event(evt, GEM_HID_BUTTON_LEFT, 0, message);
+            return 1;
+        case rasta_msg_mouse_middle_down:
+            fill_button_event(evt, GEM_HID_BUTTON_MIDDLE, 1, message);
+            return 1;
+        case rasta_msg_mouse_middle_up:
+            fill_button_event(evt, GEM_HID_BUTTON_MIDDLE, 0, message);
+            return 1;
+        case rasta_msg_mouse_right_down:
+            fill_button_event(evt, GEM_HID_BUTTON_RIGHT, 1, message);
+            return 1;
+        case rasta_msg_mouse_right_up:
+            fill_button_event(evt, GEM_HID_BUTTON_RIGHT, 0, message);
+            return 1;
+        default:
+            return 0;
     }
 }
 
@@ -530,7 +532,7 @@ int gem_hid_init(void)
         errno = EINVAL;
         return 0;
     }
-    if (connect(g_socket_fd, (struct sockaddr *) &addr, sizeof(addr)) != 0) {
+    if (connect(g_socket_fd, (struct sockaddr *)&addr, sizeof(addr)) != 0) {
         close(g_socket_fd);
         g_socket_fd = -1;
         return 0;
@@ -545,7 +547,7 @@ int gem_hid_init(void)
 
     subscription_length = strlen(subscription);
     if (sendto(g_socket_fd, subscription, subscription_length, 0,
-        (struct sockaddr *) &addr, sizeof(addr)) < 0) {
+               (struct sockaddr *)&addr, sizeof(addr)) < 0) {
         free(subscription);
         close(g_socket_fd);
         g_socket_fd = -1;

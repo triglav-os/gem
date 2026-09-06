@@ -25,7 +25,7 @@ void test_bitmap_init(test_bitmap_t *bitmap, WORD width, WORD height)
     bitmap->width = width;
     bitmap->height = height;
     bitmap->pitch = width;
-    size = (size_t) width * (size_t) height;
+    size = (size_t)width * (size_t)height;
     bitmap->pixels = calloc(size, 1u);
 }
 
@@ -38,42 +38,40 @@ void test_bitmap_free(test_bitmap_t *bitmap)
 void test_bitmap_clear(test_bitmap_t *bitmap, uint8_t value)
 {
     memset(bitmap->pixels, value,
-        (size_t) bitmap->pitch * (size_t) bitmap->height);
+           (size_t)bitmap->pitch * (size_t)bitmap->height);
 }
 
 uint8_t test_bitmap_get_pixel(const test_bitmap_t *bitmap, WORD x, WORD y)
 {
-    if (bitmap == NULL || bitmap->pixels == NULL ||
-        x < 0 || y < 0 || x >= bitmap->width || y >= bitmap->height) {
+    if (bitmap == NULL || bitmap->pixels == NULL || x < 0 || y < 0 ||
+        x >= bitmap->width || y >= bitmap->height) {
         return 0;
     }
 
-    return bitmap->pixels[(size_t) y * (size_t) bitmap->pitch + (size_t) x];
+    return bitmap->pixels[(size_t)y * (size_t)bitmap->pitch + (size_t)x];
 }
 
 void test_bitmap_set_pixel(test_bitmap_t *bitmap, WORD x, WORD y, uint8_t value)
 {
-    if (bitmap == NULL || bitmap->pixels == NULL ||
-        x < 0 || y < 0 || x >= bitmap->width || y >= bitmap->height) {
+    if (bitmap == NULL || bitmap->pixels == NULL || x < 0 || y < 0 ||
+        x >= bitmap->width || y >= bitmap->height) {
         return;
     }
 
-    bitmap->pixels[(size_t) y * (size_t) bitmap->pitch + (size_t) x] =
-        (uint8_t) ((value != 0u) ? 1u : 0u);
+    bitmap->pixels[(size_t)y * (size_t)bitmap->pitch + (size_t)x] =
+        (uint8_t)((value != 0u) ? 1u : 0u);
 }
 
 int test_bitmap_equal(const test_bitmap_t *left, const test_bitmap_t *right)
 {
     size_t size;
 
-    if (left == NULL || right == NULL ||
-        left->width != right->width ||
-        left->height != right->height ||
-        left->pitch != right->pitch) {
+    if (left == NULL || right == NULL || left->width != right->width ||
+        left->height != right->height || left->pitch != right->pitch) {
         return 0;
     }
 
-    size = (size_t) left->pitch * (size_t) left->height;
+    size = (size_t)left->pitch * (size_t)left->height;
     return memcmp(left->pixels, right->pixels, size) == 0;
 }
 
@@ -97,9 +95,7 @@ int gem_os_init(void)
     return 1;
 }
 
-void gem_os_shutdown(void)
-{
-}
+void gem_os_shutdown(void) {}
 
 void *gem_os_alloc(size_t size)
 {
@@ -118,7 +114,7 @@ uint32_t gem_os_ticks_ms(void)
 
 void gem_os_sleep_ms(uint32_t ms)
 {
-    (void) ms;
+    (void)ms;
 }
 
 int gem_hid_init(void)
@@ -126,20 +122,18 @@ int gem_hid_init(void)
     return 1;
 }
 
-void gem_hid_shutdown(void)
-{
-}
+void gem_hid_shutdown(void) {}
 
 int gem_hid_poll(gem_hid_event_t *evt)
 {
-    (void) evt;
+    (void)evt;
     return 0;
 }
 
 int gem_raster_init(uint16_t width, uint16_t height, gem_raster_format_t format)
 {
-    size_t pitch = ((size_t) width + 7u) / 8u;
-    size_t size = pitch * (size_t) height;
+    size_t pitch = ((size_t)width + 7u) / 8u;
+    size_t size = pitch * (size_t)height;
 
     if (format != GEM_RASTER_MONO1) {
         return 0;
@@ -149,7 +143,7 @@ int gem_raster_init(uint16_t width, uint16_t height, gem_raster_format_t format)
     memset(&g_surface, 0, sizeof(g_surface));
     g_surface.width = width;
     g_surface.height = height;
-    g_surface.pitch = (uint16_t) pitch;
+    g_surface.pitch = (uint16_t)pitch;
     g_surface.format = format;
     g_surface.pixels = calloc(size, 1u);
     return (g_surface.pixels != NULL) ? 1 : 0;
@@ -178,20 +172,17 @@ void gem_raster_present(void)
 
 void gem_raster_present_rect(int x, int y, int width, int height)
 {
-    (void) x;
-    (void) y;
-    (void) width;
-    (void) height;
+    (void)x;
+    (void)y;
+    (void)width;
+    (void)height;
     ++g_present_count;
 }
 
-void gem_raster_set_palette(uint8_t index,
-                            uint8_t r,
-                            uint8_t g,
-                            uint8_t b)
+void gem_raster_set_palette(uint8_t index, uint8_t r, uint8_t g, uint8_t b)
 {
-    (void) index;
-    (void) r;
-    (void) g;
-    (void) b;
+    (void)index;
+    (void)r;
+    (void)g;
+    (void)b;
 }

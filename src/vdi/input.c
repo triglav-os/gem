@@ -9,8 +9,8 @@
 
 #include "gem/vdi.h"
 
-#include "_internal.h"
-#include "_state.h"
+#include "vdi_internal.h"
+#include "vdi_state.h"
 
 #include "platform/hid.h"
 #include "platform/os.h"
@@ -18,39 +18,40 @@
 
 VOID v_hide_c(VDI_HANDLE handle)
 {
-    if (handle != _vdi_handle_screen || !_vdi.open) {
+    if (handle != vdi_handle_screen || !vdi_state.open) {
         return;
     }
 
-    if (_vdi.cursor_hidden == 0) {
-        WORD cx = _vdi.cursor_x;
-        WORD cy = _vdi.cursor_y;
+    if (vdi_state.cursor_hidden == 0) {
+        WORD cx = vdi_state.cursor_x;
+        WORD cy = vdi_state.cursor_y;
 
-        _vdi.cursor_hidden = 1;
-        _vdi_prepare_screen_write();
+        vdi_state.cursor_hidden = 1;
+        vdi_prepare_screen_write();
         /* Cheap cursor erase even under begin_update / wind_update. */
-        gem_raster_present_rect((int) cx, (int) cy, 17, 17);
+        gem_raster_present_rect((int)cx, (int)cy, 17, 17);
     }
 }
 
 VOID v_show_c(VDI_HANDLE handle, WORD reset)
 {
-    (void) reset;
+    (void)reset;
 
-    if (handle != _vdi_handle_screen || !_vdi.open) {
+    if (handle != vdi_handle_screen || !vdi_state.open) {
         return;
     }
 
-    if (_vdi.cursor_hidden != 0) {
-        _vdi.cursor_hidden = 0;
+    if (vdi_state.cursor_hidden != 0) {
+        vdi_state.cursor_hidden = 0;
         /* Redraw pointer via mouse-state path (cursor box present). */
-        _vdi_set_mouse_state(_vdi.mouse_x, _vdi.mouse_y, _vdi.mouse_status);
+        vdi_set_mouse_state(vdi_state.mouse_x, vdi_state.mouse_y,
+                            vdi_state.mouse_status);
     }
 }
 
 VOID vq_mouse(VDI_HANDLE handle, WORD *status, WORD *x, WORD *y)
 {
-    if (handle != _vdi_handle_screen || !_vdi.open) {
+    if (handle != vdi_handle_screen || !vdi_state.open) {
         if (status != NULL) {
             *status = 0;
         }
@@ -63,26 +64,26 @@ VOID vq_mouse(VDI_HANDLE handle, WORD *status, WORD *x, WORD *y)
         return;
     }
 
-    _vdi_pump_events();
+    vdi_pump_events();
     if (status != NULL) {
-        *status = _vdi.mouse_status;
+        *status = vdi_state.mouse_status;
     }
     if (x != NULL) {
-        *x = _vdi.mouse_x;
+        *x = vdi_state.mouse_x;
     }
     if (y != NULL) {
-        *y = _vdi.mouse_y;
+        *y = vdi_state.mouse_y;
     }
 }
 
 VOID vrq_string(VDI_HANDLE handle, WORD max_length, WORD echo_mode,
-    WORD *echo_xy, BYTE *out_string)
+                WORD *echo_xy, BYTE *out_string)
 {
     WORD length = 0;
     WORD echo_x = 0;
     WORD echo_y = 0;
 
-    if (handle != _vdi_handle_screen || !_vdi.open || out_string == NULL ||
+    if (handle != vdi_handle_screen || !vdi_state.open || out_string == NULL ||
         max_length < 0) {
         return;
     }
@@ -92,7 +93,8 @@ VOID vrq_string(VDI_HANDLE handle, WORD max_length, WORD echo_mode,
         echo_y = echo_xy[1];
     }
 
-    FOREVER {
+    FOREVER
+    {
         gem_hid_event_t evt;
 
         if (gem_hid_poll(&evt) == 0) {
@@ -102,9 +104,9 @@ VOID vrq_string(VDI_HANDLE handle, WORD max_length, WORD echo_mode,
 
         if (evt.type == GEM_HID_MOUSE_MOVE ||
             evt.type == GEM_HID_MOUSE_BUTTON) {
-            _vdi.mouse_x = evt.x;
-            _vdi.mouse_y = evt.y;
-            _vdi.mouse_status = (WORD) evt.flags;
+            vdi_state.mouse_x = evt.x;
+            vdi_state.mouse_y = evt.y;
+            vdi_state.mouse_status = (WORD)evt.flags;
             continue;
         }
         if (evt.type != GEM_HID_KEY || (evt.flags & 1u) == 0u) {
@@ -112,7 +114,7 @@ VOID vrq_string(VDI_HANDLE handle, WORD max_length, WORD echo_mode,
         }
 
         {
-            char ch = (char) (evt.key & 0xffu);
+            char ch = (char)(evt.key & 0xffu);
 
             if (ch == '\0') {
                 continue;
@@ -126,9 +128,10 @@ VOID vrq_string(VDI_HANDLE handle, WORD max_length, WORD echo_mode,
                     --length;
                     out_string[length] = '\0';
                     if (echo_mode != 0 && echo_xy != NULL) {
-                        _vdi_fill_rect(echo_x, (WORD) (echo_y - 7),
-                            (WORD) (echo_x + max_length *
-                            _vdi_font_cell_width()), echo_y, 0);
+                        vdi_fill_rect(
+                            echo_x, (WORD)(echo_y - 7),
+                            (WORD)(echo_x + max_length * vdi_font_cell_width()),
+                            echo_y, 0);
                         v_gtext(handle, echo_x, echo_y, out_string);
                     }
                 }
@@ -138,7 +141,7 @@ VOID vrq_string(VDI_HANDLE handle, WORD max_length, WORD echo_mode,
                 continue;
             }
 
-            out_string[length++] = (BYTE) ch;
+            out_string[length++] = (BYTE)ch;
             out_string[length] = '\0';
             if (echo_mode != 0 && echo_xy != NULL) {
                 v_gtext(handle, echo_x, echo_y, out_string);
@@ -148,37 +151,37 @@ VOID vrq_string(VDI_HANDLE handle, WORD max_length, WORD echo_mode,
 }
 
 WORD vrq_locator(WORD handle, WORD x, WORD y, WORD *xout, WORD *yout,
-    WORD *term)
+                 WORD *term)
 {
-    (void) x;
-    (void) y;
+    (void)x;
+    (void)y;
 
-    if (!_vdi_valid_handle(handle)) {
+    if (!vdi_valid_handle(handle)) {
         return 0;
     }
 
-    _vdi_pump_events();
+    vdi_pump_events();
     if (xout != NULL) {
-        *xout = _vdi.mouse_x;
+        *xout = vdi_state.mouse_x;
     }
     if (yout != NULL) {
-        *yout = _vdi.mouse_y;
+        *yout = vdi_state.mouse_y;
     }
     if (term != NULL) {
-        *term = _vdi.mouse_status;
+        *term = vdi_state.mouse_status;
     }
     return 1;
 }
 
 WORD vsm_locator(WORD handle, WORD x, WORD y, WORD *xout, WORD *yout,
-    WORD *term)
+                 WORD *term)
 {
     return vrq_locator(handle, x, y, xout, yout, term);
 }
 
 WORD vrq_valuator(WORD handle, WORD val_in, WORD *val_out, WORD *term)
 {
-    if (!_vdi_valid_handle(handle)) {
+    if (!vdi_valid_handle(handle)) {
         return 0;
     }
     if (val_out != NULL) {
@@ -197,7 +200,7 @@ WORD vsm_valuator(WORD handle, WORD val_in, WORD *val_out, WORD *term)
 
 WORD vrq_choice(WORD handle, WORD ch_in, WORD *ch_out)
 {
-    if (!_vdi_valid_handle(handle)) {
+    if (!vdi_valid_handle(handle)) {
         return 0;
     }
     if (ch_out != NULL) {
@@ -208,7 +211,7 @@ WORD vrq_choice(WORD handle, WORD ch_in, WORD *ch_out)
 
 WORD vsm_choice(WORD handle, WORD *choice)
 {
-    if (!_vdi_valid_handle(handle)) {
+    if (!vdi_valid_handle(handle)) {
         return 0;
     }
     if (choice != NULL) {
@@ -218,9 +221,9 @@ WORD vsm_choice(WORD handle, WORD *choice)
 }
 
 WORD vsm_string(WORD handle, WORD length, WORD echo_mode, WORD *echoxy,
-    BYTE *string)
+                BYTE *string)
 {
-    if (!_vdi_valid_handle(handle) || string == NULL) {
+    if (!vdi_valid_handle(handle) || string == NULL) {
         return 0;
     }
 
@@ -230,46 +233,46 @@ WORD vsm_string(WORD handle, WORD length, WORD echo_mode, WORD *echoxy,
 
 WORD vsin_mode(WORD handle, WORD dev_type, WORD mode)
 {
-    if (!_vdi_valid_handle(handle) || dev_type < 0 ||
+    if (!vdi_valid_handle(handle) || dev_type < 0 ||
         dev_type >= VDI_INPUT_DEVICES) {
         return 0;
     }
 
-    _vdi_compat.input_mode[dev_type] = mode;
+    vdi_compat.input_mode[dev_type] = mode;
     return mode;
 }
 
 WORD vqin_mode(WORD handle, WORD dev_type, WORD *input_mode)
 {
-    if (!_vdi_valid_handle(handle) || input_mode == NULL || dev_type < 0 ||
+    if (!vdi_valid_handle(handle) || input_mode == NULL || dev_type < 0 ||
         dev_type >= VDI_INPUT_DEVICES) {
         return 0;
     }
 
-    *input_mode = _vdi_compat.input_mode[dev_type];
+    *input_mode = vdi_compat.input_mode[dev_type];
     return 1;
 }
 
 WORD vsc_form(WORD handle, MFORM *cur_form)
 {
-    if (!_vdi_valid_handle(handle) || cur_form == NULL) {
+    if (!vdi_valid_handle(handle) || cur_form == NULL) {
         return 0;
     }
 
-    return _vdi_set_mouse_form(cur_form);
+    return vdi_set_mouse_form(cur_form);
 }
 
 WORD vex_timv(WORD handle, VOID (*tim_addr)(void), VOID (**old_addr)(void),
-    WORD *scale)
+              WORD *scale)
 {
-    if (!_vdi_valid_handle(handle)) {
+    if (!vdi_valid_handle(handle)) {
         return 0;
     }
 
     if (old_addr != NULL) {
-        *old_addr = _vdi_compat.timv;
+        *old_addr = vdi_compat.timv;
     }
-    _vdi_compat.timv = tim_addr;
+    vdi_compat.timv = tim_addr;
     if (scale != NULL) {
         *scale = 1;
     }
@@ -278,46 +281,46 @@ WORD vex_timv(WORD handle, VOID (*tim_addr)(void), VOID (**old_addr)(void),
 
 WORD vex_butv(WORD handle, VOID (*usr_code)(void), VOID (**sav_code)(void))
 {
-    if (!_vdi_valid_handle(handle)) {
+    if (!vdi_valid_handle(handle)) {
         return 0;
     }
 
     if (sav_code != NULL) {
-        *sav_code = _vdi_compat.butv;
+        *sav_code = vdi_compat.butv;
     }
-    _vdi_compat.butv = usr_code;
+    vdi_compat.butv = usr_code;
     return 1;
 }
 
 WORD vex_motv(WORD handle, VOID (*usr_code)(void), VOID (**sav_code)(void))
 {
-    if (!_vdi_valid_handle(handle)) {
+    if (!vdi_valid_handle(handle)) {
         return 0;
     }
 
     if (sav_code != NULL) {
-        *sav_code = _vdi_compat.motv;
+        *sav_code = vdi_compat.motv;
     }
-    _vdi_compat.motv = usr_code;
+    vdi_compat.motv = usr_code;
     return 1;
 }
 
 WORD vex_curv(WORD handle, VOID (*usr_code)(void), VOID (**sav_code)(void))
 {
-    if (!_vdi_valid_handle(handle)) {
+    if (!vdi_valid_handle(handle)) {
         return 0;
     }
 
     if (sav_code != NULL) {
-        *sav_code = _vdi_compat.curv;
+        *sav_code = vdi_compat.curv;
     }
-    _vdi_compat.curv = usr_code;
+    vdi_compat.curv = usr_code;
     return 1;
 }
 
 WORD vq_key_s(WORD handle, WORD *status)
 {
-    if (!_vdi_valid_handle(handle)) {
+    if (!vdi_valid_handle(handle)) {
         return 0;
     }
 

@@ -1,0 +1,185 @@
+diff --git a/m68k_in.c b/m68k_in.c
+index e8dd8d9..af09b4d 100644
+--- a/m68k_in.c
++++ b/m68k_in.c
+@@ -167,7 +167,6 @@ M68KMAKE_TABLE_FOOTER
+ void m68ki_build_opcode_table(void)
+ {
+ 	const opcode_handler_struct *ostruct;
+-	int cycle_cost;
+ 	int instr;
+ 	int i;
+ 	int j;
+@@ -221,7 +220,7 @@ void m68ki_build_opcode_table(void)
+ 				{
+ 					// On the 68000 and 68010 shift distance affect execution time.
+ 					// Add the cycle cost of shifting; 2 times the shift distance
+-					cycle_cost = ((((i-1)&7)+1)<<1);
++					int cycle_cost = ((((i-1)&7)+1)<<1);
+ 					m68ki_cycles[0][instr] += cycle_cost;
+ 					m68ki_cycles[1][instr] += cycle_cost;
+ 					// On the 68020 shift distance does not affect execution time
+@@ -2476,10 +2475,7 @@ M68KMAKE_OP(bfchg, 32, ., .)
+ 		sint offset = (word2>>6)&31;
+ 		uint width = word2;
+ 		uint mask_base;
+-		uint data_long;
+ 		m68ki_bitfield_t data;
+-		uint data_byte = 0;
+-		uint mask_byte = 0;
+ 		uint ea = M68KMAKE_GET_EA_AY_8;
+ 
+ 
+@@ -2554,7 +2550,6 @@ M68KMAKE_OP(bfclr, 32, ., .)
+ 		uint width = word2;
+ 		uint mask_base;
+ 		m68ki_bitfield_t data;
+-		uint mask_byte = 0;
+ 		uint ea = M68KMAKE_GET_EA_AY_8;
+ 
+ 
+diff --git a/m68kmake.c b/m68kmake.c
+index c7f1efb..e584e94 100644
+--- a/m68kmake.c
++++ b/m68kmake.c
+@@ -219,14 +219,14 @@ typedef struct
+ 
+ 
+ /* Function Prototypes */
+-void error_exit(const char* fmt, ...);
+-void perror_exit(const char* fmt, ...);
++_Noreturn void error_exit(const char* fmt, ...);
++_Noreturn void perror_exit(const char* fmt, ...);
+ ptrdiff_t check_strsncpy(char* dst, char* src, int maxlength);
+ ptrdiff_t check_atoi(char* str, int *result);
+ ptrdiff_t skip_spaces(char* str);
+ int num_bits(int value);
+ int atoh(char* buff);
+-size_t fgetline(char* buff, int nchars, FILE* file);
++ptrdiff_t fgetline(char* buff, int nchars, FILE* file);
+ int get_oper_cycles(opcode_struct* op, int ea_mode, int cpu_type);
+ opcode_struct* find_opcode(char* name, int size, char* spec_proc, char* spec_ea);
+ opcode_struct* find_illegal_opcode(void);
+@@ -470,7 +470,7 @@ const int g_clr_cycle_table[13][3] =
+ /* ======================================================================== */
+ 
+ /* Print an error message and exit with status error */
+-void error_exit(const char* fmt, ...)
++_Noreturn void error_exit(const char* fmt, ...)
+ {
+ 	va_list args;
+ 	fprintf(stderr, "In %s, near or on line %d:\n\t", g_input_filename, g_line_number);
+@@ -487,7 +487,7 @@ void error_exit(const char* fmt, ...)
+ }
+ 
+ /* Print an error message, call perror(), and exit with status error */
+-void perror_exit(const char* fmt, ...)
++_Noreturn void perror_exit(const char* fmt, ...)
+ {
+ 	va_list args;
+ 	va_start(args, fmt);
+@@ -590,10 +590,11 @@ int atoh(char* buff)
+ 	return accum;
+ }
+ 
++/* GEM port derivative: signed return preserves the EOF sentinel. */
+ /* Get a line of text from a file, discarding any end-of-line characters */
+-size_t fgetline(char* buff, int nchars, FILE* file)
++ptrdiff_t fgetline(char* buff, int nchars, FILE* file)
+ {
+-	size_t length;
++	ptrdiff_t length;
+ 
+ 	if(fgets(buff, nchars, file) == NULL)
+ 		return -1;
+@@ -715,8 +716,6 @@ int extract_opcode_info(char* src, char* name, int* size, char* spec_proc, char*
+ 
+ 	ptr += check_strcncpy(spec_ea, ptr, ')', MAX_SPEC_EA_LENGTH);
+ 	if(*ptr != ')') return 0;
+-	ptr++;
+-	ptr += skip_spaces(ptr);
+ 
+ 	return 1;
+ }
+@@ -1017,7 +1016,7 @@ void process_opcode_handlers(FILE* filep)
+ 		/* Get the rest of the function */
+ 		for(body->length=0;;body->length++)
+ 		{
+-			if(body->length > MAX_BODY_LENGTH)
++			if(body->length >= MAX_BODY_LENGTH)
+ 				error_exit("Function too long");
+ 
+ 			if(fgetline(body->body[body->length], MAX_LINE_LENGTH, input_file) < 0)
+@@ -1159,7 +1158,7 @@ void read_insert(char* insert)
+ {
+ 	char* ptr = insert;
+ 	char* overflow = insert + MAX_INSERT_LENGTH - MAX_LINE_LENGTH;
+-	size_t length;
++	ptrdiff_t length;
+ 	char* first_blank = NULL;
+ 
+ 	first_blank = NULL;
+@@ -1245,6 +1244,9 @@ int main(int argc, char **argv)
+     if(argc > 1)
+ 	{
+ 		char *ptr;
++		/* GEM port derivative: validate argv before fixed-buffer copies. */
++		if(!argv[1][0] || strlen(argv[1]) > sizeof(output_path) - 2)
++			error_exit("Invalid or overlong output directory");
+ 		strcpy(output_path, argv[1]);
+ 
+ 		for(ptr = strchr(output_path, '\\'); ptr; ptr = strchr(ptr, '\\'))
+@@ -1252,7 +1254,11 @@ int main(int argc, char **argv)
+         if(output_path[strlen(output_path)-1] != '/')
+ 			strcat(output_path, "/");
+ 		if(argc > 2)
++		{
++			if(strlen(argv[2]) >= sizeof(g_input_filename))
++				error_exit("Input filename too long");
+ 			strcpy(g_input_filename, argv[2]);
++		}
+ 	}
+ 
+ 
+@@ -1285,6 +1291,8 @@ int main(int argc, char **argv)
+ 			if(prototype_header_read)
+ 				error_exit("Duplicate prototype header");
+ 			read_insert(temp_insert);
++			if(!g_prototype_file)
++				error_exit("Prototype output is not open");
+ 			fprintf(g_prototype_file, "%s\n\n", temp_insert);
+ 			prototype_header_read = 1;
+ 		}
+diff --git a/m68kmmu.h b/m68kmmu.h
+index b6d9098..00d3bc9 100644
+--- a/m68kmmu.h
++++ b/m68kmmu.h
+@@ -160,7 +160,6 @@ uint pmmu_translate_addr(uint addr_in)
+ 
+ 				shift = is+abits+bbits+cbits;
+ 				addr_out = ((addr_in<<shift)>>shift) + tbl_entry;
+-				resolved = 1;
+ 				break;
+ 		}
+ 	}
+diff --git a/softfloat/softfloat-macros b/softfloat/softfloat-macros
+index 5de9031..7acac6d 100644
+--- a/softfloat/softfloat-macros
++++ b/softfloat/softfloat-macros
+@@ -285,6 +285,16 @@ static inline void
+      bits64 a0, bits64 a1, int16 count, bits64 *z0Ptr, bits64 *z1Ptr )
+ {
+ 
++    /* GEM port derivative: define boundary shifts without C shift overflow. */
++    if ( (unsigned int) count >= 128 ) {
++        *z0Ptr = *z1Ptr = 0;
++        return;
++    }
++    if ( count >= 64 ) {
++        *z0Ptr = a1 << (count - 64);
++        *z1Ptr = 0;
++        return;
++    }
+     *z1Ptr = a1<<count;
+     *z0Ptr =
+         ( count == 0 ) ? a0 : ( a0<<count ) | ( a1>>( ( - count ) & 63 ) );

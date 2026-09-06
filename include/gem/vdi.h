@@ -17,7 +17,7 @@
 extern "C" {
 #endif
 
-typedef WORD VDI_HANDLE;  /* VDI workstation handle type. */
+typedef WORD VDI_HANDLE; /* VDI workstation handle type. */
 
 /*
  * Memory form definition block.
@@ -26,28 +26,28 @@ typedef WORD VDI_HANDLE;  /* VDI workstation handle type. */
  * Otherwise it refers to an off-screen bitmap.
  */
 typedef struct mfdb {
-    VOID *fd_addr;      /* Base pixel pointer, or NULL for the screen. */
-    WORD  fd_w;         /* Bitmap width in pixels. */
-    WORD  fd_h;         /* Bitmap height in pixels. */
-    WORD  fd_wdwidth;   /* Scanline width in 16-bit words. */
-    WORD  fd_stand;     /* Non-zero when data is in standard MFDB layout. */
-    WORD  fd_nplanes;   /* Number of bitplanes in the bitmap. */
-    WORD  fd_r1;        /* Reserved for GEM compatibility. */
-    WORD  fd_r2;        /* Reserved for GEM compatibility. */
-    WORD  fd_r3;        /* Reserved for GEM compatibility. */
+    VOID *fd_addr;   /* Base pixel pointer, or NULL for the screen. */
+    WORD fd_w;       /* Bitmap width in pixels. */
+    WORD fd_h;       /* Bitmap height in pixels. */
+    WORD fd_wdwidth; /* Scanline width in 16-bit words. */
+    WORD fd_stand;   /* Non-zero when data is in standard MFDB layout. */
+    WORD fd_nplanes; /* Number of bitplanes in the bitmap. */
+    WORD fd_r1;      /* Reserved for GEM compatibility. */
+    WORD fd_r2;      /* Reserved for GEM compatibility. */
+    WORD fd_r3;      /* Reserved for GEM compatibility. */
 } MFDB;
 
 /*
  * Mouse form used by vsc_form().
  */
 typedef struct mform {
-    WORD mf_xhot;       /* Horizontal hot-spot position within the cursor. */
-    WORD mf_yhot;       /* Vertical hot-spot position within the cursor. */
-    WORD mf_nplanes;    /* Number of bitplanes in the cursor image. */
-    WORD mf_fg;         /* Foreground color index. */
-    WORD mf_bg;         /* Background color index. */
-    WORD mf_mask[16];   /* Per-row transparency and shape mask words. */
-    WORD mf_data[16];   /* Per-row cursor bitmap data words. */
+    WORD mf_xhot;     /* Horizontal hot-spot position within the cursor. */
+    WORD mf_yhot;     /* Vertical hot-spot position within the cursor. */
+    WORD mf_nplanes;  /* Number of bitplanes in the cursor image. */
+    WORD mf_fg;       /* Foreground color index. */
+    WORD mf_bg;       /* Background color index. */
+    WORD mf_mask[16]; /* Per-row transparency and shape mask words. */
+    WORD mf_data[16]; /* Per-row cursor bitmap data words. */
 } MFORM;
 
 /*
@@ -315,9 +315,8 @@ VOID v_fillarea(WORD handle, WORD count, WORD xy[]);
  *      WORD cells[4] = {0, 1, 1, 0};
  *      v_cellarray(handle, rect, 2, 2, 2, 1, cells);
  */
-WORD v_cellarray(WORD handle, WORD xy[], WORD row_length,
-                 WORD el_per_row, WORD num_rows, WORD wr_mode,
-                 WORD colors[]);
+WORD v_cellarray(WORD handle, WORD xy[], WORD row_length, WORD el_per_row,
+                 WORD num_rows, WORD wr_mode, WORD colors[]);
 
 /*
  * Draw a filled rectangle.
@@ -357,8 +356,7 @@ VOID v_bar(VDI_HANDLE handle, CONST WORD pxy[4]);
  * Sample call:
  *      v_arc(handle, 80, 80, 30, 0, 900);
  */
-VOID v_arc(WORD handle, WORD x, WORD y, WORD radius, WORD begang,
-           WORD endang);
+VOID v_arc(WORD handle, WORD x, WORD y, WORD radius, WORD begang, WORD endang);
 
 /*
  * Draw a circular pie slice.
@@ -401,8 +399,7 @@ VOID v_pieslice(WORD handle, WORD x, WORD y, WORD radius, WORD begang,
  * Sample call:
  *      v_pie(handle, 80, 80, 30, 900, 1800);
  */
-VOID v_pie(WORD handle, WORD x, WORD y, WORD radius, WORD begang,
-           WORD endang);
+VOID v_pie(WORD handle, WORD x, WORD y, WORD radius, WORD begang, WORD endang);
 
 /*
  * Draw a circle.
@@ -461,8 +458,8 @@ VOID v_ellipse(WORD handle, WORD x, WORD y, WORD xrad, WORD yrad);
  * Sample call:
  *      v_ellarc(handle, 100, 70, 40, 20, 450, 1350);
  */
-VOID v_ellarc(WORD handle, WORD x, WORD y, WORD xrad, WORD yrad,
-              WORD begang, WORD endang);
+VOID v_ellarc(WORD handle, WORD x, WORD y, WORD xrad, WORD yrad, WORD begang,
+              WORD endang);
 
 /*
  * Draw an elliptical pie slice.
@@ -484,8 +481,8 @@ VOID v_ellarc(WORD handle, WORD x, WORD y, WORD xrad, WORD yrad,
  * Sample call:
  *      v_ellpie(handle, 100, 70, 40, 20, 1800, 2700);
  */
-VOID v_ellpie(WORD handle, WORD x, WORD y, WORD xrad, WORD yrad,
-              WORD begang, WORD endang);
+VOID v_ellpie(WORD handle, WORD x, WORD y, WORD xrad, WORD yrad, WORD begang,
+              WORD endang);
 
 /*
  * Draw a rounded rectangle outline.
@@ -572,8 +569,8 @@ VOID v_justified(WORD handle, WORD x, WORD y, char *string, WORD length,
  *      WORD cw, ch, fw, fh;
  *      vst_height(handle, 16, &cw, &ch, &fw, &fh);
  */
-WORD vst_height(WORD handle, WORD height, WORD *charw, WORD *charh,
-                WORD *cellw, WORD *cellh);
+WORD vst_height(WORD handle, WORD height, WORD *charw, WORD *charh, WORD *cellw,
+                WORD *cellh);
 
 /*
  * Set text rotation.
@@ -860,9 +857,8 @@ WORD vq_color(WORD handle, WORD index, WORD setflag, WORD rgb[]);
  *      WORD used, rows, cells[4];
  *      vq_cellarray(handle, rect, 2, 4, &used, &rows, cells);
  */
-WORD vq_cellarray(WORD handle, WORD xy[], WORD row_length,
-                  WORD num_requested, WORD *el_used, WORD *rows_used,
-                  WORD status[]);
+WORD vq_cellarray(WORD handle, WORD xy[], WORD row_length, WORD num_requested,
+                  WORD *el_used, WORD *rows_used, WORD status[]);
 
 /*
  * Request locator input.
@@ -1034,8 +1030,8 @@ VOID vrq_string(VDI_HANDLE handle, WORD max_length, WORD echo_mode,
  *      WORD echo_xy[2] = {10, 20};
  *      vsm_string(handle, 31, 1, echo_xy, text);
  */
-WORD vsm_string(WORD handle, WORD length, WORD echo_mode,
-                WORD *echo_xy, BYTE *string);
+WORD vsm_string(WORD handle, WORD length, WORD echo_mode, WORD *echo_xy,
+                BYTE *string);
 
 /*
  * Set write mode.
@@ -1286,8 +1282,8 @@ WORD vst_effects(WORD handle, WORD effect);
  *      WORD cw, ch, fw, fh;
  *      vst_point(handle, 12, &cw, &ch, &fw, &fh);
  */
-WORD vst_point(WORD handle, WORD point, WORD *charw, WORD *charh,
-               WORD *cellw, WORD *cellh);
+WORD vst_point(WORD handle, WORD point, WORD *charw, WORD *charh, WORD *cellw,
+               WORD *cellh);
 
 /*
  * Set line end styles.
@@ -1347,8 +1343,8 @@ WORD vsl_end_style(WORD handle, WORD begstyle, WORD endstyle);
  *      WORD pxy[8] = {0, 0, 15, 15, 32, 32, 47, 47};
  *      vro_cpyfm(handle, 1, pxy, &src, &dst);
  */
-VOID vro_cpyfm(VDI_HANDLE handle, WORD mode, CONST WORD pxy[8],
-               MFDB *src, MFDB *dst);
+VOID vro_cpyfm(VDI_HANDLE handle, WORD mode, CONST WORD pxy[8], MFDB *src,
+               MFDB *dst);
 
 /*
  * Transform a memory form between layouts.
@@ -1506,8 +1502,8 @@ WORD vqt_extent(WORD handle, char *string, WORD extent[8]);
  *      WORD w, ld, rd;
  *      vqt_width(handle, 'A', &w, &ld, &rd);
  */
-WORD vqt_width(WORD handle, WORD character, WORD *cell_width,
-               WORD *left_delta, WORD *right_delta);
+WORD vqt_width(WORD handle, WORD character, WORD *cell_width, WORD *left_delta,
+               WORD *right_delta);
 
 /*
  * Exchange the timer interrupt vector.
@@ -1590,8 +1586,8 @@ WORD vst_unload_fonts(WORD handle, WORD select);
  *      WORD colors[2] = {0, 1};
  *      vrt_cpyfm(handle, 1, pxy, &src, &dst, colors);
  */
-VOID vrt_cpyfm(VDI_HANDLE handle, WORD mode, CONST WORD pxy[8],
-               MFDB *src, MFDB *dst, CONST WORD colors[2]);
+VOID vrt_cpyfm(VDI_HANDLE handle, WORD mode, CONST WORD pxy[8], MFDB *src,
+               MFDB *dst, CONST WORD colors[2]);
 
 /*
  * Show the mouse cursor.
@@ -1770,8 +1766,8 @@ WORD vqt_name(WORD handle, WORD element_num, BYTE *name);
  *      vqt_fontinfo(handle, &min_ade, &max_ade, distances,
  *          &max_width, effects);
  */
-WORD vqt_fontinfo(WORD handle, WORD *min_ade, WORD *max_ade,
-                  WORD distances[], WORD *max_width, WORD effects[]);
+WORD vqt_fontinfo(WORD handle, WORD *min_ade, WORD *max_ade, WORD distances[],
+                  WORD *max_width, WORD effects[]);
 
 /*
  * Query character cell rows and columns.
@@ -2223,8 +2219,8 @@ WORD vs_palette(WORD handle, WORD palette);
  * Sample call:
  *      v_meta_extents(handle, 0, 0, 100, 100);
  */
-WORD v_meta_extents(WORD handle, WORD min_x, WORD min_y,
-                    WORD max_x, WORD max_y);
+WORD v_meta_extents(WORD handle, WORD min_x, WORD min_y, WORD max_x,
+                    WORD max_y);
 
 /*
  * Write a raw metafile record.
@@ -2247,8 +2243,8 @@ WORD v_meta_extents(WORD handle, WORD min_x, WORD min_y,
  *      WORD ptsin[2] = {0, 0};
  *      v_write_meta(handle, 1, intin, 1, ptsin);
  */
-WORD v_write_meta(WORD handle, WORD num_intin, WORD *intin,
-                  WORD num_ptsin, WORD *ptsin);
+WORD v_write_meta(WORD handle, WORD num_intin, WORD *intin, WORD num_ptsin,
+                  WORD *ptsin);
 
 /*
  * Set metafile output filename.

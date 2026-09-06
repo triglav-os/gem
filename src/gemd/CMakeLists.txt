@@ -2,6 +2,13 @@ add_executable(gemd
     main.c
     transport.c
     drawing.c
+    aes_dispatch.c
+    ../gem/aes_validate.c
+    ../gem/tree_decode.c
+    vdi_dispatch.c
+    vdi_bitmap.c
+    ../gem/bitmap_size.c
+    ../gem/vdi_validate.c
     ../gem/protocol.c
 )
 

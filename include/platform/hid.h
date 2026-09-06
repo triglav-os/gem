@@ -17,38 +17,38 @@ extern "C" {
 #endif
 
 typedef enum gem_hid_event_type {
-    GEM_HID_NONE         = 0,
-    GEM_HID_MOUSE_MOVE   = 1,
+    GEM_HID_NONE = 0,
+    GEM_HID_MOUSE_MOVE = 1,
     GEM_HID_MOUSE_BUTTON = 2,
-    GEM_HID_KEY          = 3,
-    GEM_HID_QUIT         = 4
+    GEM_HID_KEY = 3,
+    GEM_HID_QUIT = 4
 } gem_hid_event_type_t;
 
 typedef enum gem_hid_button {
-    GEM_HID_BUTTON_LEFT   = 1,
-    GEM_HID_BUTTON_RIGHT  = 2,
+    GEM_HID_BUTTON_LEFT = 1,
+    GEM_HID_BUTTON_RIGHT = 2,
     GEM_HID_BUTTON_MIDDLE = 4
 } gem_hid_button_t;
 
 typedef struct gem_hid_event {
     gem_hid_event_type_t type;
-    uint16_t             flags;
+    uint16_t flags;
 
-    int16_t              x;
-    int16_t              y;
-    int16_t              dx;
-    int16_t              dy;
+    int16_t x;
+    int16_t y;
+    int16_t dx;
+    int16_t dy;
 
-    uint16_t             button;
-    uint16_t             key;
-    uint16_t             mod;
+    uint16_t button;
+    uint16_t key;
+    uint16_t mod;
 } gem_hid_event_t;
 
 /*
  * Initializes the platform input backend.
  * Returns non-zero on success and zero on failure.
  */
-int  gem_hid_init(void);
+int gem_hid_init(void);
 
 /*
  * Shuts down the platform input backend and releases its resources.
@@ -60,7 +60,7 @@ void gem_hid_shutdown(void);
  * Writes the event to `evt` when one is available.
  * Returns non-zero when an event was produced, or zero otherwise.
  */
-int  gem_hid_poll(gem_hid_event_t *evt);
+int gem_hid_poll(gem_hid_event_t *evt);
 
 #ifdef __cplusplus
 }

@@ -1,7 +1,8 @@
 /*
- * Declares monochrome alert icon assets converted from docs/orig/icons
- * so hosted AES alerts can draw Atari-style note, question, and stop
- * pictograms without depending on external image loading at runtime.
+ * Declares monochrome alert icon assets converted from
+ * docs/images/originals/icons so hosted AES alerts can draw Atari-style note,
+ * question, and stop pictograms without depending on external image loading at
+ * runtime.
  *
  * MIT License (see: LICENSE)
  * Copyright (C) 2026 tomaz stih

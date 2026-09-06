@@ -7,7 +7,7 @@
 #ifndef GEMD_TRANSPORT_H
 #define GEMD_TRANSPORT_H
 
-#include "../gem/_gem.h"
+#include "../gem/gem_protocol.h"
 
 typedef struct gemd_io {
     gem_rpc_header_t header;

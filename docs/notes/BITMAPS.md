@@ -1,9 +1,8 @@
 # GEM Bitmaps
 
-This note describes the GEM bitmap model that this project should use
-internally when implementing VDI raster operations. The key GEM raster
+This note describes the GEM bitmap model used by the hosted VDI raster implementation. The key GEM raster
 descriptor is the `MFDB` structure declared in
-[include/gem/vdi.h](/home/tstih/data/triglav-os/gem/include/gem/vdi.h).
+[include/gem/vdi.h](../../include/gem/vdi.h).
 
 ## MFDB
 
@@ -118,16 +117,15 @@ width  = abs(x1 - x0) + 1
 height = abs(y1 - y0) + 1
 ```
 
-## Project Direction
+## Current implementation and transport
 
-The current `rasta` platform backend still presents through the platform
-surface API, but the long-term fast VDI path should think in GEM MFDB
-terms:
+The hosted VDI uses packed monochrome surfaces and MFDB operations in
+[src/vdi/raster.c](../../src/vdi/raster.c), with pixel helpers in
+[src/vdi/surface.c](../../src/vdi/surface.c). Platform backends present that
+surface through Rasta or Linux framebuffer devices.
 
-- packed 1 bpp scanlines,
-- 16-bit scanline alignment,
-- monochrome source and destination blits,
-- clipping performed before or during blit operations.
-
-That will let text, cursor rendering, pattern fills, and `vro_cpyfm` /
-`vrt_cpyfm` share one efficient raster model.
+Proxy clients copy bitmap metadata and data through connection-owned buffers;
+they do not send dereferenceable client pointers to gemd. The current transfer
+supports one-plane MFDBs, 4096-byte chunks and at most 8 MiB per bitmap.
+See [API transport](../architecture/API_TRANSPORT.md) for limits, and
+[UAT](../tests/UAT.md) for raster scenes and direct/proxy comparisons.

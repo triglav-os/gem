@@ -25,7 +25,7 @@
 
 enum {
     linux_hid_max_devices = 32,
-    linux_bits_per_long = (int) (sizeof(unsigned long) * 8u),
+    linux_bits_per_long = (int)(sizeof(unsigned long) * 8u),
     gem_mod_rshift = 0x0001,
     gem_mod_lshift = 0x0002,
     gem_mod_ctrl = 0x0004,
@@ -55,8 +55,8 @@ static int g_have_abs_pointer;
 
 static int bit_is_set(const unsigned long *bits, unsigned int bit)
 {
-    return (bits[bit / (unsigned int) linux_bits_per_long] &
-        (1ul << (bit % (unsigned int) linux_bits_per_long))) != 0ul;
+    return (bits[bit / (unsigned int)linux_bits_per_long] &
+            (1ul << (bit % (unsigned int)linux_bits_per_long))) != 0ul;
 }
 
 static int option_enabled(const char *name)
@@ -64,8 +64,8 @@ static int option_enabled(const char *name)
     const char *value = getenv(name);
 
     return value != NULL &&
-        (strcmp(value, "1") == 0 || strcmp(value, "on") == 0 ||
-        strcmp(value, "true") == 0 || strcmp(value, "yes") == 0);
+           (strcmp(value, "1") == 0 || strcmp(value, "on") == 0 ||
+            strcmp(value, "true") == 0 || strcmp(value, "yes") == 0);
 }
 
 static int parse_positive_env(const char *name, int fallback)
@@ -81,7 +81,7 @@ static int parse_positive_env(const char *name, int fallback)
     if (end == value || *end != '\0' || parsed < 1L || parsed > 32L) {
         return fallback;
     }
-    return (int) parsed;
+    return (int)parsed;
 }
 
 static void close_devices(void)
@@ -90,9 +90,9 @@ static void close_devices(void)
 
     for (index = 0u; index < g_device_count; ++index) {
         if (option_enabled("GEM_LINUX_GRAB")) {
-            (void) ioctl(g_devices[index].fd, EVIOCGRAB, 0);
+            (void)ioctl(g_devices[index].fd, EVIOCGRAB, 0);
         }
-        (void) close(g_devices[index].fd);
+        (void)close(g_devices[index].fd);
     }
     memset(g_devices, 0, sizeof(g_devices));
     g_device_count = 0u;
@@ -100,10 +100,10 @@ static void close_devices(void)
 
 static int add_device(const char *path)
 {
-    unsigned long event_bits[(EV_MAX + linux_bits_per_long) /
-        linux_bits_per_long];
-    unsigned long key_bits[(KEY_MAX + linux_bits_per_long) /
-        linux_bits_per_long];
+    unsigned long
+        event_bits[(EV_MAX + linux_bits_per_long) / linux_bits_per_long];
+    unsigned long
+        key_bits[(KEY_MAX + linux_bits_per_long) / linux_bits_per_long];
     linux_hid_device_t *device;
     int fd;
 
@@ -118,35 +118,32 @@ static int add_device(const char *path)
     memset(event_bits, 0, sizeof(event_bits));
     memset(key_bits, 0, sizeof(key_bits));
     if (ioctl(fd, EVIOCGBIT(0, sizeof(event_bits)), event_bits) < 0) {
-        (void) close(fd);
+        (void)close(fd);
         return 0;
     }
     if (bit_is_set(event_bits, EV_KEY)) {
-        (void) ioctl(fd, EVIOCGBIT(EV_KEY, sizeof(key_bits)), key_bits);
+        (void)ioctl(fd, EVIOCGBIT(EV_KEY, sizeof(key_bits)), key_bits);
     }
 
     device = &g_devices[g_device_count];
     memset(device, 0, sizeof(*device));
     device->fd = fd;
     device->has_keyboard = bit_is_set(event_bits, EV_KEY) &&
-        bit_is_set(key_bits, KEY_A) && bit_is_set(key_bits, KEY_ENTER);
+                           bit_is_set(key_bits, KEY_A) &&
+                           bit_is_set(key_bits, KEY_ENTER);
     device->has_pointer =
-        (bit_is_set(event_bits, EV_REL) ||
-        bit_is_set(event_bits, EV_ABS)) &&
+        (bit_is_set(event_bits, EV_REL) || bit_is_set(event_bits, EV_ABS)) &&
         bit_is_set(event_bits, EV_KEY) &&
-        (bit_is_set(key_bits, BTN_LEFT) ||
-        bit_is_set(key_bits, BTN_TOUCH) ||
-        bit_is_set(key_bits, BTN_MOUSE));
+        (bit_is_set(key_bits, BTN_LEFT) || bit_is_set(key_bits, BTN_TOUCH) ||
+         bit_is_set(key_bits, BTN_MOUSE));
     if (!device->has_keyboard && !device->has_pointer) {
-        (void) close(fd);
+        (void)close(fd);
         return 0;
     }
 
     if (bit_is_set(event_bits, EV_ABS)) {
-        device->has_abs_x =
-            ioctl(fd, EVIOCGABS(ABS_X), &device->abs_x) == 0;
-        device->has_abs_y =
-            ioctl(fd, EVIOCGABS(ABS_Y), &device->abs_y) == 0;
+        device->has_abs_x = ioctl(fd, EVIOCGABS(ABS_X), &device->abs_x) == 0;
+        device->has_abs_y = ioctl(fd, EVIOCGABS(ABS_Y), &device->abs_y) == 0;
     }
 
     /*
@@ -156,13 +153,12 @@ static int add_device(const char *path)
      */
     if (device->has_pointer && !device->has_abs_x && !device->has_abs_y &&
         g_have_abs_pointer && !option_enabled("GEM_LINUX_KEEP_REL_MOUSE")) {
-        (void) close(fd);
+        (void)close(fd);
         memset(device, 0, sizeof(*device));
         return 0;
     }
-    if (option_enabled("GEM_LINUX_GRAB") &&
-        ioctl(fd, EVIOCGRAB, 1) < 0) {
-        (void) close(fd);
+    if (option_enabled("GEM_LINUX_GRAB") && ioctl(fd, EVIOCGRAB, 1) < 0) {
+        (void)close(fd);
         memset(device, 0, sizeof(*device));
         return 0;
     }
@@ -183,9 +179,9 @@ static void open_explicit_devices(const char *paths)
         return;
     }
     for (path = strtok_r(copy, ",:", &save); path != NULL;
-        path = strtok_r(NULL, ",:", &save)) {
+         path = strtok_r(NULL, ",:", &save)) {
         if (path[0] != '\0') {
-            (void) add_device(path);
+            (void)add_device(path);
         }
     }
     free(copy);
@@ -205,88 +201,134 @@ static void discover_devices(void)
         if (strncmp(entry->d_name, "event", 5u) != 0) {
             continue;
         }
-        if (snprintf(path, sizeof(path), "/dev/input/%s",
-            entry->d_name) < (int) sizeof(path)) {
-            (void) add_device(path);
+        if (snprintf(path, sizeof(path), "/dev/input/%s", entry->d_name) <
+            (int)sizeof(path)) {
+            (void)add_device(path);
         }
     }
-    (void) closedir(directory);
+    (void)closedir(directory);
 }
 
 static uint16_t modifier_for_key(uint16_t code)
 {
     switch (code) {
-    case KEY_LEFTSHIFT:
-        return gem_mod_lshift;
-    case KEY_RIGHTSHIFT:
-        return gem_mod_rshift;
-    case KEY_LEFTCTRL:
-    case KEY_RIGHTCTRL:
-        return gem_mod_ctrl;
-    case KEY_LEFTALT:
-    case KEY_RIGHTALT:
-        return gem_mod_alt;
-    default:
-        return 0u;
+        case KEY_LEFTSHIFT:
+            return gem_mod_lshift;
+        case KEY_RIGHTSHIFT:
+            return gem_mod_rshift;
+        case KEY_LEFTCTRL:
+        case KEY_RIGHTCTRL:
+            return gem_mod_ctrl;
+        case KEY_LEFTALT:
+        case KEY_RIGHTALT:
+            return gem_mod_alt;
+        default:
+            return 0u;
     }
 }
 
 static uint8_t usb_scan_for_key(uint16_t code)
 {
     if (code >= KEY_A && code <= KEY_Z) {
-        return (uint8_t) (4u + code - KEY_A);
+        return (uint8_t)(4u + code - KEY_A);
     }
     if (code >= KEY_1 && code <= KEY_9) {
-        return (uint8_t) (30u + code - KEY_1);
+        return (uint8_t)(30u + code - KEY_1);
     }
 
     switch (code) {
-    case KEY_0: return 39u;
-    case KEY_ENTER: return 40u;
-    case KEY_ESC: return 41u;
-    case KEY_BACKSPACE: return 42u;
-    case KEY_TAB: return 43u;
-    case KEY_SPACE: return 44u;
-    case KEY_MINUS: return 45u;
-    case KEY_EQUAL: return 46u;
-    case KEY_LEFTBRACE: return 47u;
-    case KEY_RIGHTBRACE: return 48u;
-    case KEY_BACKSLASH: return 49u;
-    case KEY_SEMICOLON: return 51u;
-    case KEY_APOSTROPHE: return 52u;
-    case KEY_GRAVE: return 53u;
-    case KEY_COMMA: return 54u;
-    case KEY_DOT: return 55u;
-    case KEY_SLASH: return 56u;
-    case KEY_CAPSLOCK: return 57u;
-    case KEY_F1: return 58u;
-    case KEY_F2: return 59u;
-    case KEY_F3: return 60u;
-    case KEY_F4: return 61u;
-    case KEY_F5: return 62u;
-    case KEY_F6: return 63u;
-    case KEY_F7: return 64u;
-    case KEY_F8: return 65u;
-    case KEY_F9: return 66u;
-    case KEY_F10: return 67u;
-    case KEY_F11: return 68u;
-    case KEY_F12: return 69u;
-    case KEY_HOME: return 74u;
-    case KEY_PAGEUP: return 75u;
-    case KEY_DELETE: return 76u;
-    case KEY_END: return 77u;
-    case KEY_PAGEDOWN: return 78u;
-    case KEY_RIGHT: return 79u;
-    case KEY_LEFT: return 80u;
-    case KEY_DOWN: return 81u;
-    case KEY_UP: return 82u;
-    case KEY_LEFTCTRL: return 224u;
-    case KEY_LEFTSHIFT: return 225u;
-    case KEY_LEFTALT: return 226u;
-    case KEY_RIGHTCTRL: return 228u;
-    case KEY_RIGHTSHIFT: return 229u;
-    case KEY_RIGHTALT: return 230u;
-    default: return (uint8_t) code;
+        case KEY_0:
+            return 39u;
+        case KEY_ENTER:
+            return 40u;
+        case KEY_ESC:
+            return 41u;
+        case KEY_BACKSPACE:
+            return 42u;
+        case KEY_TAB:
+            return 43u;
+        case KEY_SPACE:
+            return 44u;
+        case KEY_MINUS:
+            return 45u;
+        case KEY_EQUAL:
+            return 46u;
+        case KEY_LEFTBRACE:
+            return 47u;
+        case KEY_RIGHTBRACE:
+            return 48u;
+        case KEY_BACKSLASH:
+            return 49u;
+        case KEY_SEMICOLON:
+            return 51u;
+        case KEY_APOSTROPHE:
+            return 52u;
+        case KEY_GRAVE:
+            return 53u;
+        case KEY_COMMA:
+            return 54u;
+        case KEY_DOT:
+            return 55u;
+        case KEY_SLASH:
+            return 56u;
+        case KEY_CAPSLOCK:
+            return 57u;
+        case KEY_F1:
+            return 58u;
+        case KEY_F2:
+            return 59u;
+        case KEY_F3:
+            return 60u;
+        case KEY_F4:
+            return 61u;
+        case KEY_F5:
+            return 62u;
+        case KEY_F6:
+            return 63u;
+        case KEY_F7:
+            return 64u;
+        case KEY_F8:
+            return 65u;
+        case KEY_F9:
+            return 66u;
+        case KEY_F10:
+            return 67u;
+        case KEY_F11:
+            return 68u;
+        case KEY_F12:
+            return 69u;
+        case KEY_HOME:
+            return 74u;
+        case KEY_PAGEUP:
+            return 75u;
+        case KEY_DELETE:
+            return 76u;
+        case KEY_END:
+            return 77u;
+        case KEY_PAGEDOWN:
+            return 78u;
+        case KEY_RIGHT:
+            return 79u;
+        case KEY_LEFT:
+            return 80u;
+        case KEY_DOWN:
+            return 81u;
+        case KEY_UP:
+            return 82u;
+        case KEY_LEFTCTRL:
+            return 224u;
+        case KEY_LEFTSHIFT:
+            return 225u;
+        case KEY_LEFTALT:
+            return 226u;
+        case KEY_RIGHTCTRL:
+            return 228u;
+        case KEY_RIGHTSHIFT:
+            return 229u;
+        case KEY_RIGHTALT:
+            return 230u;
+        default:
+            return (uint8_t)code;
     }
 }
 
@@ -302,89 +344,174 @@ static uint8_t ascii_for_key(uint16_t code)
      * 'a' + (code - KEY_A) turns L into 'i' and S into 'b'.
      */
     switch (code) {
-    case KEY_A: letter = 'a'; break;
-    case KEY_B: letter = 'b'; break;
-    case KEY_C: letter = 'c'; break;
-    case KEY_D: letter = 'd'; break;
-    case KEY_E: letter = 'e'; break;
-    case KEY_F: letter = 'f'; break;
-    case KEY_G: letter = 'g'; break;
-    case KEY_H: letter = 'h'; break;
-    case KEY_I: letter = 'i'; break;
-    case KEY_J: letter = 'j'; break;
-    case KEY_K: letter = 'k'; break;
-    case KEY_L: letter = 'l'; break;
-    case KEY_M: letter = 'm'; break;
-    case KEY_N: letter = 'n'; break;
-    case KEY_O: letter = 'o'; break;
-    case KEY_P: letter = 'p'; break;
-    case KEY_Q: letter = 'q'; break;
-    case KEY_R: letter = 'r'; break;
-    case KEY_S: letter = 's'; break;
-    case KEY_T: letter = 't'; break;
-    case KEY_U: letter = 'u'; break;
-    case KEY_V: letter = 'v'; break;
-    case KEY_W: letter = 'w'; break;
-    case KEY_X: letter = 'x'; break;
-    case KEY_Y: letter = 'y'; break;
-    case KEY_Z: letter = 'z'; break;
-    default:
-        break;
+        case KEY_A:
+            letter = 'a';
+            break;
+        case KEY_B:
+            letter = 'b';
+            break;
+        case KEY_C:
+            letter = 'c';
+            break;
+        case KEY_D:
+            letter = 'd';
+            break;
+        case KEY_E:
+            letter = 'e';
+            break;
+        case KEY_F:
+            letter = 'f';
+            break;
+        case KEY_G:
+            letter = 'g';
+            break;
+        case KEY_H:
+            letter = 'h';
+            break;
+        case KEY_I:
+            letter = 'i';
+            break;
+        case KEY_J:
+            letter = 'j';
+            break;
+        case KEY_K:
+            letter = 'k';
+            break;
+        case KEY_L:
+            letter = 'l';
+            break;
+        case KEY_M:
+            letter = 'm';
+            break;
+        case KEY_N:
+            letter = 'n';
+            break;
+        case KEY_O:
+            letter = 'o';
+            break;
+        case KEY_P:
+            letter = 'p';
+            break;
+        case KEY_Q:
+            letter = 'q';
+            break;
+        case KEY_R:
+            letter = 'r';
+            break;
+        case KEY_S:
+            letter = 's';
+            break;
+        case KEY_T:
+            letter = 't';
+            break;
+        case KEY_U:
+            letter = 'u';
+            break;
+        case KEY_V:
+            letter = 'v';
+            break;
+        case KEY_W:
+            letter = 'w';
+            break;
+        case KEY_X:
+            letter = 'x';
+            break;
+        case KEY_Y:
+            letter = 'y';
+            break;
+        case KEY_Z:
+            letter = 'z';
+            break;
+        default:
+            break;
     }
     if (letter != 0) {
         if (upper) {
-            letter = (char) (letter - 'a' + 'A');
+            letter = (char)(letter - 'a' + 'A');
         }
-        return (uint8_t) letter;
+        return (uint8_t)letter;
     }
 
     if (code >= KEY_1 && code <= KEY_9) {
         static const char normal[] = "123456789";
         static const char shifted_digits[] = "!@#$%^&*(";
 
-        return (uint8_t) (shifted ?
-            shifted_digits[code - KEY_1] : normal[code - KEY_1]);
+        return (uint8_t)(shifted ? shifted_digits[code - KEY_1]
+                                 : normal[code - KEY_1]);
     }
     switch (code) {
-    case KEY_0: return (uint8_t) (shifted ? ')' : '0');
-    case KEY_ENTER:
-    case KEY_KPENTER: return '\n';
-    case KEY_ESC: return 27u;
-    case KEY_BACKSPACE: return '\b';
-    case KEY_TAB: return '\t';
-    case KEY_SPACE: return ' ';
-    case KEY_MINUS: return (uint8_t) (shifted ? '_' : '-');
-    case KEY_EQUAL: return (uint8_t) (shifted ? '+' : '=');
-    case KEY_LEFTBRACE: return (uint8_t) (shifted ? '{' : '[');
-    case KEY_RIGHTBRACE: return (uint8_t) (shifted ? '}' : ']');
-    case KEY_BACKSLASH: return (uint8_t) (shifted ? '|' : '\\');
-    case KEY_SEMICOLON: return (uint8_t) (shifted ? ':' : ';');
-    case KEY_APOSTROPHE: return (uint8_t) (shifted ? '"' : '\'');
-    case KEY_GRAVE: return (uint8_t) (shifted ? '~' : '`');
-    case KEY_COMMA: return (uint8_t) (shifted ? '<' : ',');
-    case KEY_DOT: return (uint8_t) (shifted ? '>' : '.');
-    case KEY_SLASH: return (uint8_t) (shifted ? '?' : '/');
-    case KEY_KP0: return '0';
-    case KEY_KP1: return '1';
-    case KEY_KP2: return '2';
-    case KEY_KP3: return '3';
-    case KEY_KP4: return '4';
-    case KEY_KP5: return '5';
-    case KEY_KP6: return '6';
-    case KEY_KP7: return '7';
-    case KEY_KP8: return '8';
-    case KEY_KP9: return '9';
-    case KEY_KPDOT: return '.';
-    case KEY_KPMINUS: return '-';
-    case KEY_KPPLUS: return '+';
-    case KEY_KPASTERISK: return '*';
-    case KEY_KPSLASH: return '/';
-    default: return 0u;
+        case KEY_0:
+            return (uint8_t)(shifted ? ')' : '0');
+        case KEY_ENTER:
+        case KEY_KPENTER:
+            return '\n';
+        case KEY_ESC:
+            return 27u;
+        case KEY_BACKSPACE:
+            return '\b';
+        case KEY_TAB:
+            return '\t';
+        case KEY_SPACE:
+            return ' ';
+        case KEY_MINUS:
+            return (uint8_t)(shifted ? '_' : '-');
+        case KEY_EQUAL:
+            return (uint8_t)(shifted ? '+' : '=');
+        case KEY_LEFTBRACE:
+            return (uint8_t)(shifted ? '{' : '[');
+        case KEY_RIGHTBRACE:
+            return (uint8_t)(shifted ? '}' : ']');
+        case KEY_BACKSLASH:
+            return (uint8_t)(shifted ? '|' : '\\');
+        case KEY_SEMICOLON:
+            return (uint8_t)(shifted ? ':' : ';');
+        case KEY_APOSTROPHE:
+            return (uint8_t)(shifted ? '"' : '\'');
+        case KEY_GRAVE:
+            return (uint8_t)(shifted ? '~' : '`');
+        case KEY_COMMA:
+            return (uint8_t)(shifted ? '<' : ',');
+        case KEY_DOT:
+            return (uint8_t)(shifted ? '>' : '.');
+        case KEY_SLASH:
+            return (uint8_t)(shifted ? '?' : '/');
+        case KEY_KP0:
+            return '0';
+        case KEY_KP1:
+            return '1';
+        case KEY_KP2:
+            return '2';
+        case KEY_KP3:
+            return '3';
+        case KEY_KP4:
+            return '4';
+        case KEY_KP5:
+            return '5';
+        case KEY_KP6:
+            return '6';
+        case KEY_KP7:
+            return '7';
+        case KEY_KP8:
+            return '8';
+        case KEY_KP9:
+            return '9';
+        case KEY_KPDOT:
+            return '.';
+        case KEY_KPMINUS:
+            return '-';
+        case KEY_KPPLUS:
+            return '+';
+        case KEY_KPASTERISK:
+            return '*';
+        case KEY_KPSLASH:
+            return '/';
+        default:
+            return 0u;
     }
 }
 
 static int translate_key(gem_hid_event_t *event,
-    const struct input_event *input)
+                         const struct input_event *input)
 {
     uint16_t modifier;
     int pressed;
@@ -396,9 +523,9 @@ static int translate_key(gem_hid_event_t *event,
     modifier = modifier_for_key(input->code);
     if (modifier != 0u) {
         if (pressed) {
-            g_modifiers = (uint16_t) (g_modifiers | modifier);
+            g_modifiers = (uint16_t)(g_modifiers | modifier);
         } else {
-            g_modifiers = (uint16_t) (g_modifiers & (uint16_t) ~modifier);
+            g_modifiers = (uint16_t)(g_modifiers & (uint16_t)~modifier);
         }
     }
     if (input->code == KEY_CAPSLOCK && input->value == 1) {
@@ -407,11 +534,11 @@ static int translate_key(gem_hid_event_t *event,
 
     memset(event, 0, sizeof(*event));
     event->type = GEM_HID_KEY;
-    event->flags = (uint16_t) (pressed ? 1u : 0u);
+    event->flags = (uint16_t)(pressed ? 1u : 0u);
     event->x = g_mouse_x;
     event->y = g_mouse_y;
-    event->key = (uint16_t) ((uint16_t) usb_scan_for_key(input->code) << 8);
-    event->key = (uint16_t) (event->key | ascii_for_key(input->code));
+    event->key = (uint16_t)((uint16_t)usb_scan_for_key(input->code) << 8);
+    event->key = (uint16_t)(event->key | ascii_for_key(input->code));
     event->mod = g_modifiers;
     return 1;
 }
@@ -419,20 +546,20 @@ static int translate_key(gem_hid_event_t *event,
 static uint16_t button_for_code(uint16_t code)
 {
     switch (code) {
-    case BTN_LEFT:
-    case BTN_TOUCH:
-        return GEM_HID_BUTTON_LEFT;
-    case BTN_RIGHT:
-        return GEM_HID_BUTTON_RIGHT;
-    case BTN_MIDDLE:
-        return GEM_HID_BUTTON_MIDDLE;
-    default:
-        return 0u;
+        case BTN_LEFT:
+        case BTN_TOUCH:
+            return GEM_HID_BUTTON_LEFT;
+        case BTN_RIGHT:
+            return GEM_HID_BUTTON_RIGHT;
+        case BTN_MIDDLE:
+            return GEM_HID_BUTTON_MIDDLE;
+        default:
+            return 0u;
     }
 }
 
 static int translate_button(gem_hid_event_t *event,
-    const struct input_event *input)
+                            const struct input_event *input)
 {
     uint16_t button = button_for_code(input->code);
 
@@ -440,9 +567,9 @@ static int translate_button(gem_hid_event_t *event,
         return 0;
     }
     if (input->value != 0) {
-        g_buttons = (uint16_t) (g_buttons | button);
+        g_buttons = (uint16_t)(g_buttons | button);
     } else {
-        g_buttons = (uint16_t) (g_buttons & (uint16_t) ~button);
+        g_buttons = (uint16_t)(g_buttons & (uint16_t)~button);
     }
     memset(event, 0, sizeof(*event));
     event->type = GEM_HID_MOUSE_BUTTON;
@@ -459,13 +586,13 @@ static int16_t clamp_coordinate(int value, int maximum)
         return 0;
     }
     if (value > maximum) {
-        return (int16_t) maximum;
+        return (int16_t)maximum;
     }
-    return (int16_t) value;
+    return (int16_t)value;
 }
 
-static int translate_pointer(linux_hid_device_t *device,
-    gem_hid_event_t *event, const struct input_event *input)
+static int translate_pointer(linux_hid_device_t *device, gem_hid_event_t *event,
+                             const struct input_event *input)
 {
     gem_raster_surface_t *surface = gem_raster_surface();
     int old_x = g_mouse_x;
@@ -480,23 +607,23 @@ static int translate_pointer(linux_hid_device_t *device,
     max_y = surface->height - 1;
 
     if (input->type == EV_REL && input->code == REL_X) {
-        g_mouse_x = clamp_coordinate(
-            g_mouse_x + input->value * g_rel_scale, max_x);
+        g_mouse_x =
+            clamp_coordinate(g_mouse_x + input->value * g_rel_scale, max_x);
     } else if (input->type == EV_REL && input->code == REL_Y) {
-        g_mouse_y = clamp_coordinate(
-            g_mouse_y + input->value * g_rel_scale, max_y);
+        g_mouse_y =
+            clamp_coordinate(g_mouse_y + input->value * g_rel_scale, max_y);
     } else if (input->type == EV_ABS && input->code == ABS_X &&
-        device->has_abs_x &&
-        device->abs_x.maximum != device->abs_x.minimum) {
-        g_mouse_x = (int16_t) (((int64_t) input->value -
-            device->abs_x.minimum) * max_x /
-            (device->abs_x.maximum - device->abs_x.minimum));
+               device->has_abs_x &&
+               device->abs_x.maximum != device->abs_x.minimum) {
+        g_mouse_x =
+            (int16_t)(((int64_t)input->value - device->abs_x.minimum) * max_x /
+                      (device->abs_x.maximum - device->abs_x.minimum));
     } else if (input->type == EV_ABS && input->code == ABS_Y &&
-        device->has_abs_y &&
-        device->abs_y.maximum != device->abs_y.minimum) {
-        g_mouse_y = (int16_t) (((int64_t) input->value -
-            device->abs_y.minimum) * max_y /
-            (device->abs_y.maximum - device->abs_y.minimum));
+               device->has_abs_y &&
+               device->abs_y.maximum != device->abs_y.minimum) {
+        g_mouse_y =
+            (int16_t)(((int64_t)input->value - device->abs_y.minimum) * max_y /
+                      (device->abs_y.maximum - device->abs_y.minimum));
     } else {
         return 0;
     }
@@ -506,13 +633,13 @@ static int translate_pointer(linux_hid_device_t *device,
     event->flags = g_buttons;
     event->x = g_mouse_x;
     event->y = g_mouse_y;
-    event->dx = (int16_t) (g_mouse_x - old_x);
-    event->dy = (int16_t) (g_mouse_y - old_y);
+    event->dx = (int16_t)(g_mouse_x - old_x);
+    event->dy = (int16_t)(g_mouse_y - old_y);
     return 1;
 }
 
-static int translate_event(linux_hid_device_t *device,
-    gem_hid_event_t *event, const struct input_event *input)
+static int translate_event(linux_hid_device_t *device, gem_hid_event_t *event,
+                           const struct input_event *input)
 {
     if (input->type == EV_KEY && device->has_keyboard &&
         input->code < BTN_MISC) {
@@ -535,15 +662,15 @@ int gem_hid_init(void)
 
     close_devices();
     g_have_abs_pointer = 0;
-    /* Relative mice need a large scale on 1280x+ desktops; tablets ignore it. */
+    /* Relative mice need a large scale on 1280x+ desktops; tablets ignore it.
+     */
     g_rel_scale = parse_positive_env("GEM_LINUX_MOUSE_SCALE", 8);
 
     /*
      * Two-pass discovery: absolute pointers first (tablets), then the rest.
      * That way relative mice can be skipped when a tablet is present.
      */
-    if (paths != NULL && paths[0] != '\0' &&
-        strcmp(paths, "auto") != 0) {
+    if (paths != NULL && paths[0] != '\0' && strcmp(paths, "auto") != 0) {
         open_explicit_devices(paths);
     } else {
         discover_devices();
@@ -562,16 +689,16 @@ int gem_hid_init(void)
 
         for (index = 0u; index < g_device_count; ++index) {
             linux_hid_device_t *device = &g_devices[index];
-            int is_rel_only_pointer = device->has_pointer &&
-                !device->has_abs_x && !device->has_abs_y &&
-                !device->has_keyboard;
+            int is_rel_only_pointer =
+                device->has_pointer && !device->has_abs_x &&
+                !device->has_abs_y && !device->has_keyboard;
 
             if (is_rel_only_pointer &&
                 !option_enabled("GEM_LINUX_KEEP_REL_MOUSE")) {
                 if (option_enabled("GEM_LINUX_GRAB")) {
-                    (void) ioctl(device->fd, EVIOCGRAB, 0);
+                    (void)ioctl(device->fd, EVIOCGRAB, 0);
                 }
-                (void) close(device->fd);
+                (void)close(device->fd);
                 continue;
             }
             if (out != index) {
@@ -583,8 +710,8 @@ int gem_hid_init(void)
     }
 
     if (surface != NULL) {
-        g_mouse_x = (int16_t) (surface->width / 2u);
-        g_mouse_y = (int16_t) (surface->height / 2u);
+        g_mouse_x = (int16_t)(surface->width / 2u);
+        g_mouse_y = (int16_t)(surface->height / 2u);
     }
     g_buttons = 0u;
     g_modifiers = 0u;
@@ -629,7 +756,7 @@ int gem_hid_poll(gem_hid_event_t *event)
             gem_hid_event_t translated;
 
             count = read(device->fd, &input, sizeof(input));
-            if (count != (ssize_t) sizeof(input)) {
+            if (count != (ssize_t)sizeof(input)) {
                 break;
             }
             if (!translate_event(device, &translated, &input)) {

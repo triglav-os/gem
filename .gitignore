@@ -1,4 +1,4 @@
-# Compilation artifacts
+# Compilation artifacts, downloaded dependencies and extracted upstream sources
 /bin/
 /build/
 
@@ -6,5 +6,6 @@
 /docs/manuals/*.pdf
 
 # AI files
+.codex
 .agents/
 .claude/

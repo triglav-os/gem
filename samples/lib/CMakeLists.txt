@@ -1,0 +1,5 @@
+add_subdirectory(musashi)
+add_subdirectory(fat12)
+add_subdirectory(msa)
+add_subdirectory(prg)
+add_subdirectory(resources)

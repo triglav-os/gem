@@ -6,8 +6,8 @@
  */
 #ifndef GEMD_DRAWING_H
 #define GEMD_DRAWING_H
-#include "../vdi/_state.h"
-#include "../gem/_gem.h"
+#include "../vdi/vdi_state.h"
+#include "../gem/gem_protocol.h"
 
 typedef struct gemd_drawing {
     vdi_compat_state_t attributes;
@@ -15,7 +15,8 @@ typedef struct gemd_drawing {
     int initialized;
 } gemd_drawing_t;
 
-/* Save/restore attributes, never cursor, damage, framebuffer or update state. */
+/* Save/restore attributes, never cursor, damage, framebuffer or update state.
+ */
 void gemd_drawing_save(gemd_drawing_t *state);
 void gemd_drawing_restore(const gemd_drawing_t *state);
 /* Initialize independent default attributes without resetting other clients. */

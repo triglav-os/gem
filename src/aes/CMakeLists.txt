@@ -1,8 +1,8 @@
 add_library(aes SHARED
     alert_icons.c
-    _aes.c
-    _menu.c
-    _window.c
+    aes_core.c
+    menu_internal.c
+    window_internal.c
     aes.c
     event.c
     file_selector.c

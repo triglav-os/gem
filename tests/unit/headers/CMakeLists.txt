@@ -27,3 +27,8 @@ add_test(NAME test_gem_header COMMAND test_gem_header)
 
 get_property(local_tests DIRECTORY PROPERTY TESTS)
 set_tests_properties(${local_tests} PROPERTIES LABELS unit)
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+add_test(NAME test_api_surface COMMAND ${Python3_EXECUTABLE} -B
+    ${CMAKE_CURRENT_SOURCE_DIR}/test_api_surface.py
+    ${PROJECT_SOURCE_DIR} $<TARGET_FILE:gem>)
+set_tests_properties(test_api_surface PROPERTIES LABELS unit)
