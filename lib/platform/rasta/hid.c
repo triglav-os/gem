@@ -127,11 +127,10 @@ static char *build_subscription_payload(void)
     const char *path = rasta_framebuffer_path();
     uint16_t scale = rasta_scale();
     const char *cursor_mode = rasta_cursor_mode();
-    /* The viewer's --inverse is a bare flag: a value token makes it reject
-     * the whole datagram, leaving its geometry and framebuffer unchanged.
-     * Inversion cannot be switched off by a datagram; the launch flag stays. */
+    /* Keep the launch polarity when Rasta reconfigures its geometry. */
     const char *inverse_flag =
-        strcmp(rasta_inverse_mode(), "on") == 0 ? " --inverse" : "";
+        strcmp(rasta_inverse_mode(), "on") == 0 ? " --inverse on" :
+                                                  " --inverse off";
     const char *scan;
     size_t escaped_length;
     size_t total_length;
@@ -153,7 +152,7 @@ static char *build_subscription_payload(void)
 
     prefix_length =
         snprintf(NULL, 0,
-                 "--width %u --height %u --bpp 1 --scale %u --cursor %s%s "
+                 "--width %u --height %u --bpp 32 --scale %u --cursor %s%s "
                  "--framebuffer \"",
                  (unsigned)surface->width, (unsigned)surface->height,
                  (unsigned)scale, cursor_mode, inverse_flag);
@@ -170,7 +169,7 @@ static char *build_subscription_payload(void)
 
     prefix_length =
         snprintf(payload, total_length,
-                 "--width %u --height %u --bpp 1 --scale %u --cursor %s%s "
+                 "--width %u --height %u --bpp 32 --scale %u --cursor %s%s "
                  "--framebuffer \"",
                  (unsigned)surface->width, (unsigned)surface->height,
                  (unsigned)scale, cursor_mode, inverse_flag);

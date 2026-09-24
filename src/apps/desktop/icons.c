@@ -383,6 +383,7 @@ void desktop_select_icon(WORD object_id)
     if (object_id != NIL) {
         g_desktop.desktop_tree[object_id].ob_state = SELECTED;
     }
+    desktop_publish_location_selection();
 }
 
 static void desktop_status_for_icon(const desktop_icon_entry_t *entry)
@@ -391,7 +392,7 @@ static void desktop_status_for_icon(const desktop_icon_entry_t *entry)
     int label_max;
 
     if (entry == NULL) {
-        desktop_set_status("Select a disk or the trash can.");
+        desktop_set_status("Select a location or the trash can.");
         return;
     }
 
@@ -469,6 +470,9 @@ void desktop_install_trash_icon(void)
 {
     desktop_icon_entry_t *entry;
 
+    if (g_desktop.icon_count >= DESKTOP_MAX_ICONS) {
+        return;
+    }
     entry = &g_desktop.icons[g_desktop.icon_count];
     memset(entry, 0, sizeof(*entry));
     strncpy(entry->label, "Trash", sizeof(entry->label) - 1u);

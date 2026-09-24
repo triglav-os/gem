@@ -8,6 +8,7 @@
 
 #include "aes_internal.h"
 #include "aes_shel.h"
+#include "system_menu.h"
 
 #include "platform/os.h"
 
@@ -74,6 +75,8 @@ WORD appl_init(void)
                 candidate == 32767 ? 1 : (WORD)(candidate + 1);
             strcpy(aes_state.apps[i].name, "APP");
             aes_state.current_app_id = aes_state.apps[i].id;
+            aes_state.active_app_id = aes_state.apps[i].id;
+            aes_state.input_focus_app_id = aes_state.apps[i].id;
             global[2] = aes_state.current_app_id;
             aes_trace("appl_init return id=%d", aes_state.current_app_id);
             return aes_state.current_app_id;
@@ -90,6 +93,7 @@ WORD appl_exit(void)
     int apps_left = 0;
 
     if (app != NULL) {
+        aes_system_menu_unregister_owner(app->id);
         memset(app, 0, sizeof(*app));
     }
 

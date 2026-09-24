@@ -352,6 +352,21 @@ static int gem_os_find_path(const char *name, int mode, char *out,
     return gem_os_search_list(aes_path, name, mode, out, out_size);
 }
 
+static int gem_os_copy_text(char *out, size_t out_size, const char *value)
+{
+    size_t length;
+
+    if (out == NULL || out_size == 0u || value == NULL) {
+        return 0;
+    }
+    length = strlen(value);
+    if (length >= out_size) {
+        return 0;
+    }
+    memcpy(out, value, length + 1u);
+    return 1;
+}
+
 int gem_os_find_file(const char *name, char *out, size_t out_size)
 {
     return gem_os_find_path(name, GEM_OS_ACCESS_READ, out, out_size);
@@ -360,6 +375,117 @@ int gem_os_find_file(const char *name, char *out, size_t out_size)
 int gem_os_find_executable(const char *name, char *out, size_t out_size)
 {
     return gem_os_find_path(name, GEM_OS_ACCESS_EXECUTE, out, out_size);
+}
+
+static int gem_os_find_special_program(const char *name, const char *env_name,
+                                       const char *first_suffix,
+                                       const char *second_suffix,
+                                       char *out, size_t out_size)
+{
+    const char *configured = gem_os_getenv_ref(env_name);
+    const char *home = gem_os_getenv_ref("HOME");
+    const char *gemix = gem_os_getenv_ref("GEMIX_HOME");
+    char directories[GEM_OS_PATH_MAX * 4u];
+    int length;
+
+    if (name == NULL || name[0] == '\0' || out == NULL || out_size == 0u) {
+        return 0;
+    }
+    if (configured != NULL &&
+        gem_os_search_list(configured, name, GEM_OS_ACCESS_READ, out,
+                           out_size)) {
+        return 1;
+    }
+    if (gemix != NULL && gemix[0] != '\0') {
+        length = snprintf(directories, sizeof(directories),
+                          "%s/%s:%s/%s", gemix, first_suffix, gemix,
+                          second_suffix);
+        if (length > 0 && (size_t)length < sizeof(directories) &&
+            gem_os_search_list(directories, name, GEM_OS_ACCESS_READ, out,
+                               out_size)) {
+            return 1;
+        }
+    }
+    if (home != NULL && home[0] == '/') {
+        length = snprintf(directories, sizeof(directories),
+                          "%s/.gem/%s:%s/.gem/%s", home, first_suffix, home,
+                          second_suffix);
+        if (length > 0 && (size_t)length < sizeof(directories) &&
+            gem_os_search_list(directories, name, GEM_OS_ACCESS_READ, out,
+                               out_size)) {
+            return 1;
+        }
+    }
+    if (strcmp(first_suffix, "accessories") == 0) {
+        return gem_os_search_list(
+            "/usr/local/share/gem/accessories:/usr/share/gem/accessories",
+            name, GEM_OS_ACCESS_READ, out, out_size);
+    }
+    return gem_os_search_list("/usr/local/share/gem/auto:/usr/share/gem/auto",
+                              name, GEM_OS_ACCESS_READ, out, out_size);
+}
+
+int gem_os_find_accessory(const char *name, char *out, size_t out_size)
+{
+    return gem_os_find_special_program(name, "GEM_ACC_PATH", "accessories",
+                                        "acc", out, out_size);
+}
+
+int gem_os_find_auto_program(const char *name, char *out, size_t out_size)
+{
+    return gem_os_find_special_program(name, "GEM_AUTO_PATH", "auto", "AUTO",
+                                        out, out_size);
+}
+
+int gem_os_user_config_dir(char *out, size_t out_size)
+{
+    const char *xdg = gem_os_getenv_ref("XDG_CONFIG_HOME");
+    const char *home;
+    int length;
+
+    if (out == NULL || out_size == 0u) {
+        return 0;
+    }
+    if (xdg != NULL && xdg[0] == '/') {
+        return gem_os_copy_text(out, out_size, xdg);
+    }
+    home = gem_os_getenv_ref("HOME");
+    if (home == NULL || home[0] != '/') {
+        return 0;
+    }
+    length = snprintf(out, out_size, "%s/.config", home);
+    return length > 0 && (size_t)length < out_size;
+}
+
+int gem_os_system_config_dirs(char *out, size_t out_size)
+{
+    const char *xdg = gem_os_getenv_ref("XDG_CONFIG_DIRS");
+
+    if (out == NULL || out_size == 0u) {
+        return 0;
+    }
+    return gem_os_copy_text(out, out_size,
+                            xdg != NULL && xdg[0] != '\0' ? xdg : "/etc/xdg");
+}
+
+int gem_os_user_data_dir(char *out, size_t out_size)
+{
+    const char *xdg = gem_os_getenv_ref("XDG_DATA_HOME");
+    const char *home;
+    int length;
+
+    if (out == NULL || out_size == 0u) {
+        return 0;
+    }
+    if (xdg != NULL && xdg[0] == '/') {
+        return gem_os_copy_text(out, out_size, xdg);
+    }
+    home = gem_os_getenv_ref("HOME");
+    if (home == NULL || home[0] != '/') {
+        return 0;
+    }
+    length = snprintf(out, out_size, "%s/.local/share", home);
+    return length > 0 && (size_t)length < out_size;
 }
 
 static size_t gem_os_tail_arguments(char *tail, size_t tail_len, char *argv[],
@@ -720,6 +846,18 @@ int gem_os_open_write(const char *path)
     return open(path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
 }
 
+int gem_os_open_existing(const char *path, int mode)
+{
+    int flags;
+
+    if (path == NULL || mode < 0 || mode > 2) {
+        errno = EINVAL;
+        return -1;
+    }
+    flags = mode == 0 ? O_RDONLY : mode == 1 ? O_WRONLY : O_RDWR;
+    return open(path, flags);
+}
+
 int gem_os_close(int fd)
 {
     return close(fd);
@@ -1047,6 +1185,75 @@ static int gem_os_parent_path(const char *path, char *parent,
     return 1;
 }
 
+int gem_os_copy_path(const char *old_path, const char *new_path)
+{
+    char new_parent[PATH_MAX];
+    char resolved_source[PATH_MAX];
+    char resolved_parent[PATH_MAX];
+    char resolved_destination[PATH_MAX];
+    const char *name;
+    struct stat source_info;
+    struct stat destination_info;
+    int length;
+    int saved_error;
+
+    if (old_path == NULL || new_path == NULL ||
+        lstat(old_path, &source_info) != 0 ||
+        gem_os_parent_path(new_path, new_parent, sizeof(new_parent)) == 0) {
+        if (old_path == NULL || new_path == NULL) errno = EINVAL;
+        return 0;
+    }
+    if (lstat(new_path, &destination_info) == 0) {
+        errno = EEXIST;
+        return 0;
+    }
+    if (errno != ENOENT) return 0;
+
+    if (S_ISDIR(source_info.st_mode)) {
+        name = strrchr(new_path, '/');
+        name = name != NULL ? name + 1u : new_path;
+        if (name[0] == '\0' || realpath(old_path, resolved_source) == NULL ||
+            realpath(new_parent, resolved_parent) == NULL) return 0;
+        length = snprintf(resolved_destination,
+                          sizeof(resolved_destination), "%s/%s",
+                          resolved_parent, name);
+        if (length <= 0 || (size_t)length >= sizeof(resolved_destination)) {
+            errno = ENAMETOOLONG;
+            return 0;
+        }
+        length = (int)strlen(resolved_source);
+        if (strncmp(resolved_destination, resolved_source,
+                    (size_t)length) == 0 &&
+            (resolved_destination[length] == '\0' ||
+             resolved_destination[length] == '/')) {
+            errno = EINVAL;
+            return 0;
+        }
+    }
+    if (gem_os_copy_entry_path(old_path, new_path) != 0) return 1;
+    saved_error = errno;
+    if (saved_error != EEXIST)
+        (void)gem_os_remove_tree_under(new_path, new_parent);
+    errno = saved_error;
+    return 0;
+}
+
+static int gem_os_rename_no_replace(const char *old_path,
+                                    const char *new_path)
+{
+    struct stat destination_info;
+
+    if (renameat2(AT_FDCWD, old_path, AT_FDCWD, new_path,
+                  RENAME_NOREPLACE) == 0) return 1;
+    if (errno != ENOSYS && errno != EINVAL) return 0;
+    if (lstat(new_path, &destination_info) == 0) {
+        errno = EEXIST;
+        return 0;
+    }
+    if (errno != ENOENT) return 0;
+    return rename(old_path, new_path) == 0;
+}
+
 int gem_os_move_path(const char *old_path, const char *new_path)
 {
     char old_parent[PATH_MAX];
@@ -1059,7 +1266,7 @@ int gem_os_move_path(const char *old_path, const char *new_path)
         errno = EINVAL;
         return 0;
     }
-    if (rename(old_path, new_path) == 0) {
+    if (gem_os_rename_no_replace(old_path, new_path) != 0) {
         return 1;
     }
     if (errno != EXDEV ||
@@ -1084,9 +1291,10 @@ int gem_os_move_path(const char *old_path, const char *new_path)
         if (errno != ENOENT) {
             return 0;
         }
-        if (rename(old_path, temporary) == 0) {
+        if (gem_os_rename_no_replace(old_path, temporary) != 0) {
             break;
         }
+        if (errno == EEXIST) continue;
         return 0;
     }
     if (attempt == 100u) {
@@ -1095,7 +1303,8 @@ int gem_os_move_path(const char *old_path, const char *new_path)
     if (gem_os_copy_entry_path(temporary, new_path) == 0) {
         saved_error = errno;
         (void)rename(temporary, old_path);
-        (void)gem_os_remove_tree_under(new_path, new_parent);
+        if (saved_error != EEXIST)
+            (void)gem_os_remove_tree_under(new_path, new_parent);
         errno = saved_error;
         return 0;
     }

@@ -23,6 +23,10 @@
 #define GEM_RPC_MENU_MAX_STRINGS 32u
 #define GEM_RPC_MENU_STRING_MAX 64u
 #define GEM_RPC_PAYLOAD_MAX 65536u
+#define GEM_RPC_LOCATION_MAX 32u
+#define GEM_RPC_LOCATION_PATH_MAX 512u
+#define GEM_RPC_LOCATION_LABEL_MAX 64u
+#define GEM_MSG_LOCATION_CHANGED 0x7f10
 
 typedef enum gem_rpc_opcode {
     GEM_RPC_APPL_INIT = 1,
@@ -80,7 +84,18 @@ typedef enum gem_rpc_opcode {
     GEM_RPC_BITMAP_COPY,
     GEM_RPC_AES_TREE,
     GEM_RPC_AES_EXT,
-    GEM_RPC_CALLBACK_DONE
+    GEM_RPC_CALLBACK_DONE,
+    GEM_RPC_LOCATION_LIST,
+    GEM_RPC_LOCATION_ADD,
+    GEM_RPC_LOCATION_REMOVE,
+    GEM_RPC_LOCATION_SELECT,
+    GEM_RPC_OVERLAY_CREATE,
+    GEM_RPC_OVERLAY_RESIZE,
+    GEM_RPC_OVERLAY_MAP,
+    GEM_RPC_OVERLAY_UNMAP,
+    GEM_RPC_OVERLAY_DESTROY,
+    GEM_RPC_OVERLAY_UPDATE,
+    GEM_RPC_FSEL_OPTIONS
 } gem_rpc_opcode_t;
 
 typedef struct gem_rpc_header {
@@ -160,8 +175,80 @@ typedef struct gem_rpc_path {
 typedef struct gem_rpc_fsel {
     char path[1024];
     char name[1024];
+    char title[64];
     WORD button;
+    WORD mode;
 } gem_rpc_fsel_t;
+
+typedef struct gem_rpc_fsel_options_req {
+    UWORD options;
+    WORD setit;
+} gem_rpc_fsel_options_req_t;
+
+enum gem_rpc_fsel_mode {
+    GEM_RPC_FSEL_OPEN = 0,
+    GEM_RPC_FSEL_SAVE = 1,
+    GEM_RPC_FSEL_DIRECTORY = 2,
+    GEM_RPC_FSEL_LOCATION = 3
+};
+
+typedef struct gem_rpc_location_entry {
+    char path[GEM_RPC_LOCATION_PATH_MAX];
+    char label[GEM_RPC_LOCATION_LABEL_MAX];
+    uint16_t type;
+    uint16_t reserved;
+} gem_rpc_location_entry_t;
+
+enum { GEM_RPC_LOCATION_FOLDER = 0, GEM_RPC_LOCATION_DISK_IMAGE = 1 };
+
+#define GEM_RPC_DESKTOP_SHOW_HIDDEN 0x00000001u
+
+typedef struct gem_rpc_location_list {
+    uint32_t count;
+    gem_rpc_location_entry_t entries[GEM_RPC_LOCATION_MAX];
+} gem_rpc_location_list_t;
+
+/* Keep the location-list wire size stable for a running mixed-version
+ * desktop/gemd pair.  The final entry's previously reserved word carries
+ * list-wide Desktop options, including when that entry is in use. */
+#define GEM_RPC_LOCATION_LIST_OPTIONS(list) \
+    ((list).entries[GEM_RPC_LOCATION_MAX - 1u].reserved)
+
+typedef struct gem_rpc_location_req {
+    char path[GEM_RPC_LOCATION_PATH_MAX];
+} gem_rpc_location_req_t;
+
+typedef struct gem_rpc_overlay_create_req {
+    WORD window;
+    uint16_t width;
+    uint16_t height;
+} gem_rpc_overlay_create_req_t;
+
+typedef struct gem_rpc_overlay_id_req {
+    uint32_t id;
+} gem_rpc_overlay_id_req_t;
+
+typedef struct gem_rpc_overlay_resize_req {
+    uint32_t id;
+    uint16_t width;
+    uint16_t height;
+} gem_rpc_overlay_resize_req_t;
+
+typedef struct gem_rpc_overlay_map_req {
+    uint32_t id;
+    WORD window;
+} gem_rpc_overlay_map_req_t;
+
+typedef struct gem_rpc_overlay_update_req {
+    uint32_t id;
+    uint16_t x;
+    uint16_t y;
+    uint16_t width;
+    uint16_t height;
+    uint16_t pitch;
+    uint16_t reserved;
+    /* width * height BGRA bytes follow this header in the RPC payload. */
+} gem_rpc_overlay_update_req_t;
 
 typedef struct gem_rpc_color_req {
     WORD handle;
@@ -312,6 +399,10 @@ typedef struct gem_rpc_menu_click_req {
 int gem_rpc_call(gem_rpc_opcode_t opcode, const void *request,
                  uint32_t request_size, int32_t *status, void *response,
                  uint32_t response_size);
+int gem_location_list(gem_rpc_location_list_t *locations);
+int gem_location_add(const char *path);
+int gem_location_remove(const char *path);
+int gem_location_select(const char *path);
 
 /* Private transport configuration; defaults to the historical socket path. */
 const char *gem_rpc_socket_path(void);

@@ -26,7 +26,7 @@ static void desktop_set_title(OBJECT *tree, WORD title, const char *text,
     if (visible) {
         tree[title].ob_spec = (LONG)(intptr_t)text;
     } else {
-        tree[title].ob_spec = (LONG)(intptr_t) "";
+        tree[title].ob_spec = (LONG)(intptr_t)"";
         tree[title].ob_width = 0;
     }
 }
@@ -68,7 +68,7 @@ void desktop_update_desk_menu_labels(void)
             item->ob_flags &= (UWORD)~HIDETREE;
             ++used_count;
         } else {
-            item->ob_spec = (LONG)(intptr_t) "";
+            item->ob_spec = (LONG)(intptr_t)"";
             item->ob_state |= DISABLED;
             item->ob_flags |= HIDETREE;
         }
@@ -187,13 +187,13 @@ static void desktop_init_menu_tree(void)
 
     /* Bar titles. */
     desktop_init_object(&tree[MENU_TITLE_DESK], MENU_TITLE_FILE, NIL, NIL,
-                        G_TITLE, NONE, NORMAL, (LONG)(intptr_t) " Desk ", 0, 0,
+                        G_TITLE, NONE, NORMAL, (LONG)(intptr_t)" Desk ", 0, 0,
                         6, 1);
     desktop_init_object(&tree[MENU_TITLE_FILE], MENU_TITLE_ARRANGE, NIL, NIL,
-                        G_TITLE, NONE, NORMAL, (LONG)(intptr_t) " File ", 6, 0,
+                        G_TITLE, NONE, NORMAL, (LONG)(intptr_t)" File ", 6, 0,
                         6, 1);
     desktop_init_object(&tree[MENU_TITLE_ARRANGE], MENU_TITLES, NIL, NIL,
-                        G_TITLE, NONE, NORMAL, (LONG)(intptr_t) " Arrange ", 12,
+                        G_TITLE, NONE, NORMAL, (LONG)(intptr_t)" Arrange ", 12,
                         0, 9, 1);
 
     /* Desk popup: six slots for open file-manager windows, filled in by
@@ -201,57 +201,57 @@ static void desktop_init_menu_tree(void)
     desktop_init_object(&tree[MENU_DESK_BOX], MENU_FILE_BOX, MENU_DESK_1,
                         MENU_DESK_6, G_BOX, NONE, NORMAL, 0x1100L, 0, 0, 22, 6);
     desktop_init_object(&tree[MENU_DESK_1], MENU_DESK_2, NIL, NIL, G_STRING,
-                        NONE, DISABLED, (LONG)(intptr_t) "", 0, 0, 22, 1);
+                        NONE, DISABLED, (LONG)(intptr_t)"", 0, 0, 22, 1);
     desktop_init_object(&tree[MENU_DESK_2], MENU_DESK_3, NIL, NIL, G_STRING,
-                        NONE, DISABLED, (LONG)(intptr_t) "", 0, 1, 22, 1);
+                        NONE, DISABLED, (LONG)(intptr_t)"", 0, 1, 22, 1);
     desktop_init_object(&tree[MENU_DESK_3], MENU_DESK_4, NIL, NIL, G_STRING,
-                        NONE, DISABLED, (LONG)(intptr_t) "", 0, 2, 22, 1);
+                        NONE, DISABLED, (LONG)(intptr_t)"", 0, 2, 22, 1);
     desktop_init_object(&tree[MENU_DESK_4], MENU_DESK_5, NIL, NIL, G_STRING,
-                        NONE, DISABLED, (LONG)(intptr_t) "", 0, 3, 22, 1);
+                        NONE, DISABLED, (LONG)(intptr_t)"", 0, 3, 22, 1);
     desktop_init_object(&tree[MENU_DESK_5], MENU_DESK_6, NIL, NIL, G_STRING,
-                        NONE, DISABLED, (LONG)(intptr_t) "", 0, 4, 22, 1);
+                        NONE, DISABLED, (LONG)(intptr_t)"", 0, 4, 22, 1);
     desktop_init_object(&tree[MENU_DESK_6], MENU_DESK_BOX, NIL, NIL, G_STRING,
-                        NONE, DISABLED, (LONG)(intptr_t) "", 0, 5, 22, 1);
+                        NONE, DISABLED, (LONG)(intptr_t)"", 0, 5, 22, 1);
 
     /* File popup. */
     desktop_init_object(&tree[MENU_FILE_BOX], MENU_ARRANGE_BOX, MENU_FILE_OPEN,
                         MENU_FILE_EMPTY_TRASH, G_BOX, NONE, NORMAL, 0x1100L, 0,
                         0, 18, 4);
     desktop_init_object(&tree[MENU_FILE_OPEN], MENU_FILE_DELETE, NIL, NIL,
-                        G_STRING, NONE, NORMAL, (LONG)(intptr_t) "  Open", 0, 0,
+                        G_STRING, NONE, NORMAL, (LONG)(intptr_t)"  Open", 0, 0,
                         18, 1);
     desktop_init_object(&tree[MENU_FILE_DELETE], MENU_FILE_RESTORE, NIL, NIL,
-                        G_STRING, NONE, NORMAL, (LONG)(intptr_t) "  Delete", 0,
+                        G_STRING, NONE, NORMAL, (LONG)(intptr_t)"  Delete", 0,
                         1, 18, 1);
     desktop_init_object(&tree[MENU_FILE_RESTORE], MENU_FILE_EMPTY_TRASH, NIL,
                         NIL, G_STRING, NONE, NORMAL,
-                        (LONG)(intptr_t) "  Restore", 0, 2, 18, 1);
+                        (LONG)(intptr_t)"  Restore", 0, 2, 18, 1);
     desktop_init_object(&tree[MENU_FILE_EMPTY_TRASH], MENU_FILE_BOX, NIL, NIL,
-                        G_STRING, NONE, NORMAL,
-                        (LONG)(intptr_t) "  Empty Trash", 0, 3, 18, 1);
+                        G_STRING, NONE, NORMAL, (LONG)(intptr_t)"  Empty Trash",
+                        0, 3, 18, 1);
 
     /* Arrange popup: view toggle, a separator, then the sort radio group. */
     desktop_init_object(&tree[MENU_ARRANGE_BOX], MENU_POPUPS,
                         MENU_ARRANGE_SHOW_AS_ICONS, MENU_ARRANGE_SORT_TYPE,
                         G_BOX, NONE, NORMAL, 0x1100L, 0, 0, 20, 6);
     desktop_init_object(&tree[MENU_ARRANGE_SHOW_AS_ICONS],
-                        MENU_ARRANGE_SEPARATOR, NIL, NIL, G_STRING, NONE, NORMAL,
-                        (LONG)(intptr_t) "  Show as icons", 0, 0, 20, 1);
+                        MENU_ARRANGE_SEPARATOR, NIL, NIL, G_STRING, NONE,
+                        NORMAL, (LONG)(intptr_t)"  Show as icons", 0, 0, 20, 1);
     desktop_init_object(&tree[MENU_ARRANGE_SEPARATOR], MENU_ARRANGE_SORT_NAME,
                         NIL, NIL, G_STRING, NONE, DISABLED,
-                        (LONG)(intptr_t) "-------------------", 0, 1, 20, 1);
+                        (LONG)(intptr_t)"-------------------", 0, 1, 20, 1);
     desktop_init_object(&tree[MENU_ARRANGE_SORT_NAME], MENU_ARRANGE_SORT_DATE,
                         NIL, NIL, G_STRING, NONE, NORMAL,
-                        (LONG)(intptr_t) "  Sort by name", 0, 2, 20, 1);
+                        (LONG)(intptr_t)"  Sort by name", 0, 2, 20, 1);
     desktop_init_object(&tree[MENU_ARRANGE_SORT_DATE], MENU_ARRANGE_SORT_SIZE,
                         NIL, NIL, G_STRING, NONE, NORMAL,
-                        (LONG)(intptr_t) "  Sort by date", 0, 3, 20, 1);
+                        (LONG)(intptr_t)"  Sort by date", 0, 3, 20, 1);
     desktop_init_object(&tree[MENU_ARRANGE_SORT_SIZE], MENU_ARRANGE_SORT_TYPE,
                         NIL, NIL, G_STRING, NONE, NORMAL,
-                        (LONG)(intptr_t) "  Sort by size", 0, 4, 20, 1);
+                        (LONG)(intptr_t)"  Sort by size", 0, 4, 20, 1);
     desktop_init_object(&tree[MENU_ARRANGE_SORT_TYPE], MENU_ARRANGE_BOX, NIL,
                         NIL, G_STRING, LASTOB, NORMAL,
-                        (LONG)(intptr_t) "  Sort by type", 0, 5, 20, 1);
+                        (LONG)(intptr_t)"  Sort by type", 0, 5, 20, 1);
 }
 
 static void desktop_init_desktop_tree(void)
@@ -298,8 +298,14 @@ static void desktop_refresh_browsers(int resort)
             desktop_browser_resort(browser);
         }
         browser->view_mode = g_desktop.icon_view ? DESKTOP_BROWSER_VIEW_ICONS
-                                                  : DESKTOP_BROWSER_VIEW_LIST;
+                                                 : DESKTOP_BROWSER_VIEW_LIST;
         if (browser->view_mode == DESKTOP_BROWSER_VIEW_LIST) {
+            WORD entry_index;
+
+            for (entry_index = 0; entry_index < browser->entry_count;
+                 ++entry_index) {
+                browser->entries[entry_index].selected = 0;
+            }
             browser->selected_index = NIL;
             browser->last_click_index = NIL;
             browser->last_click_ms = 0u;
@@ -352,20 +358,17 @@ static void desktop_handle_menu_item(WORD item)
             }
             break;
         }
-        case MENU_FILE_OPEN:
-            {
-                desktop_browser_window_t *browser = desktop_find_browser_by_handle(
-                    g_desktop.active_browser_handle);
+        case MENU_FILE_OPEN: {
+            desktop_browser_window_t *browser =
+                desktop_find_browser_by_handle(g_desktop.active_browser_handle);
 
-                if (browser != NULL && browser->selected_index >= 0 &&
-                    browser->selected_index < browser->entry_count) {
-                    desktop_browser_open_entry(browser,
-                                               browser->selected_index);
-                } else {
-                    desktop_set_status("Select a File Manager item first.");
-                }
+            if (browser != NULL && browser->selected_index >= 0 &&
+                browser->selected_index < browser->entry_count) {
+                desktop_browser_open_entry(browser, browser->selected_index);
+            } else {
+                desktop_set_status("Select a File Manager item first.");
             }
-            break;
+        } break;
         case MENU_FILE_DELETE:
             desktop_delete_active_selection();
             break;
@@ -380,8 +383,9 @@ static void desktop_handle_menu_item(WORD item)
             g_desktop.icon_view = g_desktop.icon_view ? 0 : 1;
             desktop_refresh_browsers(0);
             desktop_update_desk_menu_labels();
-            desktop_set_status(g_desktop.icon_view ? "Showing entries as icons."
-                                                   : "Showing entries as text.");
+            desktop_set_status(g_desktop.icon_view
+                                   ? "Showing entries as icons."
+                                   : "Showing entries as text.");
             break;
         case MENU_ARRANGE_SORT_NAME:
         case MENU_ARRANGE_SORT_DATE:
@@ -408,16 +412,26 @@ static int desktop_init(void)
     g_desktop.active_browser_handle = NIL;
     g_desktop.drag_browser_handle = NIL;
     g_desktop.drag_entry_index = NIL;
+    g_desktop.locations_menu_id = NIL;
+    g_desktop.remove_location_menu_id = NIL;
+    gemconf_init(&g_desktop.config);
 
     if (gem_os_init() == 0) {
+        gemconf_clear(&g_desktop.config);
         return 0;
     }
 
     g_desktop.app_id = appl_init();
-    if (g_desktop.app_id < 0) {
+    if (g_desktop.app_id <= 0) {
+        gemconf_clear(&g_desktop.config);
         gem_os_shutdown();
         return 0;
     }
+    (void)gemconf_load(&g_desktop.config, "desktop");
+    g_desktop.locations_menu_id =
+        menu_register(g_desktop.app_id, "Add Location...");
+    g_desktop.remove_location_menu_id =
+        menu_register(g_desktop.app_id, "Remove Location...");
 
     g_desktop.vdi_handle =
         graf_handle(&g_desktop.char_width, &g_desktop.char_height,
@@ -425,6 +439,7 @@ static int desktop_init(void)
     v_opnvwk(work_in, &g_desktop.vdi_handle, work_out);
     if (g_desktop.vdi_handle == 0) {
         appl_exit();
+        gemconf_clear(&g_desktop.config);
         gem_os_shutdown();
         return 0;
     }
@@ -433,16 +448,20 @@ static int desktop_init(void)
     g_desktop.screen_height = (WORD)(work_out[1] + 1);
 
     desktop_init_menu_tree();
+    /* Normalize the bare-desktop menu before its first server-side draw.
+     * Otherwise Desk/File/Arrange briefly use their template widths and then
+     * collapse when the open-browser count is evaluated below. */
+    desktop_update_desk_menu_labels();
+    menu_click(1, 1);
+    menu_bar(g_desktop.menu_tree, 1);
     desktop_probe_disks();
     desktop_sort_icons_by_label();
     desktop_install_trash_icon();
     desktop_refresh_trash_availability();
     desktop_update_desk_menu_labels();
-    menu_click(1, 1);
-    menu_bar(g_desktop.menu_tree, 1);
     wind_get(0, WF_WORKXYWH, &g_desktop.work.g_x, &g_desktop.work.g_y,
              &g_desktop.work.g_w, &g_desktop.work.g_h);
-    desktop_set_status("Select a disk or the trash can.");
+    desktop_set_status("Select a location or the trash can.");
     desktop_init_desktop_tree();
     desktop_layout_icons();
     desktop_redraw(NULL);
@@ -459,12 +478,19 @@ static void desktop_shutdown(void)
         }
     }
     menu_bar(g_desktop.menu_tree, 0);
+    if (g_desktop.locations_menu_id != NIL) {
+        (void)menu_unregister(g_desktop.locations_menu_id);
+    }
+    if (g_desktop.remove_location_menu_id != NIL) {
+        (void)menu_unregister(g_desktop.remove_location_menu_id);
+    }
     if (g_desktop.vdi_handle != 0) {
         v_clsvwk(g_desktop.vdi_handle);
     }
     if (g_desktop.app_id >= 0) {
         appl_exit();
     }
+    gemconf_clear(&g_desktop.config);
     gem_os_shutdown();
 }
 
@@ -486,9 +512,9 @@ int main(void)
         WORD br = 0;
         WORD event;
 
-        event = evnt_multi((UWORD)(MU_MESAG | MU_BUTTON | MU_KEYBD), 1, 1, 1,
-                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, msg, 0, 0, &mx, &my,
-                           &mb, &ks, &kr, &br);
+        event = evnt_multi((UWORD)(MU_MESAG | MU_BUTTON | MU_KEYBD), 1, 1, 1, 0,
+                           0, 0, 0, 0, 0, 0, 0, 0, 0, msg, 0, 0, &mx, &my, &mb,
+                           &ks, &kr, &br);
         (void)mb;
         (void)ks;
         (void)br;
@@ -497,18 +523,46 @@ int main(void)
             WORD ch = (WORD)(kr & 0xff);
 
             WORD scan = (WORD)((kr >> 8) & 0xff);
+#ifndef GEM_DESKTOP_HOSTED
+            (void)scan;
+#endif
 
             if (ch == 27 || ch == 'q' || ch == 'Q') {
                 done = 1;
-            } else if (ch == 127 || scan == 0x53) {
-                desktop_delete_active_selection();
-            } else {
+            }
+            else if (ch == 13 && g_desktop.selected_icon != NIL &&
+                     g_desktop.active_browser_handle == NIL) {
+                desktop_open_selected_icon();
+            }
+#ifdef GEM_DESKTOP_HOSTED
+            else if (ch == 127 || scan == 0x4c || scan == 0x53 ||
+                     scan == 0x7f) {
+                if (g_desktop.selected_icon != NIL) {
+                    desktop_delete_selected_location();
+                } else {
+                    desktop_delete_active_selection();
+                }
+            }
+#endif
+            else {
                 desktop_browser_handle_key(kr);
             }
         }
 
         if ((event & MU_MESAG) != 0) {
-            if (msg[0] == MN_SELECTED) {
+            if (msg[0] == AC_OPEN && msg[3] == g_desktop.locations_menu_id) {
+                desktop_choose_location();
+            } else if (msg[0] == AC_OPEN &&
+                       msg[3] == g_desktop.remove_location_menu_id) {
+                desktop_delete_selected_location();
+            }
+#ifndef GEM_DESKTOP_HOSTED
+            else if (msg[0] == GEM_MSG_LOCATION_CHANGED) {
+                desktop_refresh_locations();
+                desktop_set_status("Location removed.");
+            }
+#endif
+            else if (msg[0] == MN_SELECTED) {
                 desktop_handle_menu_item(msg[4]);
                 menu_tnormal(g_desktop.menu_tree, msg[3], 1);
             } else if (msg[0] == WM_REDRAW && msg[3] == 0) {
@@ -528,13 +582,12 @@ int main(void)
             WORD handle = wind_find(mx, my);
             WORD object = desktop_find_icon_at(mx, my);
 
-
             if (my < g_desktop.work.g_y) {
                 continue;
             }
 
             if (handle > 0) {
-                desktop_browser_handle_click(handle, mx, my);
+                desktop_browser_handle_click(handle, mx, my, ks);
                 continue;
             }
 
@@ -550,7 +603,7 @@ int main(void)
                 desktop_object_rect(g_desktop.selected_icon, &dirty);
                 desktop_expand_icon_damage_rect(&dirty);
                 desktop_select_icon(NIL);
-                desktop_set_status("Select a disk or the trash can.");
+                desktop_set_status("Select a location or the trash can.");
                 desktop_redraw(&dirty);
             }
         }

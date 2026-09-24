@@ -12,8 +12,10 @@
 #include "session.h"
 
 #include "../aes/aes_shel.h"
+#include "../aes/system_menu.h"
 
 #include "platform/raster.h"
+#include "overlay.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -96,6 +98,10 @@ void gemd_cleanup_app(WORD app_id)
         return;
     }
 
+    gemd_overlay_cleanup_app(app_id);
+
+    aes_system_menu_unregister_owner(app_id);
+
     aes_state.current_app_id = app_id;
     global[2] = app_id;
     /* Detach while the session's relocated tree is still alive. In
@@ -107,6 +113,18 @@ void gemd_cleanup_app(WORD app_id)
 
     if (aes_state.desktop_owner_app_id == app_id) {
         aes_state.desktop_owner_app_id = 0;
+        gemd_location_clear_selection();
+    }
+    if (aes_state.input_focus_app_id == app_id) {
+        aes_state.input_focus_app_id = 0;
+    }
+    if (aes_state.modal_form_owner_app_id == app_id) {
+        GRECT exposed = aes_state.modal_form_rect;
+
+        aes_state.modal_form_owner_app_id = 0;
+        aes_set_rect(&aes_state.modal_form_rect, 0, 0, 0, 0);
+        if (exposed.g_w > 0 && exposed.g_h > 0)
+            aes_redraw_region(&exposed);
     }
 
     aes_state.current_app_id = app_id;
@@ -328,7 +346,7 @@ void gemd_shutdown(void)
             current.st_dev == g_socket_identity.st_dev &&
             current.st_ino == g_socket_identity.st_ino &&
             S_ISSOCK(current.st_mode))
-            (void)unlink(gem_rpc_socket_path());
+            (void)gem_os_unlink(gem_rpc_socket_path());
     }
 }
 
@@ -364,6 +382,10 @@ int gemd_authorized(const gemd_session_t *session, uint16_t opcode,
     }
     if (!session->app_id)
         return 0;
+    if (opcode == GEM_RPC_LOCATION_LIST || opcode == GEM_RPC_LOCATION_ADD ||
+        opcode == GEM_RPC_LOCATION_REMOVE || opcode == GEM_RPC_LOCATION_SELECT) {
+        return session->app_id == aes_state.desktop_owner_app_id;
+    }
     if (gemd_vdi_request(opcode)) {
         memcpy(&handle, payload, sizeof(handle));
         if (!g_server_vdi_handle || handle != g_server_vdi_handle)

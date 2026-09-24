@@ -20,10 +20,20 @@ ROOT = Path(__file__).resolve().parents[2]
 RUNTIME = Path(os.environ.get('GEM_RUNTIME_ROOT', str(ROOT/'bin'))).resolve()
 SESSION = ROOT / 'build/f5'
 STATE = SESSION / 'state.json'
-BUNDLED_APPS = ('desktop', 'calc', 'clock', 'terminal')
-SAMPLE_APPS = ('gemscape', 'maestro', 'stout')
-ALL_APPS = BUNDLED_APPS + SAMPLE_APPS
+BUNDLED_APPS = (
+    'desktop', 'calc', 'clock', 'terminal', 'gemscape', 'gemread', 'stout'
+)
+SOURCE_BUNDLED_APPS = {
+    'desktop', 'calculator', 'clock', 'terminal', 'gemscape', 'gemread',
+    'stout'
+}
+SAMPLE_APPS = ('maestro',)
+# Keep Stout last in the interaction run so its guest window is exposed for
+# the repeated drag regression, independently of where the executable lives.
+ALL_APPS = BUNDLED_APPS[:-1] + SAMPLE_APPS + ('stout',)
 INITIAL_APPS = ('desktop', 'terminal')
+F5_WIDTH = 1920
+F5_HEIGHT = 1080
 
 
 def application_path(name):
@@ -73,6 +83,39 @@ def remove_socket(state):
             path.unlink()
     except FileNotFoundError:
         pass
+
+
+def receive_exact(connection, size):
+    data = b''
+    while len(data) < size:
+        part = connection.recv(size - len(data))
+        if not part:
+            raise ConnectionError('gemd closed the readiness probe')
+        data += part
+    return data
+
+
+def gemd_responding(path):
+    """Confirm gemd can service a new application after desktop startup."""
+    try:
+        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:
+            connection.settimeout(2)
+            connection.connect(str(path))
+
+            def call(opcode):
+                connection.sendall(struct.pack('=IHHI', 0x47454d31, 2,
+                                               opcode, 0))
+                magic, status, size = struct.unpack(
+                    '=IiI', receive_exact(connection, 12))
+                if magic != 0x47454d31 or size > 65536:
+                    raise ConnectionError('invalid gemd readiness reply')
+                receive_exact(connection, size)
+                return status
+
+            app_id = call(1)
+            return app_id > 0 and call(2) == 1
+    except (ConnectionError, OSError, struct.error):
+        return False
 
 
 def stop():
@@ -153,8 +196,7 @@ class Session:
                    if p.is_dir() and (p/'CMakeLists.txt').exists()}
         samples = {p.name for p in (ROOT/'samples/src').iterdir()
                    if p.is_dir() and (p/'CMakeLists.txt').exists()}
-        if bundled != {'desktop', 'calculator', 'clock', 'terminal'} or \
-                samples != set(SAMPLE_APPS) | {'msa'}:
+        if bundled != SOURCE_BUNDLED_APPS or samples != {'maestro', 'msa'}:
             raise RuntimeError('Update the session launcher for the changed application inventory')
         SESSION.mkdir(parents=True, exist_ok=True)
         SESSION.chmod(0o700)
@@ -169,16 +211,19 @@ class Session:
             raise RuntimeError('Run make to download and build the pinned Rasta viewer')
         overrides = {'GEMD_SOCKET': str(sock), 'GEM_RASTA_FRAMEBUFFER': str(SESSION/'framebuffer'),
             'GEM_RASTA_HOST': '127.0.0.1', 'GEM_RASTA_PORT': str(port),
-            'GEM_VDI_WIDTH': '1024', 'GEM_VDI_HEIGHT': '768',
+            'GEM_RASTA_CURSOR': 'off',
+            'GEM_VDI_WIDTH': str(F5_WIDTH), 'GEM_VDI_HEIGHT': str(F5_HEIGHT),
             'GEM_RESOURCE_DIR': str(RUNTIME/'resources'),
+            'GEMIX_HOME': str(RUNTIME),
+            'XDG_CONFIG_HOME': str(SESSION/'config'),
             'STOUT_MAX_CYCLES': '0',
             'ASAN_OPTIONS': 'detect_leaks=0:abort_on_error=1',
             'UBSAN_OPTIONS': 'halt_on_error=1:print_stacktrace=1'}
         self.env = dict(os.environ, **overrides)
         (SESSION/'session.env').write_text(''.join(f'{key}={value}\n' for key, value in overrides.items()))
         self.publish()
-        viewer = self.start_process('rasta', [rasta, '--inverse', '--port', str(port), '--width', '1024',
-            '--height', '768', '--bpp', '1', '--scale', '1', '--framebuffer', str(SESSION/'framebuffer')])
+        viewer = self.start_process('rasta', [rasta, '--inverse', 'off', '--cursor', 'off', '--port', str(port), '--width', str(F5_WIDTH),
+            '--height', str(F5_HEIGHT), '--bpp', '32', '--scale', '1', '--framebuffer', str(SESSION/'framebuffer')])
         self.pause(.4)
         if viewer.poll() is not None:
             raise RuntimeError('Rasta failed to start; see rasta.log')
@@ -202,11 +247,18 @@ class Session:
         desktop = self.start_process('desktop', [str(application_path('desktop'))])
         def rendered():
             path = SESSION/'framebuffer'
-            return path.exists() and len(set(path.read_bytes())) > 8
+            if not path.exists():
+                return False
+            raw = path.read_bytes()
+            return len(raw) == F5_WIDTH * F5_HEIGHT * 4 and any(
+                raw[offset] == 0 for offset in range(0, len(raw), 4))
         self.wait(rendered, 'desktop to render')
         self.pause(.5)
         if desktop.poll() is not None:
             raise RuntimeError('Desktop failed to initialize; see desktop.log')
+        self.wait(lambda: gemd_responding(sock),
+                  'gemd to finish the initial Desktop redraw', 20)
+        self.state['desktop_rpc_ready'] = True
         if self.interaction:
             self.interaction.snapshot('desktop_ready')
         self.publish('desktop-ready')
@@ -230,7 +282,9 @@ class Session:
                 continue
             command = [str(application_path(name))]
             if name == 'stout':
-                command.append(str(program))
+                command.extend((str(program), str(ROOT/'samples/data/st.msa')))
+            if name == 'gemread' and os.environ.get('GEMREAD_DOCUMENT'):
+                command.append(os.environ['GEMREAD_DOCUMENT'])
             proc = self.start_process(name, command)
             if name == 'stout':
                 def connected():
@@ -249,8 +303,15 @@ class Session:
                 raise RuntimeError(f'Application exited during startup: {proc.args}')
         capture_name = ('all_samples.pbm' if self.apps == ALL_APPS
                         else 'applications.pbm')
-        (SESSION/capture_name).write_bytes(
-            b'P4\n1024 768\n' + (SESSION/'framebuffer').read_bytes())
+        raw = (SESSION/'framebuffer').read_bytes()
+        pitch = (F5_WIDTH + 7) // 8
+        mono = bytearray(pitch * F5_HEIGHT)
+        for y in range(F5_HEIGHT):
+            for x in range(F5_WIDTH):
+                if raw[(y * F5_WIDTH + x) * 4] < 128:
+                    mono[y * pitch + x // 8] |= 0x80 >> (x % 8)
+        header = f'P4\n{F5_WIDTH} {F5_HEIGHT}\n'.encode()
+        (SESSION/capture_name).write_bytes(header + bytes(mono))
         self.state['started_apps'] = list(self.apps)
         self.state['all_samples_started'] = self.apps == ALL_APPS
         self.publish('all-samples-ready' if self.apps == ALL_APPS

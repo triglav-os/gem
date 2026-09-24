@@ -13,6 +13,7 @@ add_library(gem SHARED
     client_queries.c
     protocol.c
     client_objc.c
+    client_overlay.c
 )
 
 target_include_directories(gem

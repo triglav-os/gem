@@ -6,7 +6,9 @@
  * Copyright (C) 2026 tomaz stih
  */
 #include <gem.h>
+#include <gem/gemconf.h>
 #include <gem/os.h>
+#include "gem_protocol.h"
 #include <assert.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -22,6 +24,21 @@ typedef struct shell_child_result {
 
 static WORD handle;
 static int callback_count;
+
+_Static_assert(sizeof(gem_rpc_location_list_t) == 18564u,
+               "location-list wire ABI changed");
+
+static int location_present(const gem_rpc_location_list_t *locations,
+                            const char *path, const char *label)
+{
+    uint32_t index;
+
+    for (index = 0u; index < locations->count; ++index)
+        if (strcmp(locations->entries[index].path, path) == 0 &&
+            strcmp(locations->entries[index].label, label) == 0)
+            return 1;
+    return 0;
+}
 
 static void read_shell_result(const char *path, shell_child_result_t *result)
 {
@@ -60,9 +77,26 @@ static WORD draw_user(LONG value)
 int main(void)
 {
     WORD app = appl_init();
+    WORD menu_id;
+    OBJECT bar[7] = {{-1, 1, 4, G_IBOX, 0, 0, 0, 0, 0, 640, 20},
+                     {4, 2, 2, G_BOX, 0, 0, 0, 0, 0, 640, 20},
+                     {1, 3, 3, G_IBOX, 0, 0, 0, 0, 0, 640, 20},
+                     {2, -1, -1, (UWORD)(0x2100 | G_TITLE), 0, 0,
+                      (LONG)(intptr_t)" Menu ", 0, 0, 48, 20},
+                     {0, 5, 5, G_IBOX, 0, 0, 0, 0, 20, 640, 380},
+                     {4, 6, 6, G_BOX, 0, 0, 0, 0, 0, 100, 16},
+                     {5, -1, -1, (UWORD)(0x2100 | G_STRING), LASTOB, 0,
+                      (LONG)(intptr_t)"  Item", 0, 0, 100, 16}};
     assert(app > 0);
-    assert(menu_register(app, "API TEST") == app);
+    assert(fsel_options(0, 0) == 0);
+    assert(fsel_options(FSEL_SHOW_HIDDEN, 1) == FSEL_SHOW_HIDDEN);
+    assert(fsel_options(0, 0) == FSEL_SHOW_HIDDEN);
+    assert(fsel_options(0, 1) == 0);
+    menu_id = menu_register(app, "API TEST");
+    assert(menu_id >= 0 && menu_id < 6);
     assert(appl_find("API TEST") == app);
+    assert(menu_unregister(menu_id));
+    assert(menu_bar(bar, 1) == 1);
     WORD message[8] = {1000, app, 0, 11, 22, 33, 44, 55}, received[8] = {0};
     assert(appl_write(app, 8, message));
     assert(appl_read(app, 8, received));
@@ -76,12 +110,46 @@ int main(void)
     assert(shel_wdef("other.prg", "/test"));
     assert(shel_rdef(cmd, dir));
     assert(!strcmp(cmd, "other.prg") && !strcmp(dir, "/test"));
-    char odd[3] = {'a', 'b', 'c'}, back[5] = {'x', 'x', 'x', 'x', 'x'};
-    assert(shel_put(odd, 3));
-    assert(shel_get(NULL, SHEL_BUFSIZE) == 3);
-    assert(shel_get(back, 5));
-    assert(!memcmp(odd, back, 3));
-    assert(back[3] == 'x' && back[4] == 'x');
+    {
+        static char desktop_inf[] =
+            "#E3A01\r\n#G0C2C EDIT.APP@ *.TXT@\r\n\x1a\0";
+        char back[128];
+        WORD available;
+
+        memset(back, 'x', sizeof(back));
+        assert(shel_put(desktop_inf, (WORD)(sizeof(desktop_inf) - 1u)));
+        available = shel_get(NULL, SHEL_BUFSIZE);
+        assert(available > 2 && available < (WORD)sizeof(back));
+        assert(shel_get(back, sizeof(back)));
+        assert(strstr(back, "EDIT.APP@") != NULL);
+        assert(strstr(back, "*.TXT@") != NULL);
+        assert(back[available - 2] == 0x1a && back[available - 1] == '\0');
+        assert(back[available] == 'x');
+    }
+    {
+        gemconf_t config;
+        gem_rpc_location_list_t locations;
+        char back[256] = {0};
+        unsigned attempt;
+        int found = 0;
+
+        gemconf_init(&config);
+        assert(gemconf_load(&config, "desktop"));
+        assert(gemconf_set(&config, "desktop", "show_hidden", "true"));
+        assert(gemconf_set(&config, "locations", "/tmp", "Watched"));
+        assert(gemconf_save(&config));
+        gemconf_clear(&config);
+        for (attempt = 0u; attempt < 50u && found == 0; ++attempt) {
+            gem_os_sleep_ms(20u);
+            assert(gem_location_list(&locations));
+            found = location_present(&locations, "/tmp", "Watched");
+        }
+        assert(found);
+        assert((GEM_RPC_LOCATION_LIST_OPTIONS(locations) &
+                GEM_RPC_DESKTOP_SHOW_HIDDEN) != 0u);
+        assert(shel_get(back, sizeof(back)));
+        assert(strstr(back, "Watched@") != NULL);
+    }
     {
         char *home = NULL;
         char *leaked = NULL;
@@ -140,8 +208,8 @@ int main(void)
     char buffer[16] = "AB";
     TEDINFO ted = {0};
     ted.te_ptext = (LONG)(intptr_t)buffer;
-    ted.te_ptmplt = (LONG)(intptr_t) "_______________";
-    ted.te_pvalid = (LONG)(intptr_t) "X";
+    ted.te_ptmplt = (LONG)(intptr_t)"_______________";
+    ted.te_pvalid = (LONG)(intptr_t)"X";
     ted.te_txtlen = sizeof(buffer);
     ted.te_tmplen = 16;
     ted.te_font = 3;
@@ -150,7 +218,7 @@ int main(void)
                       {2, -1, -1, G_FBOXTEXT, EDITABLE, 0, (LONG)(intptr_t)&ted,
                        10, 10, 100, 20},
                       {3, -1, -1, G_BUTTON, SELECTABLE | EXIT | DEFAULT, 0,
-                       (LONG)(intptr_t) "OK", 10, 45, 50, 20},
+                       (LONG)(intptr_t)"OK", 10, 45, 50, 20},
                       {0, -1, -1, G_USERDEF, LASTOB, 0, (LONG)(intptr_t)&user,
                        80, 45, 50, 20}};
     WORD index = 2;
@@ -184,20 +252,10 @@ int main(void)
     assert(rsrc_free());
     /* Extended object types keep the low byte; the wrapper must still send
      * the title/entry strings gemd requires for that byte. */
-    OBJECT bar[7] = {{-1, 1, 4, G_IBOX, 0, 0, 0, 0, 0, 640, 20},
-                     {4, 2, 2, G_BOX, 0, 0, 0, 0, 0, 640, 20},
-                     {1, 3, 3, G_IBOX, 0, 0, 0, 0, 0, 640, 20},
-                     {2, -1, -1, (UWORD)(0x2100 | G_TITLE), 0, 0,
-                      (LONG)(intptr_t) " Menu ", 0, 0, 48, 20},
-                     {0, 5, 5, G_IBOX, 0, 0, 0, 0, 20, 640, 380},
-                     {4, 6, 6, G_BOX, 0, 0, 0, 0, 0, 100, 16},
-                     {5, -1, -1, (UWORD)(0x2100 | G_STRING), LASTOB, 0,
-                      (LONG)(intptr_t) "  Item", 0, 0, 100, 16}};
-    assert(menu_bar(bar, 1) == 1);
     assert(menu_bar(bar, 0) == 1);
     wind_close(window);
     wind_delete(window);
-    assert(menu_unregister(app));
+    assert(!menu_unregister(menu_id));
     assert(appl_exit());
     return 0;
 }

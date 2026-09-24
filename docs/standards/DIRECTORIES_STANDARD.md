@@ -11,12 +11,12 @@ editor backups, stray object files or temporary files in the tree.
 - `samples/`: independent applications with `src/`, `include/`, `lib/` and `data/`.
   Integrated executables go in `bin/samples/`, private libraries in
   `bin/samples/lib/`, and resources in `bin/samples/data/`. Only build entry points belong at the samples root.
-- `include/`: GEM headers only. Application-private headers stay beside their
-  sources; sample interfaces belong in `samples/include/`; test-only headers
-  belong in `tests/include/`.
+- `include/`: public project headers. Application-private headers stay beside
+  their sources; sample interfaces belong in `samples/include/`; test-only
+  headers belong in `tests/include/`.
   Shared transport declarations belong in `include/gem/gemd.h`.
-- `lib/`: GEM implementation dependencies and platform backends only.
-  Sample-specific and third-party application libraries go in `samples/lib/`.
+- `lib/`: reusable project libraries, implementation dependencies and platform
+  backends. Libraries used only by independent samples go in `samples/lib/`.
 - `bin/`: final programs, final generated outputs and runtime resources.
 - `build/`: all intermediate build artifacts, including objects, dependency
   files, static libraries, maps, listings and temporary build products.
@@ -30,7 +30,7 @@ editor backups, stray object files or temporary files in the tree.
   generators live in `tools/resgen/`; container recipes live in `tools/container/`.
 - `.vscode/`: editor build, launch and debugging configuration.
 
-Public GEM headers must live in `include/`. Project implementation source may
+Public project headers must live in `include/`. Project implementation source may
 live in `src/` or a library directory under `lib/`; bundled application source
 belongs in `src/apps/<application>/`; independent sample source belongs in
 `samples/src/` or `samples/lib/`. Automated test source belongs in `tests/`,

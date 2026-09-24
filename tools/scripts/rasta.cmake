@@ -1,7 +1,7 @@
 # Build the viewer from a verified upstream snapshot, never a sibling checkout.
 include(ExternalProject)
-set(GEM_RASTA_REVISION "3dd2426f5c4bddf7d0eb4961d73c2e8c68e3510a")
-set(GEM_RASTA_SHA256 "755505af8181467203d8b8a7a572bdb01663573a0739266a405232d6ab20ba86")
+set(GEM_RASTA_REVISION "5f1e1511e918e8b4dfa6f8b7a51272f66133ea0e")
+set(GEM_RASTA_SHA256 "c017b7e0884d8e94bf16a6ce549c62f2fbf2013aeaf3bf14ef1fb0cc4bc04e78")
 ExternalProject_Add(rasta_viewer
     URL "https://codeload.github.com/tstih/rasta/tar.gz/${GEM_RASTA_REVISION}"
     URL_HASH "SHA256=${GEM_RASTA_SHA256}"
@@ -17,10 +17,3 @@ ExternalProject_Add(rasta_viewer
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
             <SOURCE_DIR>/bin/rasta "${GEM_TOOLS_DIR}/rasta"
     BUILD_BYPRODUCTS "${GEM_TOOLS_DIR}/rasta")
-
-ExternalProject_Add_Step(rasta_viewer gem_inverse
-    COMMAND ${CMAKE_COMMAND} -DSOURCE_DIR=<SOURCE_DIR>
-        -P ${PROJECT_SOURCE_DIR}/tools/scripts/rasta_inverse.cmake
-    DEPENDEES patch
-    DEPENDERS configure
-    DEPENDS ${PROJECT_SOURCE_DIR}/tools/scripts/rasta_inverse.cmake)

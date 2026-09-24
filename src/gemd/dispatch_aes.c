@@ -8,11 +8,146 @@
  */
 
 #include "session.h"
+#include "overlay.h"
 
 #include <poll.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
+#include <strings.h>
 #include <sys/socket.h>
+
+static char g_gemd_selected_location[GEM_RPC_LOCATION_PATH_MAX];
+
+static void gemd_location_label(const char *path, char *label,
+                                size_t label_size)
+{
+    const char *leaf = strrchr(path, '/');
+
+    if (strcmp(path, "/") == 0) {
+        strncpy(label, "Root", label_size - 1u);
+    } else if (leaf != NULL && leaf[1] != '\0') {
+        strncpy(label, leaf + 1, label_size - 1u);
+    } else {
+        strncpy(label, path, label_size - 1u);
+    }
+    label[label_size - 1u] = '\0';
+}
+
+static int gemd_location_valid_directory(const char *path)
+{
+    gem_os_file_info_t info;
+
+    return path != NULL && path[0] == '/' && gem_os_stat_path(path, &info) != 0 &&
+           info.is_directory != 0;
+}
+
+static int gemd_location_is_image(const char *path)
+{
+    const char *dot = path == NULL ? NULL : strrchr(path, '.');
+    gem_os_file_info_t info;
+
+    return dot != NULL && gem_os_stat_path(path, &info) != 0 &&
+           info.is_directory == 0 &&
+           (strcasecmp(dot, ".st") == 0 || strcasecmp(dot, ".msa") == 0);
+}
+
+static int gemd_location_list(void *response, uint32_t *response_size)
+{
+    gem_rpc_location_list_t *list = response;
+    size_t i;
+
+    memset(list, 0, sizeof(*list));
+    if (gemconf_get_bool(&g_gemd_config, "desktop", "show_hidden", 0) != 0) {
+        GEM_RPC_LOCATION_LIST_OPTIONS(*list) |= GEM_RPC_DESKTOP_SHOW_HIDDEN;
+    }
+    for (i = 0; i < gemconf_count(&g_gemd_config) &&
+                list->count < GEM_RPC_LOCATION_MAX;
+         ++i) {
+        const char *section = gemconf_entry_section(&g_gemd_config, i);
+        const char *path = gemconf_entry_key(&g_gemd_config, i);
+        const char *label = gemconf_entry_value(&g_gemd_config, i);
+        gem_rpc_location_entry_t *entry = &list->entries[list->count];
+
+        if (section == NULL || strcmp(section, "locations") != 0 ||
+            (!gemd_location_valid_directory(path) &&
+             !gemd_location_is_image(path))) {
+            continue;
+        }
+        strncpy(entry->path, path, sizeof(entry->path) - 1u);
+        strncpy(entry->label, label != NULL ? label : "",
+                sizeof(entry->label) - 1u);
+        if (entry->label[0] == '\0') {
+            gemd_location_label(entry->path, entry->label,
+                                sizeof(entry->label));
+        }
+        entry->type = gemd_location_is_image(path)
+                          ? GEM_RPC_LOCATION_DISK_IMAGE
+                          : GEM_RPC_LOCATION_FOLDER;
+        ++list->count;
+    }
+    *response_size = sizeof(*list);
+    return 1;
+}
+
+static int gemd_location_add(const gem_rpc_location_req_t *req)
+{
+    char label[GEM_RPC_LOCATION_LABEL_MAX];
+
+    if (!gemd_location_valid_directory(req->path) &&
+        !gemd_location_is_image(req->path)) {
+        return -1;
+    }
+    gemd_location_label(req->path, label, sizeof(label));
+    if (gemconf_set(&g_gemd_config, "locations", req->path, label) == 0 ||
+        gemconf_save(&g_gemd_config) == 0) {
+        return -1;
+    }
+    gemd_desktop_config_saved();
+    return 1;
+}
+
+static int gemd_location_remove(const gem_rpc_location_req_t *req)
+{
+    char label[GEM_RPC_LOCATION_LABEL_MAX];
+    char alert[GEM_RPC_TEXT_MAX];
+
+    if (gemconf_get(&g_gemd_config, "locations", req->path, NULL) == NULL) {
+        return -1;
+    }
+    gemd_location_label(req->path, label, sizeof(label));
+    (void)snprintf(alert, sizeof(alert),
+                   "[2][ Are you sure you want to remove \"%s\"? ]["
+                   " Remove | Cancel ]",
+                   label);
+    if (form_alert(2, alert) != 1) {
+        return 2;
+    }
+    if (gemconf_remove(&g_gemd_config, "locations", req->path) == 0 ||
+        gemconf_save(&g_gemd_config) == 0) {
+        return -1;
+    }
+    gemd_desktop_config_saved();
+    return 1;
+}
+
+int gemd_location_delete_event(void)
+{
+    gem_rpc_location_req_t req;
+
+    if (g_gemd_selected_location[0] == '\0') {
+        return 0;
+    }
+    memset(&req, 0, sizeof(req));
+    strncpy(req.path, g_gemd_selected_location, sizeof(req.path) - 1u);
+    (void)gemd_location_remove(&req);
+    return 1;
+}
+
+void gemd_location_clear_selection(void)
+{
+    g_gemd_selected_location[0] = '\0';
+}
 
 static WORD gemd_user_callback(LONG parameter)
 {
@@ -114,6 +249,11 @@ int32_t gemd_dispatch(gemd_session_t *session, const gem_rpc_header_t *header,
     *response_size = 0u;
     gemd_set_current_app(session);
 
+    if (header->opcode >= GEM_RPC_OVERLAY_CREATE &&
+        header->opcode <= GEM_RPC_OVERLAY_UPDATE)
+        return gemd_overlay_dispatch(session, header, payload, response,
+                                     response_size);
+
     if (gemd_dispatch_vdi(session, header, payload, response, response_size,
                           &status)) {
         return status;
@@ -125,8 +265,7 @@ int32_t gemd_dispatch(gemd_session_t *session, const gem_rpc_header_t *header,
             memcpy(packet, payload, sizeof(*packet));
             *response_size = sizeof(*packet);
             if ((packet->function == rpc_appl_read ||
-                 packet->function == rpc_menu_register ||
-                 packet->function == rpc_menu_unregister) &&
+                 packet->function == rpc_menu_register) &&
                 packet->args[0] != session->app_id)
                 break;
             if (packet->function == rpc_appl_write)
@@ -229,7 +368,8 @@ int32_t gemd_dispatch(gemd_session_t *session, const gem_rpc_header_t *header,
         case GEM_RPC_GRAF_MKSTATE: {
             gem_rpc_words8_t *rsp = (gem_rpc_words8_t *)response;
             memset(rsp, 0, sizeof(*rsp));
-            if (g_modal_session && session != g_modal_session) {
+            if (aes_wait_hook == gemd_service_modal &&
+                session != g_modal_session) {
                 rsp->values[0] = vdi_state.mouse_x;
                 rsp->values[1] = vdi_state.mouse_y;
                 rsp->values[2] = vdi_state.mouse_status;
@@ -261,8 +401,61 @@ int32_t gemd_dispatch(gemd_session_t *session, const gem_rpc_header_t *header,
             memcpy(rsp, payload, sizeof(*rsp));
             rsp->path[sizeof(rsp->path) - 1] = '\0';
             rsp->name[sizeof(rsp->name) - 1] = '\0';
-            status = fsel_input(rsp->path, rsp->name, &rsp->button);
+            rsp->title[sizeof(rsp->title) - 1] = '\0';
+            if (rsp->mode == GEM_RPC_FSEL_DIRECTORY) {
+                status = fsel_directory(rsp->path, &rsp->button);
+            } else if (rsp->mode == GEM_RPC_FSEL_LOCATION) {
+                status = fsel_location(rsp->path, rsp->name, &rsp->button);
+            } else if (rsp->mode == GEM_RPC_FSEL_SAVE) {
+                status = fsel_save(rsp->path, rsp->name, &rsp->button);
+            } else {
+                status = fsel_exinput(rsp->path, rsp->name, &rsp->button,
+                                      rsp->title);
+            }
             *response_size = sizeof(*rsp);
+        } break;
+
+        case GEM_RPC_FSEL_OPTIONS: {
+            const gem_rpc_fsel_options_req_t *req =
+                (const gem_rpc_fsel_options_req_t *)payload;
+
+            status = fsel_options(req->options, req->setit);
+        } break;
+
+        case GEM_RPC_LOCATION_LIST:
+            status = gemd_location_list(response, response_size);
+            break;
+
+        case GEM_RPC_LOCATION_ADD: {
+            gem_rpc_location_req_t req;
+
+            memcpy(&req, payload, sizeof(req));
+            req.path[sizeof(req.path) - 1u] = '\0';
+            status = gemd_location_add(&req);
+        } break;
+
+        case GEM_RPC_LOCATION_REMOVE: {
+            gem_rpc_location_req_t req;
+
+            memcpy(&req, payload, sizeof(req));
+            req.path[sizeof(req.path) - 1u] = '\0';
+            status = gemd_location_remove(&req);
+        } break;
+
+        case GEM_RPC_LOCATION_SELECT: {
+            gem_rpc_location_req_t req;
+
+            memcpy(&req, payload, sizeof(req));
+            req.path[sizeof(req.path) - 1u] = '\0';
+            g_gemd_selected_location[0] = '\0';
+            if ((gemd_location_valid_directory(req.path) ||
+                 gemd_location_is_image(req.path)) &&
+                gemconf_get(&g_gemd_config, "locations", req.path, NULL) !=
+                    NULL) {
+                strncpy(g_gemd_selected_location, req.path,
+                        sizeof(g_gemd_selected_location) - 1u);
+            }
+            status = 1;
         } break;
 
         case GEM_RPC_APPL_INIT:
@@ -317,7 +510,8 @@ int32_t gemd_dispatch(gemd_session_t *session, const gem_rpc_header_t *header,
              * synthetic timeout when the caller did not request MU_TIMER.
              */
             memset(rsp, 0, sizeof(*rsp));
-            if (g_modal_session && session != g_modal_session) {
+            if (aes_wait_hook == gemd_service_modal &&
+                session != g_modal_session) {
                 /* Classic synchronous panels keep input modal, but other
                  * processes can still receive redraws and advance timers. */
                 rsp->mx = vdi_state.mouse_x;

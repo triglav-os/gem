@@ -7,4 +7,5 @@ if [[ ! -x "$viewer" ]]; then
     echo 'Run make to download and build Rasta.' >&2
     exit 1
 fi
-exec "$viewer" --inverse --port "${GEM_RASTA_PORT:-5000}" "$@"
+exec "$viewer" --inverse off --cursor "${GEM_RASTA_CURSOR:-off}" --bpp 32 \
+    --port "${GEM_RASTA_PORT:-5000}" "$@"

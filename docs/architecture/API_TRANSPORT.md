@@ -1,7 +1,7 @@
 # Hosted AES and VDI transport
 
 `libgem` exports all 114 functions declared by `include/gem/vdi.h` and all
-76 declared by `include/gem/aes.h`. Applications link it without `libaes` or
+79 declared by `include/gem/aes.h`. Applications link it without `libaes` or
 `libvdi`; only `gemd` owns the rendering libraries and physical display.
 
 ## Components and ownership
@@ -45,6 +45,24 @@ session with other applications, and other clients cannot attach until it exits.
 AES applications continue to share gemd, with per-client VDI attributes and
 visible-window clipping.
 
+### Presenter overlays
+
+`include/gem/overlay.h` adds a presenter-only BGRA API for browser-like
+content. `gem_overlay_create()` attaches a layer to an AES window; resize,
+map/unmap, destroy and dirty-rectangle updates are copied over the private RPC
+transport. Updates are split below the 64 KiB payload limit, and gemd owns the
+copied pixels. The layer is never exposed as an MFDB, BITBLK, AES object-tree
+address, or VDI surface.
+
+Rasta composites BGRA32 directly over the monochrome expansion. Linux converts
+the composited result to its native framebuffer format without discarding RGB
+channels on true-color devices. Alpha is supported in the presenter only; GEM
+chrome and VDI drawing remain monochrome. Gemscape uses this API for CEF output
+and Gemread uses it for MuPDF pages and thumbnails while both retain a native
+monochrome GEM frame. The presenter reapplies the software cursor's masked
+monochrome pixels after overlay composition, so opaque application content
+cannot cover the GEM pointer.
+
 AES object trees use at most 128 objects and a 48 KiB copied data arena. Graphs,
 string termination, aligned descriptors and nonoverlapping referenced regions
 are checked before pointer relocation. Edited text is copied back into the
@@ -85,28 +103,61 @@ an application exits, the bar follows the window now on top, and only
 messages addressed to the leaving application are discarded: the redraw
 hints its closing windows queued to other applications are still delivered.
 
-An always-present system menu (`src/aes/system_menu.c`) occupies the far
-left of the bar, like the classic Apple menu: a fixed three-bar
-menu button with "About GEM" and "Shutdown". It is a gemd concept, drawn and
-tracked by the server through the shared AES from its central HID dispatch;
-gemd installs the Shutdown hook that stops the display server. Application
-menu titles are laid out to its right. The strip and system menu appear
-only within a shared desktop context (a desktop owner exists); a lone
-standalone application keeps the whole screen.
+An always-present system menu (`src/aes/system_menu.c`) occupies the far left
+of the bar, like the classic Apple menu. `menu_register()` installs up to six
+copied service labels and returns their 0–5 ids; selection sends `AC_OPEN` to
+the owner with that id in message word 3. Entries are removed explicitly with
+`menu_unregister()` or automatically when their owner exits. A separator keeps
+these registered GEM services apart from the fixed Shutdown command. Desktop
+registers Add Location there, so it remains reachable even when no icon or
+file-manager menu exists. The server draws and tracks this menu from central
+HID dispatch, and gemd installs the Shutdown hook. Application menu titles are
+laid out to its right. The strip appears only within a shared desktop context;
+a lone standalone application keeps the whole screen.
+
+The file-selector request carries an explicit open, save or directory mode and
+an optional 64-byte dialog title. All modes run through the same server-side
+modal chooser; `fsel_input(path, name, button)` and the titled
+`fsel_exinput(path, name, button, title)` open the same custom selector.
+Save and directory selection are additive wrappers over that validated request
+rather than separate protocol opcodes. Hidden and dot-prefixed directory
+entries are omitted by default. `fsel_options(FSEL_SHOW_HIDDEN, 1)` enables
+them for later selectors, and the option query/update has a dedicated validated
+RPC so direct and proxied applications use the same policy.
+Desktop location records are also gemd-owned. The proxy Desktop publishes its
+selected configured location, while gemd handles location list, add and remove
+requests, persists `desktop.cfg`, owns the Delete-key confirmation, and sends a
+refresh message after a successful change. The location-list response also
+carries the Desktop `show_hidden` preference so proxy and direct File Manager
+enumeration use the same configuration. That option uses a reserved word in
+the final location slot so extending the response did not change its wire size;
+a Desktop and gemd restarted from adjacent builds cannot desynchronize their
+RPC stream at startup. gemd also watches the atomically replaced user
+configuration file and reloads its parsed cache when an independent
+`libgemconf` client saves it.
 Normal event RPCs check queues without sleeping in gemd. libgem maintains
 timer deadlines and yields for one millisecond between empty polls, keeping
 idle applications from delaying other clients' drawing and keyboard input.
 
-The shell scrap is one mutex-protected AES-global blob of up to 32767 bytes;
-`shel_get(SHEL_BUFSIZE)` queries its current size. It is neither per-application
-configuration nor an INF-file parser. Shell launches are separate: gemd reserves
-an application id before starting each child and keeps a bounded id/PID command
-record, while the OS backend supplies the same child-only launch metadata in the
-new process environment. Consequently two concurrently launched applications
-read their own command and exact TOS tail. `doex == 0` is a successful no-op;
-`doex == 1` starts in parallel, while the graphics and overlay flags are retained
-for compatibility. Executable search, spawning, process inspection and reaping
-are all platform OS services; AES does not call host process APIs directly.
+The historical shell scrap is now a compatibility projection of
+`desktop.cfg`. `shel_get()` loads the current configuration and constructs a
+bounded DRI/FreeGEM `DESKTOP.INF` image on demand;
+`shel_get(SHEL_BUFSIZE)` returns that generated size. `shel_put()` validates and
+decodes the complete image, saves structured configuration atomically and asks
+gemd to reload its Desktop cache. One AES mutex covers each load/format or
+parse/save transaction, so concurrent legacy clients cannot expose a torn
+translation. There is no cached legacy blob and no real `DESKTOP.INF` file.
+
+Shell launches are separate. `shel_read()` returns the command and TOS tail for
+the calling child, while `shel_write()` reserves an application id before
+starting it. gemd keeps a bounded id/PID command record, and the OS backend
+supplies the same child-only launch metadata in the new process environment.
+Consequently two concurrently launched applications read their own command and
+exact TOS tail. File Manager resolves ordered `desktop.cfg` associations before
+this call; Atari executable suffixes default to Stout and mounted programs
+retain both their `A:/` guest path and image path in the quoted tail.
+`doex == 0` is a successful no-op; `doex == 1` starts in
+parallel, while the graphics and overlay flags are retained for compatibility.
 
 ## Scope of “all APIs”
 

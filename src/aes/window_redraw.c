@@ -14,6 +14,9 @@
 
 #include <string.h>
 
+/* The AES library is also used without gemd; gemd supplies this optional hook. */
+extern void gemd_overlay_window_top_changed(void) __attribute__((weak));
+
 static void aes_window_draw_cover_rect(const aes_window_t *window, GRECT *out);
 static void aes_queue_desktop_redraw(const GRECT *dirty);
 static void aes_queue_window_redraw(const aes_window_t *window,
@@ -334,6 +337,11 @@ void aes_redraw_window_change(const GRECT *before, const GRECT *after)
     WORD exposed_count;
     WORD i;
 
+    /* Native overlays are composited outside the VDI framebuffer.  Update
+     * their visibility mask before presenting damage caused by any open,
+     * close, move, resize, full or iconify transition. */
+    aes_notify_window_topology_changed();
+
     aes_expand_window_damage_rect(before, &expanded_before);
     aes_expand_window_damage_rect(after, &expanded_after);
     exposed_count =
@@ -351,6 +359,13 @@ void aes_redraw_window_change(const GRECT *before, const GRECT *after)
     aes_trace("window_change redraw_after=%d,%d %dx%d", expanded_after.g_x,
               expanded_after.g_y, expanded_after.g_w, expanded_after.g_h);
     aes_redraw_region(&expanded_after);
+}
+
+void aes_notify_window_topology_changed(void)
+{
+    if (gemd_overlay_window_top_changed != NULL) {
+        gemd_overlay_window_top_changed();
+    }
 }
 
 void aes_redraw_window_title_states(const aes_window_t *previous_top,
@@ -453,6 +468,7 @@ void aes_top_window(aes_window_t *window)
                    (aes_window_rect_is_obscured(window, &window->work) != 0);
 
     aes_raise_window(window);
+    aes_notify_window_topology_changed();
     aes_redraw_window_title_states(previous_top, window);
 
     if (was_obscured == 0 || aes_state.vdi_ready == 0) {

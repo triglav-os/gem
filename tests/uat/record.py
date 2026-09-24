@@ -16,7 +16,7 @@ def run(number):
     result=subprocess.run(command,capture_output=True,text=True)
     return number,result.returncode,result.stderr[-1000:]
 if __name__=='__main__':
-    numbers=list(map(int,sys.argv[1:])) or list(range(1,34))
+    numbers=list(map(int,sys.argv[1:])) or list(range(1,35))
     with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
         results=list(pool.map(run,numbers))
     for number,status,error in results:

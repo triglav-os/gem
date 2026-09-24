@@ -70,7 +70,9 @@ Current hosted service limits are:
 | Normal server-side event poll | Nonblocking; libgem waits in the client |
 | Menu objects / copied strings | 64 / 32 |
 | Concurrent AES launch records | 32 |
-| AES-global shell buffer | 32767 bytes |
+| Generated DESKTOP.INF compatibility image | 32767 bytes |
+| System-menu registrations | 6 labels; 63 bytes each |
+| Component configuration file | 64 KiB; 63/127/1023-byte section/key/value |
 
 Expired clients are disconnected and their owned resources/locks released.
 The libgem event wrapper preserves the application's requested logical timer
@@ -98,12 +100,17 @@ another application; disconnect/expiry unwinds only the owner's lock depth.
 Polling uses connection generations so callbacks cannot reuse stale readiness
 information after a session slot and file descriptor are recycled.
 
-Classic `form_alert` and `fsel_input` remain synchronous and input-modal.
+Classic `form_alert` and the open/save/directory selectors remain synchronous
+and input-modal.
 Their waits now service other connections, messages and timers, protect the
 panel's visible area from background drawing, and cancel when their requester
 disconnects. A second standard panel waits rather than recursively opening.
 These panels are not independent per-application input-modal windows: the
 classic shared desktop still has one interactive standard panel at a time.
+Classic applications may also bracket a custom object tree with
+`form_dial(FMD_START/FMD_FINISH)`. gemd records that owner and rectangle so
+mouse and keyboard events cannot leak to a covered File Manager window; an
+unexpected client exit clears the ownership and redraws the exposed region.
 
 `shel_write` executes as the gemd user and is not a privilege boundary. It
 does not invoke a command shell: the platform backend resolves an executable,
@@ -145,6 +152,19 @@ than exponential recursion. Directory scans yield to other connections every
 64 entries, including entries rejected by the filter. Individual filesystem
 calls are still synchronous and can block on an unhealthy mounted filesystem.
 
+`libgemconf` accepts only simple component names and absolute XDG base paths.
+It bounds files and every section/key/value, rejects embedded line breaks and
+oversized existing files, and atomically replaces user files after creating a
+private configuration directory. Configuration is ordinary same-user input,
+not a trust or privilege boundary; a same-UID process can still change it.
+gemd detects replacement of the user `desktop.cfg`, reloads its parsed cache
+and sends Desktop a refresh message. The legacy shell adapter additionally
+bounds lines, record counts and text fields while translating DRI/FreeGEM
+records. One mutex covers each legacy load/format or parse/atomic-save
+transaction; unknown syntactically valid records are stored as bounded hex.
+Independent `libgemconf` read-modify-write transactions are not merged, so
+cooperating modern applications must avoid writing the same component at once.
+
 Copied AES trees also validate offsets, aligned descriptors and nonoverlapping
 regions before relocation. USERDEF callbacks execute in the originating client;
 gemd services nested requests with bounded callback waits. The wire protocol
@@ -162,6 +182,8 @@ security-related checks include:
   overlong paths, truncated and malformed font metadata and glyph offsets,
   WORD-limit copy corners and text positions, screen scroll overlap and edges.
 - `test_gem_header`: public header compatibility.
+- `test_gemconf`: XDG precedence, typed reads, entry enumeration, length and
+  component validation, removal and atomic user-file persistence.
 - `test_gem_rpc`: existing fragmented/malformed traffic, normal proxy output
   buffers, scrap/menu lifecycle, HID modifiers and redraw/button state;
   wrong-source and oversized HID datagrams and invalid client buffer requests.
@@ -177,10 +199,12 @@ security-related checks include:
   target file, normal framebuffer publication/replacement, ID rollover, and
   standard/hostile wildcard patterns.
 - `test_aes_shell`: shell-start command synthesis, environment and path lookup,
-  a 4096-byte size query, and concurrent global-buffer writes without tearing.
+  concurrent DESKTOP.INF translations without tearing, location/association
+  round trips and direct `libgemconf` changes visible through `shel_get`.
 - `test_aes_rpc`: parallel Clock/Terminal launches with distinct application
-  ids and tails, missing-executable failure, and no shell metadata leakage into
-  the parent environment.
+  ids and tails, missing-executable failure, no shell metadata leakage into the
+  parent environment, legacy configuration translation, and gemd reload after
+  an independent `libgemconf` save.
 
 The RPC runner also verifies refusal of regular-file, symlink and live-socket
 collisions, preservation of those paths, and normal socket removal on exit.
@@ -229,11 +253,13 @@ avoids unsigned-underflow disconnects of healthy background applications.
 
 ## September 2026 audit additions
 
-The build obtains Rasta over verified TLS from a pinned archive with a checked
-SHA-256 hash. Default launchers use that binary and never kill unrelated viewer
-or server processes. The optional Docker compiler runs with the caller's UID,
-no additional capabilities and no-new-privileges; its workspace bind remains
-writable because it is a build environment, not a sandbox for hostile code.
+The build obtains Rasta and CEF over verified TLS from pinned archives with
+checked SHA-256 hashes. Their downloaded and extracted files remain in ignored
+build storage. Default launchers use the downloaded Rasta binary and never kill
+unrelated viewer or server processes. The optional Docker compiler runs with
+the caller's UID, no additional capabilities and no-new-privileges; its
+workspace bind remains writable because it is a build environment, not a
+sandbox for hostile code.
 
 FAT12 reads check sector multiplication, image bounds, FAT capacity and file
 size before allocation. Directory traversal rejects unsafe names, tracks visited
@@ -241,6 +267,12 @@ clusters and limits depth and entry count. MSA geometry is bounded to 256 tracks
 two sides and 128 sectors per track. Extraction walks directory file descriptors
 and refuses symlinks, non-regular files, foreign owners and multiply linked files.
 Stout checks VDI array counts and guest memory spans before stack-buffer copies.
+A writable raw `.ST` mount is an explicit mutation target. Guest-relative A:
+paths are normalized as FAT 8.3 components and cannot escape the image; cluster
+chains and directory growth are bounded by validated FAT12 geometry. Updates
+modify both FAT copies in memory and atomically replace only the selected image.
+`.MSA` mounts remain read-only. This protects unrelated host paths but does not
+make an untrusted guest or its selected disk image a security boundary.
 A NULL AES object clipping rectangle now resolves to screen bounds.
 
 The regression inputs and scan disposition are in

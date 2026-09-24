@@ -8,6 +8,7 @@
  */
 
 #include "desktop.h"
+#include "prg/prg.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -60,15 +61,16 @@ static int desktop_browser_entry_cmp(const void *left, const void *right)
 static int desktop_browser_name_is_app(const char *name, int executable)
 {
     const char *ext;
+    prg_file_kind_t program_kind;
 
-    if (name == NULL || executable == 0) {
+    if (name == NULL) {
         return 0;
     }
     ext = strrchr(name, '.');
-    if (ext != NULL &&
-        (strcasecmp(ext, ".app") == 0 || strcasecmp(ext, ".prg") == 0)) {
+    if (prg_file_kind(name, &program_kind)) {
         return 1;
     }
+    if (executable == 0) return 0;
     if (ext != NULL &&
         (strcasecmp(ext, ".so") == 0 || strcasecmp(ext, ".a") == 0 ||
          strcasecmp(ext, ".o") == 0)) {
@@ -78,12 +80,14 @@ static int desktop_browser_name_is_app(const char *name, int executable)
            !(strncmp(name, "lib", 3u) == 0 && ext == NULL);
 }
 
-int desktop_browser_entry_is_launchable(const desktop_browser_window_t *browser,
-                                        const desktop_browser_entry_t *entry)
+static int desktop_browser_name_is_disk_image(const char *name)
 {
-    return browser != NULL && browser->backend == DESKTOP_BROWSER_FILES &&
-           entry != NULL && entry->is_dir == 0 && entry->is_parent == 0 &&
-           entry->is_app != 0;
+    const char *ext;
+
+    if (name == NULL) return 0;
+    ext = strrchr(name, '.');
+    return ext != NULL &&
+           (strcasecmp(ext, ".st") == 0 || strcasecmp(ext, ".msa") == 0);
 }
 
 static void desktop_browser_reset_entries(desktop_browser_window_t *browser,
@@ -165,6 +169,10 @@ static int desktop_browser_load_directory(desktop_browser_window_t *browser,
         if (strcmp(source.name, ".") == 0 || strcmp(source.name, "..") == 0) {
             continue;
         }
+        if (g_desktop.show_hidden == 0 &&
+            (source.info.is_hidden != 0 || source.name[0] == '.')) {
+            continue;
+        }
         item = &browser->entries[browser->entry_count];
         memset(item, 0, sizeof(*item));
         if (snprintf(item->name, sizeof(item->name), "%s", source.name) <= 0 ||
@@ -187,6 +195,89 @@ static int desktop_browser_load_directory(desktop_browser_window_t *browser,
     return 1;
 }
 
+typedef struct desktop_disk_list_context {
+    desktop_browser_window_t *browser;
+    const char *prefix;
+} desktop_disk_list_context_t;
+
+static int desktop_browser_add_disk_entry(const fat12_dirent_t *source,
+                                          const char *relative, void *opaque)
+{
+    desktop_disk_list_context_t *context = opaque;
+    desktop_browser_window_t *browser = context->browser;
+    desktop_browser_entry_t *item;
+    const char *name = relative;
+    size_t prefix_length = strlen(context->prefix);
+
+    if (prefix_length != 0u) {
+        if (strncmp(relative, context->prefix, prefix_length) != 0 ||
+            relative[prefix_length] != '/') return 1;
+        name = relative + prefix_length + 1u;
+    }
+    if (strchr(name, '/') != NULL || name[0] == '\0' ||
+        (source->attr & FAT12_ATTR_VOLUME) != 0u ||
+        (g_desktop.show_hidden == 0 &&
+         (source->attr & FAT12_ATTR_HIDDEN) != 0u) ||
+        browser->entry_count >= DESKTOP_BROWSER_MAX_ENTRIES) return 1;
+    item = &browser->entries[browser->entry_count++];
+    memset(item, 0, sizeof(*item));
+    snprintf(item->name, sizeof(item->name), "%s", name);
+    if (snprintf(item->path, sizeof(item->path), "%s/%s", browser->disk_root,
+                 relative) >= (int)sizeof(item->path))
+        return 1;
+    item->is_dir = (source->attr & FAT12_ATTR_DIRECTORY) != 0u;
+    /* FAT attributes do not contain a Unix-style executable bit. Only the
+     * registered Atari executable suffixes are programs on a disk image. */
+    item->is_app = desktop_browser_name_is_app(item->name, 0);
+    item->is_executable = item->is_app;
+    item->size_bytes = source->size;
+    return 1;
+}
+
+static int desktop_browser_load_disk(desktop_browser_window_t *browser,
+                                     const char *path)
+{
+    desktop_disk_list_context_t context;
+    char requested_path[GEM_OS_PATH_MAX];
+    char error_text[256];
+    const char *prefix = "";
+
+    if (browser == NULL || path == NULL) return 0;
+    (void)snprintf(requested_path, sizeof(requested_path), "%s", path);
+    if (!browser->disk_open &&
+        !stout_disk_open(&browser->disk, requested_path, error_text,
+                         sizeof(error_text))) {
+        desktop_set_status(error_text[0] != '\0' ? error_text
+                                                   : "Unable to open disk image.");
+        return 0;
+    }
+    browser->disk_open = 1;
+    browser->backend = DESKTOP_BROWSER_DISK;
+    if (browser->disk_root[0] == '\0')
+        snprintf(browser->disk_root, sizeof(browser->disk_root), "%s",
+                 requested_path);
+    if (strncmp(requested_path, browser->disk_root,
+                strlen(browser->disk_root)) == 0 &&
+        requested_path[strlen(browser->disk_root)] == '/')
+        prefix = requested_path + strlen(browser->disk_root) + 1u;
+    desktop_browser_reset_entries(browser, requested_path);
+    if (prefix[0] != '\0') desktop_browser_add_parent(browser);
+    context.browser = browser;
+    context.prefix = prefix;
+    if (stout_disk_fat12(&browser->disk) == NULL ||
+        !fat12_walk_root(stout_disk_fat12(&browser->disk),
+                         desktop_browser_add_disk_entry, &context,
+                         error_text, sizeof(error_text))) {
+        desktop_set_status(error_text[0] != '\0' ? error_text
+                                                   : "Invalid FAT12 disk image.");
+        return 0;
+    }
+    qsort(browser->entries, (size_t)browser->entry_count,
+          sizeof(browser->entries[0]), desktop_browser_entry_cmp);
+    desktop_browser_set_title(browser);
+    return 1;
+}
+
 typedef struct desktop_trash_load_context {
     desktop_browser_window_t *browser;
 } desktop_trash_load_context_t;
@@ -201,6 +292,9 @@ static int desktop_browser_add_trash_item(const gem_trash_item_t *source,
 
     if (browser->entry_count >= DESKTOP_BROWSER_MAX_ENTRIES) {
         return 0;
+    }
+    if (g_desktop.show_hidden == 0 && source->name[0] == '.') {
+        return 1;
     }
     item = &browser->entries[browser->entry_count++];
     memset(item, 0, sizeof(*item));
@@ -247,6 +341,8 @@ int desktop_browser_reload(desktop_browser_window_t *browser)
         strcmp(browser->path, "trash://") == 0) {
         return desktop_browser_load_trash(browser);
     }
+    if (browser->backend == DESKTOP_BROWSER_DISK)
+        return desktop_browser_load_disk(browser, browser->path);
     /*
      * desktop_browser_load_directory() resets browser->path before loading
      * its entries.  Preserve the source string here: passing browser->path
@@ -262,11 +358,16 @@ int desktop_browser_reload(desktop_browser_window_t *browser)
 
 void desktop_browser_resort(desktop_browser_window_t *browser)
 {
+    WORD index;
+
     if (browser == NULL || browser->entry_count <= 0) {
         return;
     }
     qsort(browser->entries, (size_t)browser->entry_count,
           sizeof(browser->entries[0]), desktop_browser_entry_cmp);
+    for (index = 0; index < browser->entry_count; ++index) {
+        browser->entries[index].selected = 0;
+    }
     browser->selected_index = NIL;
     browser->last_click_index = NIL;
     browser->last_click_ms = 0u;
@@ -367,6 +468,13 @@ void desktop_browser_open_entry(desktop_browser_window_t *browser, WORD index)
         return;
     }
     if (entry->is_parent != 0) {
+        if (browser->backend == DESKTOP_BROWSER_DISK) {
+            if (desktop_browser_parent_path(browser->path, path,
+                                            sizeof(path)) != 0 &&
+                desktop_browser_load_disk(browser, path) != 0)
+                desktop_browser_changed(browser);
+            return;
+        }
         if (desktop_browser_parent_path(browser->path, path, sizeof(path)) != 0 &&
             desktop_browser_load_directory(browser, path,
                                            strcmp(path, "/") != 0) != 0) {
@@ -375,23 +483,25 @@ void desktop_browser_open_entry(desktop_browser_window_t *browser, WORD index)
         return;
     }
     if (entry->is_dir != 0) {
-        if (desktop_browser_load_directory(browser, entry->path, 1) != 0) {
+        /* Loading replaces browser->entries, so do not pass a path owned by
+         * the entry array into the loader that is about to overwrite it. */
+        (void)snprintf(path, sizeof(path), "%s", entry->path);
+        if ((browser->backend == DESKTOP_BROWSER_DISK
+                 ? desktop_browser_load_disk(browser, path)
+                 : desktop_browser_load_directory(browser, path, 1)) !=
+            0) {
             desktop_browser_changed(browser);
         }
         return;
     }
+    if (desktop_browser_name_is_disk_image(entry->name) != 0 &&
+        browser->backend == DESKTOP_BROWSER_FILES) {
+        desktop_open_disk_path(entry->path, entry->name);
+        return;
+    }
     if (desktop_browser_entry_is_launchable(browser, entry) != 0) {
-        char tail[2] = {0, 0};
-
-        if (shel_write(1, 1, 0, (char *)entry->path, tail) != 0) {
-            (void)snprintf(path, sizeof(path), "Launched %.*s", 480,
-                           entry->name);
-        } else {
-            (void)snprintf(path, sizeof(path), "Launch failed: %.*s", 470,
-                           entry->name);
-        }
+        (void)desktop_browser_launch_entry(browser, entry, path, sizeof(path));
         desktop_set_status(path);
-        desktop_redraw(NULL);
     }
 }
 
@@ -450,14 +560,27 @@ static WORD desktop_browser_used_count(void)
 void desktop_open_disk_path(const char *path, const char *label)
 {
     desktop_browser_window_t *browser = desktop_alloc_browser();
+    WORD icon;
 
     (void)label;
+    for (icon = 0; icon < g_desktop.icon_count; ++icon) {
+        if (g_desktop.icons[icon].is_folder != 0 &&
+            g_desktop.icons[icon].is_trash == 0 &&
+            strcmp(g_desktop.icons[icon].path, path) == 0) {
+            desktop_select_icon(g_desktop.icons[icon].object_id);
+            break;
+        }
+    }
     if (browser == NULL) {
         desktop_set_status("No free file windows.");
     } else {
+        int loaded;
         browser->backend = DESKTOP_BROWSER_FILES;
-        if (desktop_browser_load_directory(browser, path,
-                                           strcmp(path, "/") != 0) == 0 ||
+        loaded = (desktop_browser_name_is_disk_image(path) != 0)
+                     ? desktop_browser_load_disk(browser, path)
+                     : desktop_browser_load_directory(browser, path,
+                                                      strcmp(path, "/") != 0);
+        if (loaded == 0 ||
             desktop_browser_open_window(browser,
                                         desktop_browser_used_count()) == 0) {
             memset(browser, 0, sizeof(*browser));
@@ -491,6 +614,7 @@ void desktop_browser_close(desktop_browser_window_t *browser)
     if (browser == NULL || browser->used == 0) {
         return;
     }
+    if (browser->disk_open) stout_disk_free(&browser->disk);
     wind_get(browser->handle, WF_WXYWH, &outer.g_x, &outer.g_y, &outer.g_w,
              &outer.g_h);
     (void)wind_close(browser->handle);

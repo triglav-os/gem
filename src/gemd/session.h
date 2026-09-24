@@ -15,6 +15,7 @@
 #include "transport.h"
 #include "drawing.h"
 #include "gem/gemd.h"
+#include "gem/gemconf.h"
 
 #include "platform/hid.h"
 #include "platform/os.h"
@@ -57,6 +58,10 @@ extern struct stat g_socket_identity;
 extern int g_socket_bound;
 extern volatile sig_atomic_t g_stopping;
 extern gemd_session_t *g_modal_session;
+extern gemconf_t g_gemd_config;
+
+/* Record and announce a desktop.cfg save already applied to the cache. */
+void gemd_desktop_config_saved(void);
 
 /* Release a session's copied menu objects and strings. */
 void gemd_free_session_menu(gemd_session_t *session);
@@ -74,6 +79,9 @@ void gemd_accept_client(void);
 int gemd_init_listener(void);
 /* Close every session, the workstation and the listener. */
 void gemd_shutdown(void);
+/* Handle a physical Delete for the location currently selected by Desktop. */
+int gemd_location_delete_event(void);
+void gemd_location_clear_selection(void);
 /* Nonzero when the session may run a request under update locks. */
 int gemd_session_may_run(const gemd_session_t *session);
 /* Nonzero when the session may perform an already validated request. */

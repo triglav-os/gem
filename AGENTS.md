@@ -16,6 +16,8 @@ update this index when documents move or new essential guidance is added.
   dependencies and standalone builds against the public GEM SDK.
 - [Linux backend guide](docs/guides/GEMIX_LINUX.md): native backend configuration,
   packaging and deployment.
+- [Configuration guide](docs/guides/CONFIGURATION.md): XDG component files,
+  syntax, Desktop locations and the libgemconf API.
 - [API transport](docs/architecture/API_TRANSPORT.md): libgem/gemd architecture,
   protocol, API coverage and compatibility limits.
 - [Security and safety](docs/architecture/SECURITY.md): trust boundaries,

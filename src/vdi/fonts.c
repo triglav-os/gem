@@ -12,11 +12,11 @@
 
 #include "fonts_private.h"
 
-#include <dirent.h>
+#include "platform/os.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 
 static vdi_font_t g_vdi_fonts[vdi_max_fonts];
 static WORD g_vdi_current_font = vdi_font_id_system;
@@ -37,8 +37,6 @@ static const char *font_dir(void)
 {
     static char path[4096];
     const char *resource_dir = getenv("GEM_RESOURCE_DIR");
-    ssize_t length;
-    char *slash;
 
     if (resource_dir != NULL && resource_dir[0] != '\0') {
         if (snprintf(path, sizeof(path), "%s/fonts", resource_dir) <
@@ -46,18 +44,13 @@ static const char *font_dir(void)
             return path;
         }
     }
-    length = readlink("/proc/self/exe", path, sizeof(path) - 1u);
-    if (length > 0 && (size_t)length < sizeof(path)) {
-        path[length] = '\0';
-        slash = strrchr(path, '/');
+    if (gem_os_find_file("bin/resources/fonts/AtariSTHigh.fnt", path,
+                         sizeof(path)) != 0) {
+        char *slash = strrchr(path, '/');
+
         if (slash != NULL) {
             *slash = '\0';
-            if (strlen(path) + strlen("/../share/gem/fonts") < sizeof(path)) {
-                strcat(path, "/../share/gem/fonts");
-                if (access(path, R_OK) == 0) {
-                    return path;
-                }
-            }
+            return path;
         }
     }
 #ifdef GEM_BUILD_FONT_DIR
@@ -198,9 +191,11 @@ static int load_font_file(vdi_font_t *font, WORD font_id, const char *file_name)
 {
     BYTE path[512];
     char stored_file_name[64];
-    FILE *stream;
-    long file_size;
+    int fd;
+    int64_t file_size;
     uint8_t *data;
+    size_t offset;
+    int32_t count;
     uint32_t fields[3];
     uint32_t data_offset = 0u;
     uint32_t off_offset = 0u;
@@ -215,33 +210,35 @@ static int load_font_file(vdi_font_t *font, WORD font_id, const char *file_name)
                            stored_file_name);
     if (path_length < 0 || (size_t)path_length >= sizeof(path))
         return 0;
-    stream = fopen((const char *)path, "rb");
-    if (stream == NULL) {
+    fd = gem_os_open_read((const char *)path);
+    if (fd < 0) {
         return 0;
     }
 
-    if (fseek(stream, 0L, SEEK_END) != 0) {
-        fclose(stream);
-        return 0;
-    }
-    file_size = ftell(stream);
+    file_size = gem_os_seek(fd, 0, 2);
     if (file_size < 88L || file_size > 16L * 1024L * 1024L ||
-        fseek(stream, 0L, SEEK_SET) != 0) {
-        fclose(stream);
+        gem_os_seek(fd, 0, 0) < 0) {
+        gem_os_close(fd);
         return 0;
     }
 
     data = malloc((size_t)file_size);
     if (data == NULL) {
-        fclose(stream);
+        gem_os_close(fd);
         return 0;
     }
-    if (fread(data, 1u, (size_t)file_size, stream) != (size_t)file_size) {
-        fclose(stream);
-        free(data);
-        return 0;
+    offset = 0u;
+    while (offset < (size_t)file_size) {
+        count = gem_os_read(fd, data + offset,
+                            (uint32_t)((size_t)file_size - offset));
+        if (count <= 0) {
+            gem_os_close(fd);
+            free(data);
+            return 0;
+        }
+        offset += (size_t)count;
     }
-    fclose(stream);
+    gem_os_close(fd);
 
     clear_font_runtime(font);
     font->font_id = font_id;
@@ -438,36 +435,34 @@ int vdi_load_fonts(void)
 
 WORD vdi_load_external_fonts(void)
 {
-    DIR *directory;
-    struct dirent *entry;
+    gem_os_dir_t directory;
+    gem_os_dirent_t entry;
 
     if (!vdi_load_fonts()) {
         return 0;
     }
 
-    directory = opendir(font_dir());
-    if (directory == NULL) {
+    if (!gem_os_dir_open(font_dir(), &directory)) {
         return vdi_font_count();
     }
 
-    while ((entry = readdir(directory)) != NULL) {
+    while (gem_os_dir_read(&directory, &entry)) {
         WORD slot;
         WORD font_id;
 
-        if (!is_font_file_name(entry->d_name) ||
-            is_system_file_name(entry->d_name) ||
-            is_small_file_name(entry->d_name)) {
+        if (!is_font_file_name(entry.name) ||
+            is_system_file_name(entry.name) || is_small_file_name(entry.name)) {
             continue;
         }
 
         font_id = next_dynamic_font_id();
-        slot = reserve_font_slot(-1, font_id, entry->d_name);
+        slot = reserve_font_slot(-1, font_id, entry.name);
         if (slot >= 0) {
             (void)load_font_slot(&g_vdi_fonts[slot]);
         }
     }
 
-    closedir(directory);
+    gem_os_dir_close(&directory);
     return vdi_font_count();
 }
 

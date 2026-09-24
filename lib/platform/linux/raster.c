@@ -28,6 +28,100 @@ static uint8_t *g_framebuffer;
 static size_t g_framebuffer_size;
 static int g_framebuffer_fd = -1;
 
+enum { linux_overlay_max = 8, linux_overlay_limit = 8 * 1024 * 1024 };
+enum { linux_overlay_occlusion_max = 16 };
+typedef struct linux_overlay {
+    uint32_t id;
+    int x;
+    int y;
+    uint16_t width;
+    uint16_t height;
+    int visible;
+    int occlusion[linux_overlay_occlusion_max][4];
+    unsigned occlusion_count;
+    uint8_t *pixels;
+} linux_overlay_t;
+static linux_overlay_t g_overlays[linux_overlay_max];
+static unsigned g_overlay_count;
+static int g_cursor_x;
+static int g_cursor_y;
+static uint16_t g_cursor_mask[16];
+static int g_cursor_visible;
+
+static linux_overlay_t *find_overlay(uint32_t id)
+{
+    for (size_t i = 0; i < linux_overlay_max; ++i)
+        if (g_overlays[i].pixels != NULL && g_overlays[i].id == id)
+            return &g_overlays[i];
+    return NULL;
+}
+
+static int overlay_active(void)
+{
+    return g_overlay_count != 0u;
+}
+
+static int overlay_occluded(const linux_overlay_t *overlay, int x, int y)
+{
+    for (unsigned i = 0; i < overlay->occlusion_count; ++i) {
+        const int *r = overlay->occlusion[i];
+        if (x >= r[0] && y >= r[1] && x < r[0] + r[2] &&
+            y < r[1] + r[3])
+            return 1;
+    }
+    return 0;
+}
+
+static int overlay_color(int x, int y, uint8_t *red, uint8_t *green,
+                         uint8_t *blue)
+{
+    if (g_overlay_count == 0u)
+        return 0;
+    for (size_t i = linux_overlay_max; i-- > 0;) {
+        const linux_overlay_t *overlay = &g_overlays[i];
+        int ox = x - overlay->x;
+        int oy = y - overlay->y;
+        const uint8_t *pixel;
+        unsigned alpha;
+
+        if (overlay->pixels == NULL || overlay->visible == 0 || ox < 0 || oy < 0 ||
+            ox >= overlay->width || oy >= overlay->height)
+            continue;
+        if (overlay_occluded(overlay, x, y) != 0)
+            continue;
+        pixel = overlay->pixels +
+                ((size_t)oy * overlay->width + (size_t)ox) * 4u;
+        alpha = pixel[3];
+        if (alpha == 0u)
+            continue;
+        if (alpha == 255u) {
+            *blue = pixel[0];
+            *green = pixel[1];
+            *red = pixel[2];
+            return 1;
+        }
+        *blue = (uint8_t)((pixel[0] * alpha + *blue * (255u - alpha) +
+                           127u) /
+                          255u);
+        *green = (uint8_t)((pixel[1] * alpha + *green * (255u - alpha) +
+                            127u) /
+                           255u);
+        *red = (uint8_t)((pixel[2] * alpha + *red * (255u - alpha) + 127u) /
+                         255u);
+        return 1;
+    }
+    return 0;
+}
+
+static void clear_overlays(void)
+{
+    for (size_t i = 0; i < linux_overlay_max; ++i) {
+        free(g_overlays[i].pixels);
+        memset(&g_overlays[i], 0, sizeof(g_overlays[i]));
+    }
+    g_overlay_count = 0u;
+}
+
 static const char *framebuffer_path(void)
 {
     const char *path = getenv("GEM_LINUX_FB");
@@ -111,6 +205,8 @@ int gem_raster_init(uint16_t width, uint16_t height, gem_raster_format_t format)
         return 0;
     }
 
+    clear_overlays();
+    g_cursor_visible = 0;
     g_framebuffer_fd = open(framebuffer_path(), O_RDWR | O_CLOEXEC);
     if (g_framebuffer_fd < 0) {
         return 0;
@@ -178,6 +274,8 @@ int gem_raster_resync(void)
 
 void gem_raster_shutdown(void)
 {
+    clear_overlays();
+    g_cursor_visible = 0;
     free(g_surface.pixels);
     if (g_framebuffer != NULL) {
         (void)munmap(g_framebuffer, g_framebuffer_size);
@@ -304,7 +402,8 @@ void gem_raster_present_rect(int x, int y, int width, int height)
     }
 
     /* QEMU std / most DRM fbdev: 32bpp, 4-byte aligned line length. */
-    if (g_var.bits_per_pixel == 32u && (g_fix.line_length % 4u) == 0u &&
+    if (!overlay_active() && g_var.bits_per_pixel == 32u &&
+        (g_fix.line_length % 4u) == 0u &&
         ((uintptr_t)g_framebuffer % 4u) == 0u) {
         present_rect_xrgb32(source, x0, y0, x1, y1);
         return;
@@ -344,15 +443,151 @@ void gem_raster_present_rect(int x, int y, int width, int height)
                 (size_t)row_y * g_surface.pitch + (size_t)col_x / 8u;
             uint8_t mask = (uint8_t)(0x80u >> ((unsigned int)col_x & 7u));
             int bit_set = (source[source_offset] & mask) != 0u;
-            uint8_t intensity = shadow_bit_to_intensity(bit_set);
-            uint32_t pixel = (g_var.bits_per_pixel == 8u)
-                                 ? intensity
-                                 : native_pixel(intensity);
+                uint8_t intensity = shadow_bit_to_intensity(bit_set);
+                uint8_t red = intensity;
+                uint8_t green = intensity;
+                uint8_t blue = intensity;
+                (void)overlay_color(col_x, row_y, &red, &green, &blue);
+                if (g_cursor_visible != 0 && col_x >= g_cursor_x &&
+                    col_x < g_cursor_x + 16 && row_y >= g_cursor_y &&
+                    row_y < g_cursor_y + 16 &&
+                    (g_cursor_mask[row_y - g_cursor_y] &
+                     (uint16_t)(0x8000u >> (col_x - g_cursor_x))) != 0u)
+                    red = green = blue = intensity;
+                uint32_t pixel;
+
+                if (g_var.bits_per_pixel == 8u) {
+                    pixel = ((unsigned)red * 77u +
+                             (unsigned)green * 150u +
+                             (unsigned)blue * 29u + 128u) / 256u;
+                } else {
+                    pixel = scale_channel(red, g_var.red.length)
+                                << g_var.red.offset;
+                    pixel |= scale_channel(green, g_var.green.length)
+                             << g_var.green.offset;
+                    pixel |= scale_channel(blue, g_var.blue.length)
+                             << g_var.blue.offset;
+                    if (g_var.transp.length != 0u)
+                        pixel |= scale_channel(255u, g_var.transp.length)
+                                 << g_var.transp.offset;
+                }
 
             write_native_pixel(row + (size_t)col_x * bytes_per_pixel, pixel,
                                bytes_per_pixel);
         }
     }
+}
+
+void gem_raster_cursor_update(int x, int y, const uint16_t mask[16],
+                              int visible)
+{
+    g_cursor_x = x;
+    g_cursor_y = y;
+    if (mask != NULL)
+        memcpy(g_cursor_mask, mask, sizeof(g_cursor_mask));
+    else
+        memset(g_cursor_mask, 0, sizeof(g_cursor_mask));
+    g_cursor_visible = visible != 0;
+}
+
+int gem_raster_overlay_create(uint32_t id, int x, int y, uint16_t width,
+                              uint16_t height)
+{
+    linux_overlay_t *overlay = find_overlay(id);
+    size_t size = (size_t)width * height * 4u;
+
+    if (width == 0u || height == 0u || size > linux_overlay_limit)
+        return 0;
+    if (overlay == NULL) {
+        for (size_t i = 0; i < linux_overlay_max; ++i) {
+            if (g_overlays[i].pixels == NULL) {
+                overlay = &g_overlays[i];
+                overlay->pixels = calloc(1u, size);
+                if (overlay->pixels == NULL)
+                    return 0;
+                overlay->id = id;
+                overlay->visible = 1;
+                ++g_overlay_count;
+                break;
+            }
+        }
+    } else if (overlay->width != width || overlay->height != height) {
+        uint8_t *pixels = realloc(overlay->pixels, size);
+        if (pixels == NULL)
+            return 0;
+        overlay->pixels = pixels;
+        memset(overlay->pixels, 0, size);
+    }
+    if (overlay == NULL)
+        return 0;
+    overlay->x = x;
+    overlay->y = y;
+    overlay->width = width;
+    overlay->height = height;
+    return 1;
+}
+
+void gem_raster_overlay_set_visible(uint32_t id, int visible)
+{
+    linux_overlay_t *overlay = find_overlay(id);
+
+    if (overlay != NULL)
+        overlay->visible = (visible != 0);
+}
+
+void gem_raster_overlay_set_occlusion(uint32_t id, const int *rects,
+                                      unsigned count)
+{
+    linux_overlay_t *overlay = find_overlay(id);
+    unsigned limited = count > linux_overlay_occlusion_max
+                           ? linux_overlay_occlusion_max
+                           : count;
+    if (overlay == NULL)
+        return;
+    overlay->occlusion_count = limited;
+    if (limited != 0u && rects != NULL)
+        memcpy(overlay->occlusion, rects, (size_t)limited * 4u * sizeof(int));
+}
+
+int gem_raster_overlay_resize(uint32_t id, int x, int y, uint16_t width,
+                              uint16_t height)
+{
+    return gem_raster_overlay_create(id, x, y, width, height);
+}
+
+int gem_raster_overlay_update(uint32_t id, int x, int y, uint16_t width,
+                              uint16_t height, const uint8_t *bgra,
+                              uint16_t pitch)
+{
+    linux_overlay_t *overlay = find_overlay(id);
+
+    if (overlay == NULL || bgra == NULL || width == 0u || height == 0u ||
+        x < 0 || y < 0 || x + width > overlay->width ||
+        y + height > overlay->height || pitch < width * 4u)
+        return 0;
+    for (uint16_t row = 0; row < height; ++row)
+        memcpy(overlay->pixels +
+                   ((size_t)(y + row) * overlay->width + (size_t)x) * 4u,
+               bgra + (size_t)row * pitch, (size_t)width * 4u);
+    gem_raster_present_rect(overlay->x + x, overlay->y + y, width, height);
+    return 1;
+}
+
+void gem_raster_overlay_destroy(uint32_t id)
+{
+    linux_overlay_t *overlay = find_overlay(id);
+
+    if (overlay != NULL) {
+        free(overlay->pixels);
+        memset(overlay, 0, sizeof(*overlay));
+        if (g_overlay_count != 0u)
+            --g_overlay_count;
+    }
+}
+
+void gem_raster_overlay_clear(void)
+{
+    clear_overlays();
 }
 
 void gem_raster_present(void)

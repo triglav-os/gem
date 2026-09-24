@@ -18,7 +18,16 @@ typedef struct desktop_icon_drag_shape {
     WORD count;
 } desktop_icon_drag_shape_t;
 
+typedef struct desktop_drag_selection {
+    const desktop_browser_window_t *browser;
+    WORD primary_index;
+    WORD initial_dx;
+    WORD initial_dy;
+} desktop_drag_selection_t;
+
 static void desktop_browser_set_drop_target(WORD object, UWORD state);
+static void desktop_browser_build_list_drag_shape(
+    const GRECT *outline, desktop_icon_drag_shape_t *shape);
 
 static int
 desktop_browser_entry_has_prg_icon(const desktop_browser_window_t *browser,
@@ -28,7 +37,7 @@ desktop_browser_entry_has_prg_icon(const desktop_browser_window_t *browser,
         entry->is_parent != 0) {
         return 0;
     }
-    return entry->is_executable != 0;
+    return entry->is_app != 0;
 }
 
 const char *
@@ -135,6 +144,40 @@ static int desktop_browser_icon_rect(const desktop_browser_window_t *browser,
     rect->g_w = DESKTOP_ICON_OBJECT_W;
     rect->g_h = DESKTOP_ICON_OBJECT_H;
     return 1;
+}
+
+static WORD desktop_browser_entry_at(const desktop_browser_window_t *browser,
+                                     WORD x, WORD y)
+{
+    WORD index;
+
+    if (browser == NULL || x < browser->work.g_x || y < browser->work.g_y ||
+        x >= browser->work.g_x + browser->work.g_w ||
+        y >= browser->work.g_y + browser->work.g_h ||
+        y >= browser->work.g_y + browser->work.g_h -
+                 desktop_browser_band_height()) return NIL;
+    if (browser->view_mode == DESKTOP_BROWSER_VIEW_ICONS) {
+        WORD relative_x =
+            (WORD)(x - browser->work.g_x - DESKTOP_ICON_MARGIN_X);
+        WORD relative_y =
+            (WORD)(y - browser->work.g_y - DESKTOP_ICON_MARGIN_Y);
+        GRECT rect;
+
+        if (relative_x < 0 || relative_y < 0) return NIL;
+        index = (WORD)(browser->top_index +
+                       (relative_y / DESKTOP_ICON_STEP_Y) *
+                           browser->columns_visible +
+                       relative_x / DESKTOP_BROWSER_ICON_STEP_X);
+        if (desktop_browser_icon_rect(browser, index, &rect) == 0 ||
+            x >= rect.g_x + rect.g_w || y >= rect.g_y + rect.g_h) return NIL;
+    } else {
+        if (y < browser->work.g_y + desktop_browser_band_height()) return NIL;
+        index = (WORD)(browser->top_index +
+                       (y - browser->work.g_y -
+                        desktop_browser_band_height()) /
+                           DESKTOP_BROWSER_ROW_H);
+    }
+    return index >= 0 && index < browser->entry_count ? index : NIL;
 }
 
 static void desktop_browser_icon_parts(
@@ -384,9 +427,7 @@ void desktop_browser_redraw(desktop_browser_window_t *browser,
                             &browser->entries[index];
                         const desktop_icon_asset_t *asset =
                             desktop_browser_entry_asset(browser, entry);
-                        UWORD state = (browser->selected_index == index)
-                                          ? SELECTED
-                                          : NORMAL;
+                        UWORD state = entry->selected != 0 ? SELECTED : NORMAL;
 
                         desktop_draw_icon_object(asset, entry->name, &icon_rect,
                                                  state);
@@ -416,7 +457,7 @@ void desktop_browser_redraw(desktop_browser_window_t *browser,
                             (WORD)(browser->work.g_x + browser->work.g_w - 1);
                         row_fill[3] = row_bottom;
 
-                        if (browser->selected_index == index) {
+                        if (entry->selected != 0) {
                             vsf_color(g_desktop.vdi_handle, WHITE);
                             vr_recfl(g_desktop.vdi_handle, row_fill);
                             vst_color(g_desktop.vdi_handle, BLACK);
@@ -425,8 +466,6 @@ void desktop_browser_redraw(desktop_browser_window_t *browser,
                         }
 
                         desktop_browser_list_draw_row(browser, entry, row_y);
-                        desktop_browser_list_draw_row_separator(browser,
-                                                               row_y);
                     }
                 }
                 /* Paint the fixed header last so rows can never cover it. */
@@ -470,7 +509,7 @@ static void desktop_browser_scroll_to(desktop_browser_window_t *browser,
 }
 
 static int desktop_browser_wait_for_drag(WORD x, WORD y, WORD *mouse_x,
-                                         WORD *mouse_y)
+                                         WORD *mouse_y, WORD *key_state)
 {
     enum { DRAG_POLL_MS = 10 };
     WORD message[8] = {0};
@@ -489,9 +528,11 @@ static int desktop_browser_wait_for_drag(WORD x, WORD y, WORD *mouse_x,
             (WORD)(DESKTOP_DRAG_THRESHOLD * 2 + 1), 0, 0, 0, 0, 0, message,
             DRAG_POLL_MS, 0, mouse_x, mouse_y, &buttons, &keys, &key, &clicks);
         if ((event & MU_M1) != 0) {
+            if (key_state != NULL) *key_state = keys;
             return (buttons & 1) != 0;
         }
         if ((event & MU_BUTTON) != 0) {
+            if (key_state != NULL) *key_state = keys;
             return 0;
         }
     }
@@ -534,27 +575,138 @@ static void desktop_browser_draw_drag_shape(
     v_show_c(g_desktop.vdi_handle, 1);
 }
 
-static int desktop_browser_track_drag_shape(
-    const desktop_icon_drag_shape_t *shape, WORD start_x, WORD start_y,
-    WORD mouse_x, WORD mouse_y, WORD *final_x, WORD *final_y)
+static int desktop_browser_drag_shape_for_entry(
+    const desktop_drag_selection_t *selection, WORD index, WORD dx, WORD dy,
+    desktop_icon_drag_shape_t *shape, GRECT *outline_out)
+{
+    const desktop_browser_window_t *browser = selection->browser;
+    GRECT outline;
+
+    if ((browser->view_mode == DESKTOP_BROWSER_VIEW_ICONS
+             ? desktop_browser_icon_rect(browser, index, &outline)
+             : desktop_browser_row_rect(browser, index, &outline)) == 0) {
+        return 0;
+    }
+    if (browser->view_mode == DESKTOP_BROWSER_VIEW_LIST &&
+        outline.g_w > DESKTOP_BROWSER_ICON_STEP_X) {
+        outline.g_w = DESKTOP_BROWSER_ICON_STEP_X;
+    }
+    outline.g_x = (WORD)(outline.g_x + selection->initial_dx + dx);
+    outline.g_y = (WORD)(outline.g_y + selection->initial_dy + dy);
+    if (browser->view_mode == DESKTOP_BROWSER_VIEW_ICONS) {
+        desktop_browser_build_icon_drag_shape(browser, index, &outline, shape);
+    } else {
+        desktop_browser_build_list_drag_shape(&outline, shape);
+    }
+    if (outline_out != NULL) *outline_out = outline;
+    return 1;
+}
+
+static void desktop_browser_draw_move_marker(const GRECT *outline)
+{
+    WORD attributes[4] = {1, BLACK, MD_REPLACE, 1};
+    WORD marker[10];
+    WORD x = (WORD)(outline->g_x + outline->g_w - 10);
+    WORD y = (WORD)(outline->g_y + 4);
+
+    /* A compact M badge distinguishes Control-move from the plain copy
+     * contour without resembling the conventional plus sign for Copy. */
+    marker[0] = x;
+    marker[1] = (WORD)(y + 7);
+    marker[2] = x;
+    marker[3] = y;
+    marker[4] = (WORD)(x + 3);
+    marker[5] = (WORD)(y + 4);
+    marker[6] = (WORD)(x + 6);
+    marker[7] = y;
+    marker[8] = (WORD)(x + 6);
+    marker[9] = (WORD)(y + 7);
+    v_hide_c(g_desktop.vdi_handle);
+    (void)vql_attributes(g_desktop.vdi_handle, attributes);
+    (void)vswr_mode(g_desktop.vdi_handle, MD_XOR);
+    (void)vsl_type(g_desktop.vdi_handle, 1);
+    (void)vsl_color(g_desktop.vdi_handle, WHITE);
+    v_pline(g_desktop.vdi_handle, 5, marker);
+    (void)vsl_type(g_desktop.vdi_handle, attributes[0]);
+    (void)vsl_color(g_desktop.vdi_handle, attributes[1]);
+    (void)vswr_mode(g_desktop.vdi_handle, attributes[2]);
+    v_show_c(g_desktop.vdi_handle, 1);
+}
+
+static void desktop_browser_draw_drag_selection(
+    const desktop_drag_selection_t *selection, WORD dx, WORD dy, int move)
+{
+    const desktop_browser_window_t *browser = selection->browser;
+    GRECT primary_outline;
+    WORD index;
+    int primary_drawn = 0;
+
+    for (index = 0; index < browser->entry_count; ++index) {
+        desktop_icon_drag_shape_t shape;
+
+        if (browser->entries[index].selected == 0 ||
+            browser->entries[index].is_parent != 0 ||
+            desktop_browser_drag_shape_for_entry(selection, index, dx, dy,
+                                                  &shape,
+                                                  index == selection->primary_index
+                                                      ? &primary_outline
+                                                      : NULL) == 0) {
+            continue;
+        }
+        desktop_browser_draw_drag_shape(&shape, 0, 0);
+        if (index == selection->primary_index) primary_drawn = 1;
+    }
+    if (move != 0 && primary_drawn != 0) {
+        desktop_browser_draw_move_marker(&primary_outline);
+    }
+}
+
+static int desktop_browser_move_target_at(
+    const desktop_drag_selection_t *selection, WORD x, WORD y,
+    WORD key_state)
+{
+    desktop_browser_window_t *target;
+    WORD target_index;
+
+    if ((key_state & K_CTRL) == 0 ||
+        selection->browser->backend != DESKTOP_BROWSER_FILES) return 0;
+    target = desktop_find_browser_by_handle(wind_find(x, y));
+    if (target == NULL || target->backend != DESKTOP_BROWSER_FILES) return 0;
+    target_index = desktop_browser_entry_at(target, x, y);
+    if (target == selection->browser) {
+        return target_index >= 0 && target_index < target->entry_count &&
+               target_index != selection->primary_index &&
+               target->entries[target_index].is_dir != 0 &&
+               target->entries[target_index].selected == 0;
+    }
+    return 1;
+}
+
+static int desktop_browser_track_drag_selection(
+    const desktop_drag_selection_t *selection, WORD start_x, WORD start_y,
+    WORD mouse_x, WORD mouse_y, WORD *final_x, WORD *final_y,
+    WORD initial_keys, WORD *final_keys)
 {
     enum { DRAG_POLL_MS = 10 };
     WORD message[8] = {0};
     WORD buttons = 1;
-    WORD keys = 0;
+    WORD keys = initial_keys;
     WORD key = 0;
     WORD clicks = 0;
     WORD dx = (WORD)(mouse_x - start_x);
     WORD dy = (WORD)(mouse_y - start_y);
     WORD target = NIL;
     UWORD target_state = NORMAL;
+    int move = desktop_browser_move_target_at(selection, mouse_x, mouse_y,
+                                              keys);
     WORD event;
 
-    desktop_browser_draw_drag_shape(shape, dx, dy);
+    desktop_browser_draw_drag_selection(selection, dx, dy, move);
     for (;;) {
         WORD next_dx;
         WORD next_dy;
         WORD next_target;
+        int next_move;
 
         event = evnt_multi(MU_BUTTON | MU_TIMER, 1, 1, 0, 0, 0, 0, 0, 0, 0,
                            0, 0, 0, 0, message, DRAG_POLL_MS, 0, &mouse_x,
@@ -562,8 +714,11 @@ static int desktop_browser_track_drag_shape(
         next_dx = (WORD)(mouse_x - start_x);
         next_dy = (WORD)(mouse_y - start_y);
         next_target = desktop_browser_drag_target_at(mouse_x, mouse_y);
-        if (next_dx != dx || next_dy != dy || next_target != target) {
-            desktop_browser_draw_drag_shape(shape, dx, dy);
+        next_move = desktop_browser_move_target_at(selection, mouse_x, mouse_y,
+                                                   keys);
+        if (next_dx != dx || next_dy != dy || next_target != target ||
+            next_move != move) {
+            desktop_browser_draw_drag_selection(selection, dx, dy, move);
             if (target != NIL && next_target != target) {
                 desktop_browser_set_drop_target(target, target_state);
                 target = NIL;
@@ -576,13 +731,14 @@ static int desktop_browser_track_drag_shape(
             }
             dx = next_dx;
             dy = next_dy;
-            desktop_browser_draw_drag_shape(shape, dx, dy);
+            move = next_move;
+            desktop_browser_draw_drag_selection(selection, dx, dy, move);
         }
         if ((event & MU_BUTTON) != 0 || (buttons & 1) == 0) {
             break;
         }
     }
-    desktop_browser_draw_drag_shape(shape, dx, dy);
+    desktop_browser_draw_drag_selection(selection, dx, dy, move);
     if (target != NIL) {
         desktop_browser_set_drop_target(target, target_state);
     }
@@ -591,6 +747,9 @@ static int desktop_browser_track_drag_shape(
     }
     if (final_y != NULL) {
         *final_y = mouse_y;
+    }
+    if (final_keys != NULL) {
+        *final_keys = keys;
     }
     return 1;
 }
@@ -614,22 +773,23 @@ static void desktop_browser_build_list_drag_shape(
     shape->count = 5;
 }
 
-void desktop_browser_begin_drag(WORD handle, WORD index, WORD x, WORD y)
+int desktop_browser_begin_drag(WORD handle, WORD index, WORD x, WORD y)
 {
     desktop_browser_window_t *browser = desktop_find_browser_by_handle(handle);
     GRECT outline;
     WORD destination_x;
     WORD destination_y;
-    WORD pointer_offset_x;
-    WORD pointer_offset_y;
+    WORD key_state;
     WORD mouse_x;
     WORD mouse_y;
-    desktop_icon_drag_shape_t drag_shape;
+    desktop_drag_selection_t selection;
 
-    if (browser == NULL || browser->backend != DESKTOP_BROWSER_FILES ||
+    if (browser == NULL ||
+        (browser->backend != DESKTOP_BROWSER_FILES &&
+         browser->backend != DESKTOP_BROWSER_DISK) ||
         index < 0 || index >= browser->entry_count ||
         browser->entries[index].is_parent != 0) {
-        return;
+        return 0;
     }
     g_desktop.drag_browser_handle = handle;
     g_desktop.drag_entry_index = index;
@@ -639,44 +799,28 @@ void desktop_browser_begin_drag(WORD handle, WORD index, WORD x, WORD y)
              : desktop_browser_row_rect(browser, index, &outline)) == 0) {
         g_desktop.drag_browser_handle = NIL;
         g_desktop.drag_entry_index = NIL;
-        return;
+        return 0;
     }
-    pointer_offset_x = (WORD)(x - outline.g_x);
-    pointer_offset_y = (WORD)(y - outline.g_y);
-    if (desktop_browser_wait_for_drag(x, y, &mouse_x, &mouse_y) == 0) {
+    if (desktop_browser_wait_for_drag(x, y, &mouse_x, &mouse_y,
+                                      &key_state) == 0) {
         g_desktop.drag_browser_handle = NIL;
         g_desktop.drag_entry_index = NIL;
-        return;
+        return 0;
     }
     g_desktop.drag_started = 1;
-    outline.g_x = (WORD)(mouse_x - pointer_offset_x);
-    outline.g_y = (WORD)(mouse_y - pointer_offset_y);
-    if (browser->view_mode == DESKTOP_BROWSER_VIEW_ICONS) {
-        desktop_browser_build_icon_drag_shape(browser, index, &outline,
-                                              &drag_shape);
-        if (desktop_browser_track_drag_shape(
-                &drag_shape, mouse_x, mouse_y, mouse_x, mouse_y,
-                &destination_x, &destination_y) == 0) {
-            g_desktop.drag_browser_handle = NIL;
-            g_desktop.drag_entry_index = NIL;
-            return;
-        }
-        desktop_browser_end_drag(destination_x, destination_y);
-        return;
-    }
-    if (browser->view_mode == DESKTOP_BROWSER_VIEW_LIST &&
-        outline.g_w > DESKTOP_BROWSER_ICON_STEP_X) {
-        outline.g_w = DESKTOP_BROWSER_ICON_STEP_X;
-    }
-    desktop_browser_build_list_drag_shape(&outline, &drag_shape);
-    if (desktop_browser_track_drag_shape(
-            &drag_shape, mouse_x, mouse_y, mouse_x, mouse_y, &destination_x,
-            &destination_y) == 0) {
+    selection.browser = browser;
+    selection.primary_index = index;
+    selection.initial_dx = (WORD)(mouse_x - x);
+    selection.initial_dy = (WORD)(mouse_y - y);
+    if (desktop_browser_track_drag_selection(
+            &selection, mouse_x, mouse_y, mouse_x, mouse_y, &destination_x,
+            &destination_y, key_state, &key_state) == 0) {
         g_desktop.drag_browser_handle = NIL;
         g_desktop.drag_entry_index = NIL;
-        return;
+        return 0;
     }
-    desktop_browser_end_drag(destination_x, destination_y);
+    desktop_browser_end_drag(destination_x, destination_y, key_state);
+    return 1;
 }
 
 static void desktop_browser_set_drop_target(WORD object, UWORD state)
@@ -690,7 +834,7 @@ static void desktop_browser_set_drop_target(WORD object, UWORD state)
     desktop_redraw(&dirty);
 }
 
-void desktop_browser_end_drag(WORD x, WORD y)
+void desktop_browser_end_drag(WORD x, WORD y, WORD key_state)
 {
     desktop_browser_window_t *browser =
         desktop_find_browser_by_handle(g_desktop.drag_browser_handle);
@@ -711,9 +855,12 @@ void desktop_browser_end_drag(WORD x, WORD y)
     browser->last_click_ms = 0u;
     target_handle = wind_find(x, y);
     target_browser = desktop_find_browser_by_handle(target_handle);
-    if (target_browser != NULL &&
-        target_browser->backend == DESKTOP_BROWSER_TRASH) {
-        desktop_trash_browser_entry(browser, index);
+    if (target_browser != NULL) {
+        desktop_browser_sync_work(target_browser);
+        desktop_browser_drop_entry(
+            browser, index, target_browser,
+            desktop_browser_entry_at(target_browser, x, y),
+            (key_state & K_CTRL) != 0);
         return;
     }
     if (target_handle != 0) {
@@ -743,7 +890,12 @@ void desktop_browser_handle_key(WORD key)
     WORD character = (WORD)(key & 0xff);
     WORD next;
     WORD page;
+    WORD index;
 
+    if (character == 127 || scan == 0x4c || scan == 0x53 || scan == 0x7f) {
+        desktop_delete_active_selection();
+        return;
+    }
     if (browser == NULL) {
         return;
     }
@@ -779,6 +931,10 @@ void desktop_browser_handle_key(WORD key)
             next = (WORD)(browser->entry_count - 1);
         }
     }
+    for (index = 0; index < browser->entry_count; ++index) {
+        browser->entries[index].selected = 0;
+    }
+    browser->entries[next].selected = 1;
     browser->selected_index = next;
     browser->last_click_index = NIL;
     page = browser->view_mode == DESKTOP_BROWSER_VIEW_ICONS
@@ -794,16 +950,37 @@ void desktop_browser_handle_key(WORD key)
     desktop_update_desk_menu_labels();
 }
 
-void desktop_browser_handle_click(WORD handle, WORD mx, WORD my)
+static void desktop_browser_clear_selection(desktop_browser_window_t *browser)
+{
+    WORD index;
+
+    if (browser == NULL) return;
+    for (index = 0; index < browser->entry_count; ++index) {
+        browser->entries[index].selected = 0;
+    }
+    browser->selected_index = NIL;
+}
+
+static WORD desktop_browser_first_selected(
+    const desktop_browser_window_t *browser)
+{
+    WORD index;
+
+    if (browser == NULL) return NIL;
+    for (index = 0; index < browser->entry_count; ++index) {
+        if (browser->entries[index].selected != 0) return index;
+    }
+    return NIL;
+}
+
+void desktop_browser_handle_click(WORD handle, WORD mx, WORD my,
+                                  WORD key_state)
 {
     desktop_browser_window_t *browser = desktop_find_browser_by_handle(handle);
     WORD index;
-    WORD previous_index;
     uint32_t now;
-    GRECT dirty;
-    GRECT rect;
-    int dirty_set = 0;
     int is_double_click;
+    int shifted = (key_state & (K_LSHIFT | K_RSHIFT)) != 0;
 
     if (browser == NULL) {
         return;
@@ -844,6 +1021,11 @@ void desktop_browser_handle_click(WORD handle, WORD mx, WORD my)
             if (desktop_browser_icon_rect(browser, index, &hit_rect) == 0 ||
                 mx >= hit_rect.g_x + hit_rect.g_w ||
                 my >= hit_rect.g_y + hit_rect.g_h) {
+                if (shifted == 0) {
+                    desktop_browser_clear_selection(browser);
+                    desktop_browser_redraw(browser, NULL);
+                    desktop_update_desk_menu_labels();
+                }
                 return;
             }
         }
@@ -862,54 +1044,48 @@ void desktop_browser_handle_click(WORD handle, WORD mx, WORD my)
                            DESKTOP_BROWSER_ROW_H);
     }
     if (index < 0 || index >= browser->entry_count) {
+        if (shifted == 0) {
+            desktop_browser_clear_selection(browser);
+            desktop_browser_redraw(browser, NULL);
+            desktop_update_desk_menu_labels();
+        }
         return;
     }
 
     now = gem_os_ticks_ms();
     is_double_click =
-        browser->last_click_index == index &&
+        shifted == 0 && browser->last_click_index == index &&
         (uint32_t)(now - browser->last_click_ms) <= DESKTOP_DOUBLE_CLICK_MS;
-    previous_index = browser->selected_index;
-    browser->selected_index = index;
-    if (((browser->view_mode == DESKTOP_BROWSER_VIEW_ICONS)
-             ? desktop_browser_icon_rect(browser, previous_index, &dirty)
-             : desktop_browser_row_rect(browser, previous_index, &dirty)) !=
-        0) {
-        if (browser->view_mode == DESKTOP_BROWSER_VIEW_ICONS) {
-            desktop_expand_icon_damage_rect(&dirty);
+    if (shifted != 0) {
+        browser->entries[index].selected =
+            browser->entries[index].selected == 0;
+        browser->selected_index = browser->entries[index].selected != 0
+                                      ? index
+                                      : desktop_browser_first_selected(browser);
+        browser->last_click_index = NIL;
+        browser->last_click_ms = 0u;
+    } else {
+        if (is_double_click != 0 || browser->entries[index].selected == 0) {
+            desktop_browser_clear_selection(browser);
         }
-        dirty_set = 1;
+        browser->entries[index].selected = 1;
+        browser->selected_index = index;
     }
-    if (((browser->view_mode == DESKTOP_BROWSER_VIEW_ICONS)
-             ? desktop_browser_icon_rect(browser, index, &rect)
-             : desktop_browser_row_rect(browser, index, &rect)) != 0) {
-        if (browser->view_mode == DESKTOP_BROWSER_VIEW_ICONS) {
-            desktop_expand_icon_damage_rect(&rect);
-        }
-        if (dirty_set == 0) {
-            dirty = rect;
-            dirty_set = 1;
-        } else {
-            WORD x0 = (dirty.g_x < rect.g_x) ? dirty.g_x : rect.g_x;
-            WORD y0 = (dirty.g_y < rect.g_y) ? dirty.g_y : rect.g_y;
-            WORD x1 =
-                (WORD)(((dirty.g_x + dirty.g_w - 1) > (rect.g_x + rect.g_w - 1))
-                           ? (dirty.g_x + dirty.g_w - 1)
-                           : (rect.g_x + rect.g_w - 1));
-            WORD y1 =
-                (WORD)(((dirty.g_y + dirty.g_h - 1) > (rect.g_y + rect.g_h - 1))
-                           ? (dirty.g_y + dirty.g_h - 1)
-                           : (rect.g_y + rect.g_h - 1));
-
-            dirty.g_x = x0;
-            dirty.g_y = y0;
-            dirty.g_w = (WORD)(x1 - x0 + 1);
-            dirty.g_h = (WORD)(y1 - y0 + 1);
-        }
-    }
-    desktop_browser_redraw(browser, dirty_set != 0 ? &dirty : NULL);
+    desktop_browser_redraw(browser, NULL);
     desktop_update_desk_menu_labels();
 
+    if (shifted != 0) {
+        return;
+    }
+
+    /* A press on an already-selected item may be either the second click of
+     * a double-click or the start of a drag.  Wait for the drag threshold
+     * before opening it; opening immediately makes selected items impossible
+     * to drag during the double-click interval. */
+    if (browser->entries[index].selected != 0 &&
+        desktop_browser_begin_drag(handle, index, mx, my) != 0) {
+        return;
+    }
     if (is_double_click != 0) {
         browser->last_click_index = NIL;
         browser->last_click_ms = 0u;
@@ -917,7 +1093,6 @@ void desktop_browser_handle_click(WORD handle, WORD mx, WORD my)
     } else {
         browser->last_click_index = index;
         browser->last_click_ms = now;
-        desktop_browser_begin_drag(handle, index, mx, my);
     }
 }
 

@@ -193,7 +193,8 @@ WORD form_do(OBJECT *tree, WORD startob)
                 }
                 return 0;
             }
-            if (ascii == '\t' || scancode == 43 || scancode == 15) {
+            if (ascii == '\t' ||
+                (ascii == 0 && (scancode == 43 || scancode == 15))) {
                 active = aes_form_find_next_editable(
                     tree, active,
                     (aes_state.key_state & (K_LSHIFT | K_RSHIFT)) != 0u);
@@ -207,8 +208,8 @@ WORD form_do(OBJECT *tree, WORD startob)
                 }
                 continue;
             }
-            if (scancode == 41 || scancode == 28 || ascii == '\r' ||
-                ascii == '\n') {
+            if (ascii == '\r' || ascii == '\n' ||
+                (ascii == 0 && (scancode == 41 || scancode == 28))) {
                 WORD button = aes_form_find_default_exit(tree);
 
                 if (button != NIL) {
@@ -259,7 +260,6 @@ WORD form_dial(WORD flag, WORD x1, WORD y1, WORD w1, WORD h1, WORD x2, WORD y2,
                WORD w2, WORD h2)
 {
     GRECT dirty;
-    GRECT desktop;
 
     (void)flag;
     (void)x1;
@@ -272,13 +272,17 @@ WORD form_dial(WORD flag, WORD x1, WORD y1, WORD w1, WORD h1, WORD x2, WORD y2,
     (void)h2;
 
     if (flag == FMD_START || flag == FMD_GROW) {
-        aes_desktop_rect(&desktop);
-        if (desktop.g_w > 0 && desktop.g_h > 0) {
-            aes_redraw_region(&desktop);
-        }
+        aes_state.modal_form_owner_app_id = aes_state.current_app_id;
+        aes_set_rect(&aes_state.modal_form_rect, x2, y2, w2, h2);
+        aes_state.active_app_id = aes_state.current_app_id;
+        aes_state.input_focus_app_id = aes_state.current_app_id;
     }
 
     if (flag == FMD_FINISH || flag == FMD_SHRINK) {
+        if (aes_state.modal_form_owner_app_id == aes_state.current_app_id) {
+            aes_state.modal_form_owner_app_id = 0;
+            aes_set_rect(&aes_state.modal_form_rect, 0, 0, 0, 0);
+        }
         aes_state.hover_tree = NULL;
         aes_set_rect(&dirty, x2, y2, w2, h2);
         aes_redraw_region(&dirty);

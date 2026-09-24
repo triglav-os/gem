@@ -28,6 +28,7 @@ VOID v_hide_c(VDI_HANDLE handle)
 
         vdi_state.cursor_hidden = 1;
         vdi_prepare_screen_write();
+        vdi_presenter_cursor_sync();
         /* Cheap cursor erase even under begin_update / wind_update. */
         gem_raster_present_rect((int)cx, (int)cy, 17, 17);
     }

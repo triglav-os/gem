@@ -19,6 +19,12 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
             IMPORTED_LOCATION "${GEM_${name}_LIBRARY}"
             INTERFACE_INCLUDE_DIRECTORIES "${GEM_SDK_INCLUDE_DIR}")
     endforeach()
+    find_library(GEM_gemconf_LIBRARY NAMES gemconf
+        HINTS ${GEM_SDK_ROOT}/lib REQUIRED)
+    add_library(gemconf STATIC IMPORTED)
+    set_target_properties(gemconf PROPERTIES
+        IMPORTED_LOCATION "${GEM_gemconf_LIBRARY}"
+        INTERFACE_INCLUDE_DIRECTORIES "${GEM_SDK_INCLUDE_DIR}")
     set_target_properties(gem PROPERTIES INTERFACE_LINK_LIBRARIES platform_linux)
     set_target_properties(aes PROPERTIES INTERFACE_LINK_LIBRARIES vdi)
     if(GEM_SDK_PLATFORM STREQUAL "rasta")

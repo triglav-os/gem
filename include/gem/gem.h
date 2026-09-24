@@ -12,5 +12,6 @@
 
 #include "gem/aes.h"
 #include "gem/vdi.h"
+#include "gem/overlay.h"
 
 #endif /* GEM_H */

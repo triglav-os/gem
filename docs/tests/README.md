@@ -40,19 +40,19 @@ See [UAT scenarios](UAT.md), [API scope](../architecture/API_TRANSPORT.md) and
 `uat_desktop_direct` and `uat_desktop_proxy` verify disk, Workspace and Trash
 bitmaps, double-click Workspace, enter a fixture directory, return to its
 parent and close the file manager. They also verify the Name, Date, Size and
-Type list header, centered dotted-separated rows, fixed count/size status band
-and metadata fields. Captured screens and results are in
+Type list header, centered rows without separator rules, fixed count/size
+status band and metadata fields. Captured screens and results are in
 `build/uat/desktop_direct/` and `build/uat/desktop_proxy/`.
 See [desktop regression](DESKTOP.md) for the causes and repair.
 
-Desktop acceptance also checks menu sizing, the information alert and File →
-Open. The full-session interaction test additionally verifies opening and
+Desktop acceptance also checks menu sizing, Locations and File → Open. The
+full-session interaction test additionally verifies opening and
 closing Workspace while all F5 samples remain alive.
 
-The F5 check also leaves Desk open for three seconds with a partial RPC frame
-pending, then selects Desktop info above a window closer and keeps the alert
-open seven seconds. The client connection, window geometries and all sample
-processes must survive. See [the Desktop info regression](DESKTOP.md) for the
+The F5 check also leaves the system menu open for three seconds with a partial
+RPC frame pending, then selects Shutdown above a window closer and keeps the
+confirmation open seven seconds. The client connection, window geometries and
+all sample processes must survive. See [the modal menu regression](DESKTOP.md) for the
 reproduced disconnect and timeout-accounting fix.
 
 That prolonged alert check also covers background request traffic across
@@ -63,10 +63,26 @@ with a fresh post-I/O timestamp.
 ## Security and build verification
 
 `security_disk` extracts generated hostile FAT/MSA fixtures through the real
-MSA sample. `security_guest` runs malformed VDI traps through Stout/Musashi.
+MSA sample. `security_guest` runs malformed VDI traps through Stout/Musashi and
+executes GEMDOS, BIOS and XBIOS calls through their real 68000 trap vectors. It
+also verifies TOS caller-owned trap-stack cleanup and persists a nested relative
+`Fcreate` from an A: guest into the same generated raw ST image. A second guest
+creates the same nested file from C:, verifying that host programs use their
+source directory, create missing parents and do not produce `.TOS.files`
+sidecars.
 `test_security_bounds` checks sector overflow and all 128-bit shift counts from
 zero through 128 under sanitizers. Fixtures and outputs remain under `build/`.
 The normal sample disk and IMGVIEW files belong in `samples/data/`.
+`test_gem_trash` also covers the File Manager's no-follow copy/move backend:
+regular files, nested directories, collision preservation, descendant-copy
+rejection and cross-filesystem directory moves.
+`uat_file_drop_direct` and `uat_file_drop_proxy` exercise the actual pointer
+drag between two overlapping File Manager windows, including Shift
+multi-selection, immediate plain Copy, immediate Control-Move, its live `M`
+badge, suppression of that badge over Trash and recursive folder copying. It
+also descends five nested folders and starts a drag from an item selected by
+the immediately preceding click. A generated FAT12 image verifies hidden-entry
+filtering plus file and recursive-directory extraction into the Linux target.
 
 `make standards` and `make audit` are separate audits, not extra UAT passes.
 See [security/build audit](SECURITY_AUDIT.md) for scan coverage, finding
@@ -74,12 +90,14 @@ classification, standalone SDK and Docker verification. Dated reports preserve
 failed intermediate runs so regressions and their fixes remain visible.
 
 `test_aes_shell` exercises direct shell-start synthesis, environment/file
-lookup, the shell-buffer size query and concurrent complete-buffer updates.
-`test_aes_rpc` additionally launches two proxy applications in parallel and
-checks their distinct ids, commands and TOS tails, missing-program failure and
-the absence of child launch variables in the parent.
+lookup, on-demand DESKTOP.INF generation, structured `desktop.cfg` updates and
+concurrent legacy translations without tearing. It also verifies that a direct
+`libgemconf` save is reflected by the next `shel_get`. `test_aes_rpc`
+additionally checks the translation through a real gemd, its file-replacement
+watch/reload path, and two parallel child launches with distinct ids, commands
+and TOS tails, missing-program failure and no parent launch-variable leakage.
 
 `test_rasta_polarity` runs the downloaded viewer's core tests plus the local
 inverse-mode regression. It verifies black ink/white paper in decoded RGB,
 option parsing and preservation across subscriber reconfiguration. Full-session
-checks also require F5 to launch the viewer with `--inverse`.
+checks also require F5 to launch the viewer with `--inverse off --bpp 32`.

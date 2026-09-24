@@ -1,7 +1,7 @@
 # Musashi integration patches
 
 Only the build recipe and `patches/hosted.patch` live in
-`samples/lib/musashi/`. CMake downloads the pinned upstream source into the
+`lib/musashi/`. CMake downloads the pinned upstream source into the
 ignored build tree and applies that patch; see the
 [dependency guide](../guides/SAMPLES.md#cached-musashi-dependency). Preserve
 upstream licenses and conventions. This records local changes made during the September

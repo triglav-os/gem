@@ -32,6 +32,8 @@ enum {
      */
     AES_MAX_MESSAGES = 64,
     AES_MAX_WINDOWS = 16,
+    AES_MAX_SYSTEM_ITEMS = 6,
+    AES_SYSTEM_ITEM_TEXT = 64,
     AES_MAX_MENU_SAVED_REGIONS = 2,
     AES_PATH_LEN = 260,
     AES_DECOR = 8,
@@ -75,10 +77,18 @@ typedef struct aes_app {
     WORD input_event_count;
 } aes_app_t;
 
+typedef struct aes_system_item {
+    WORD used;
+    WORD owner;
+    char text[AES_SYSTEM_ITEM_TEXT];
+} aes_system_item_t;
+
 /* Hosted server cooperation during synchronous panels; absent in direct AES. */
 extern int (*aes_wait_hook)(void);
 /* gemd routes physical input centrally; evnt_multi consumes app queues only. */
 extern int aes_external_input;
+/* Optional modal-control cursor selection for non-standard controls. */
+extern int (*aes_hover_cursor_hook)(WORD x, WORD y);
 /* Case-insensitive selector glob (* and ?); no recursive backtracking. */
 int aes_fsel_match_pattern(const char *pattern, const char *name);
 /* Temporary alert occlusion; this is not an application-visible window. */
@@ -113,6 +123,7 @@ typedef struct aes_state {
     uint32_t next_window_z;
     WORD dclick_rate;
     WORD menu_click;
+    UWORD fsel_options;
     WORD update_depth;
     uint32_t next_message_seq;
     WORD vdi_ready;
@@ -124,6 +135,9 @@ typedef struct aes_state {
     WORD menu_owner_app_id;
     WORD desktop_owner_app_id;
     WORD active_app_id;
+    WORD input_focus_app_id;
+    WORD modal_form_owner_app_id;
+    GRECT modal_form_rect;
     WORD menu_popup_root_direct;
     OBJECT *hover_tree;
     OBJECT *edit_tree;
@@ -141,6 +155,7 @@ typedef struct aes_state {
     size_t resource_size;
     WORD resource_is_builtin;
     aes_app_t apps[AES_MAX_APPS];
+    aes_system_item_t system_items[AES_MAX_SYSTEM_ITEMS];
     aes_message_t messages[AES_MAX_MESSAGES];
     aes_window_t windows[AES_MAX_WINDOWS];
     WORD desktop_bvdisk;
@@ -314,6 +329,7 @@ void aes_clear_window_frame(const aes_window_t *window);
 void aes_redraw_open_windows(void);
 void aes_redraw_region(const GRECT *dirty);
 void aes_redraw_window_change(const GRECT *before, const GRECT *after);
+void aes_notify_window_topology_changed(void);
 void aes_redraw_window_title_states(const aes_window_t *previous_top,
                                     const aes_window_t *new_top);
 void aes_top_window(aes_window_t *window);

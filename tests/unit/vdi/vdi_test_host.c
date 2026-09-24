@@ -179,6 +179,15 @@ void gem_raster_present_rect(int x, int y, int width, int height)
     ++g_present_count;
 }
 
+void gem_raster_cursor_update(int x, int y, const uint16_t mask[16],
+                              int visible)
+{
+    (void)x;
+    (void)y;
+    (void)mask;
+    (void)visible;
+}
+
 void gem_raster_set_palette(uint8_t index, uint8_t r, uint8_t g, uint8_t b)
 {
     (void)index;

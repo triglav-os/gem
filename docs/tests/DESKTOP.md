@@ -24,8 +24,8 @@ Size and Type header and verifies that file metadata is rendered in the last
 three columns. Rows, header and footer use the system font, and directory labels
 use the compact `/name` form. The header uses
 Gemscape's metric-derived band height, an unhighlighted background and a
-horizontal separator; it remains fixed while vertically centered file rows and
-their dotted separators scroll. A matching bottom status band reports
+horizontal separator; it remains fixed while vertically centered file rows
+without separator rules scroll. A matching bottom status band reports
 file/folder counts and total byte size.
 No AI or manual input is required.
 
@@ -52,8 +52,9 @@ there are no file-manager windows. Desktop info opens a real information
 alert. Placeholder file operations, the entire Options menu and unsupported
 sort modes have been removed.
 
-Direct/proxy UAT checks Desk geometry with zero and one browser window,
-Desktop info opening/dismissal and File → Open, in addition to browsing.
+Direct/proxy UAT checks the always-available Locations command, directory
+chooser cancellation, Desk geometry with one browser window and File → Open,
+in addition to browsing.
 The full F5 session test clicks the exposed Workspace label, waits beyond the
 double-click interval, and clicks it again to verify that selection alone does
 not activate an icon. It then performs a real double-click, verifies a new
@@ -61,11 +62,12 @@ browser window and closes it. Terminal can cover the icon bitmap while part of
 the label remains exposed; input must go to the desktop only in the exposed
 region. Restart F5 after rebuilding to use the current server and desktop.
 
-## Desktop info removing windows
+## Modal menu tracking removing windows
 
 A deterministic reproduction opens a witness window on a second connection,
-sends part of a valid RPC frame, and leaves Desk open for three seconds before
-selecting Desktop info. Before the fix gemd disconnected that client, removed
+sends part of a valid RPC frame, and leaves the system menu open for three
+seconds before selecting its confirmation command. Before the fix gemd
+disconnected that client, removed
 its window and the next write failed with `BrokenPipeError`. Evidence is in
 `build/desktop-info-timeout-repro.log`.
 
@@ -77,14 +79,14 @@ gemd now advances session deadline timestamps by the time spent dispatching
 physical input, preserving the remaining client time budget. Requests outside
 these server-imposed pauses still expire under the existing limits.
 
-The F5 integration test keeps the menu open three seconds, selects Desktop
-info over Stout's closer, completes the interrupted request, and keeps the
-alert open another seven seconds. It checks every existing window's geometry,
-the witness connection, all sample processes, and dismissal of the alert.
-`desktop_info_before.pbm`, `desktop_info_selected.pbm`,
-`desktop_info_open.pbm` and `desktop_info_closed.pbm` in
+The F5 integration test keeps the system menu open three seconds, selects
+Shutdown over Stout's closer, completes the interrupted request, and keeps the
+confirmation open another seven seconds. It checks every existing window's
+geometry, the witness connection, all sample processes, and dismissal of the
+alert. `system_alert_before.pbm`, `system_alert_selected.pbm`,
+`system_alert_open.pbm` and `system_alert_closed.pbm` in
 `build/sample_session_test/` capture this path. The standalone direct/proxy
-checks continue to verify the alert's visible appearance and dismissal.
+checks independently verify Locations and chooser dismissal.
 
 The longer alert check also reproduced a second disconnect: Clock's window
 (handle 2) disappeared while the alert was open. Diagnostic tracing recorded
@@ -143,6 +145,31 @@ Every filesystem window showing the affected parent and every Trash window is
 reloaded immediately. Empty Trash follows the cached Trash contents rather than
 the active-window backend, so it remains enabled after a source-window drag
 changes focus away from an open Trash browser.
+
+Normal File Manager windows are also drop targets. Dropping a file or folder
+on a directory entry targets that directory; dropping on the remaining work
+area targets the displayed directory. Plain drops copy immediately and holding
+Control at button-up moves instead; there is no Copy/Move/Cancel dialog.
+Shift-click toggles multiple entries and dragging any selected member operates
+on the complete selection. Each selected item gets a live contour. While
+Control is held over a valid normal destination, the primary contour gains an
+`M` badge; normal Atari/EmuTOS uses the same ghost for both operations, so this
+badge is an explicit usability extension. It is never drawn over Trash.
+Existing destinations are never overwritten, and successful operations reload
+every open window showing the source or destination. The OS copy helper recurses
+without following symbolic links, rejects copying a directory into itself, and
+removes an incomplete destination after ordinary I/O failure.
+The direct/proxy `uat_file_drop` scenario opens two configured locations,
+descends through five nested directories and returns, Shift-selects a real file
+and nested folder in the upper File Manager, and drags them onto the exposed
+work area of the lower one. It verifies immediate plain Copy, immediate
+Control-Move, the live move badge and its absence over Trash. The move gesture
+first selects its source and begins dragging inside the double-click interval,
+covering the selected-item activation race. The Trash scenario repeats that
+gesture from both icon and list views. The same File Manager scenario mounts a
+generated FAT12 `.ST` image, verifies that its hidden directory is omitted by
+`show_hidden = false`, then copies a root file and recursive directory into the
+Linux destination.
 
 Popup menu layout measures rendered labels and shortcuts, strips conventional
 leading checkmark blanks from the visible label, and gives the content equal

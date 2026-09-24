@@ -11,11 +11,16 @@
 #define GEM_SAMPLE_DESKTOP_H
 
 #include <gem.h>
+#ifndef GEM_DESKTOP_HOSTED
+#include "gem_protocol.h"
+#endif
+#include <gem/gemconf.h>
 
 #include <gem/os.h>
 
 #include "desktop_assets.h"
 #include "gem_trash.h"
+#include "stout/disk.h"
 
 #include <stddef.h>
 #include <stdint.h>
@@ -73,7 +78,8 @@ enum {
 };
 
 enum { DESKTOP_BROWSER_VIEW_LIST = 0, DESKTOP_BROWSER_VIEW_ICONS = 1 };
-enum { DESKTOP_BROWSER_FILES = 0, DESKTOP_BROWSER_TRASH = 1 };
+enum { DESKTOP_BROWSER_FILES = 0, DESKTOP_BROWSER_TRASH = 1,
+       DESKTOP_BROWSER_DISK = 2 };
 enum {
     DESKTOP_SORT_NAME = 0,
     DESKTOP_SORT_DATE,
@@ -108,6 +114,7 @@ typedef struct desktop_browser_entry {
     WORD is_app;
     WORD is_executable;
     WORD is_parent;
+    WORD selected;
     WORD is_trash_root_item;
     gem_trash_item_t trash_item;
 } desktop_browser_entry_t;
@@ -128,6 +135,9 @@ typedef struct desktop_browser_window {
     char title[96];
     char trash_payload_root[GEM_OS_PATH_MAX];
     gem_trash_item_t trash_root_item;
+    stout_disk_t disk;
+    WORD disk_open;
+    char disk_root[GEM_OS_PATH_MAX];
     uint32_t last_click_ms;
     WORD last_click_index;
     desktop_browser_entry_t entries[DESKTOP_BROWSER_MAX_ENTRIES];
@@ -143,8 +153,11 @@ typedef struct desktop_state {
     WORD active_browser_handle;
     WORD icon_view;
     WORD sort_mode;
+    WORD show_hidden;
     WORD trash_nonempty;
     WORD app_id;
+    WORD locations_menu_id;
+    WORD remove_location_menu_id;
     VDI_HANDLE vdi_handle;
     WORD char_width;
     WORD char_height;
@@ -154,6 +167,7 @@ typedef struct desktop_state {
     WORD screen_height;
     GRECT work;
     char status_text[96];
+    gemconf_t config;
     uint32_t last_desktop_click_ms;
     WORD last_desktop_click_object;
     WORD drag_browser_handle;
@@ -170,15 +184,21 @@ void desktop_browser_close(desktop_browser_window_t *browser);
 /* Re-sort a populated browser after the sort mode changes. */
 void desktop_browser_resort(desktop_browser_window_t *browser);
 /* Handle a work-area click in the browser owning handle. */
-void desktop_browser_handle_click(WORD handle, WORD mx, WORD my);
+void desktop_browser_handle_click(WORD handle, WORD mx, WORD my,
+                                  WORD key_state);
 /* Handle a WM_* message addressed to a browser window. */
 void desktop_browser_handle_message(WORD msg[8]);
 /* Route Return and arrow-key navigation to the active browser. */
 void desktop_browser_handle_key(WORD key);
 /* Remember a selected filesystem entry as a possible drag source. */
-void desktop_browser_begin_drag(WORD handle, WORD index, WORD x, WORD y);
+int desktop_browser_begin_drag(WORD handle, WORD index, WORD x, WORD y);
+/* Complete a browser-to-browser drop using Trash or filesystem handling. */
+void desktop_browser_drop_entry(desktop_browser_window_t *source,
+                                WORD source_index,
+                                desktop_browser_window_t *target,
+                                WORD target_index, int move);
 /* Complete or cancel a pending browser drag at the supplied point. */
-void desktop_browser_end_drag(WORD x, WORD y);
+void desktop_browser_end_drag(WORD x, WORD y, WORD key_state);
 /* Height shared by the list header and browser status band. */
 WORD desktop_browser_band_height(void);
 /* Sort mode selected by a list-view column header or Arrange menu item. */
@@ -225,8 +245,16 @@ void desktop_open_selected_icon(void);
 /* Join a directory and name into out; nonzero when it fits. */
 int desktop_path_join(const char *dir, const char *name, char *path,
                       size_t path_size);
-/* Rebuild the disk icons from the mount table. */
+/* Rebuild the configured desktop location icons. */
 void desktop_probe_disks(void);
+/* Publish the selected configured location to gemd. */
+void desktop_publish_location_selection(void);
+/* Re-read locations after a gemd-owned configuration change. */
+void desktop_refresh_locations(void);
+/* Open the Locations selector, persist a chosen directory and rebuild icons. */
+void desktop_choose_location(void);
+/* Remove the selected configured desktop location. */
+void desktop_delete_selected_location(void);
 /* Repaint the desktop background and icons within dirty. */
 void desktop_redraw(const GRECT *dirty);
 /* Repaint desktop areas uncovered by a window change. */
@@ -237,9 +265,9 @@ void desktop_refresh_icon_bindings(void);
 void desktop_select_icon(WORD object_id);
 /* Replace the status line text. */
 void desktop_set_status(const char *text);
-/* Sort disk icons alphabetically, keeping trash last. */
+/* Sort desktop icons alphabetically, keeping trash last. */
 void desktop_sort_icons_by_label(void);
-/* Rebuild the Desk menu entries from the disk icons. */
+/* Rebuild the Desk menu entries from the desktop icons. */
 void desktop_update_desk_menu_labels(void);
 /* Trash or permanently remove the active browser selection after consent. */
 void desktop_delete_active_selection(void);
@@ -249,14 +277,19 @@ void desktop_restore_active_selection(void);
 void desktop_empty_trash(void);
 /* Refresh the cached availability used by the global Empty Trash command. */
 void desktop_refresh_trash_availability(void);
+/* Reload every filesystem window displaying the parent of path. */
+void desktop_refresh_file_windows_for_path(const char *path);
 /* Move a selected normal-browser entry to Trash after confirmation. */
-void desktop_trash_browser_entry(desktop_browser_window_t *browser,
-                                 WORD index);
+void desktop_trash_browser_entry(desktop_browser_window_t *browser, WORD index);
 /* USERDEF callback rendering a desktop icon object. */
 WORD desktop_user_draw(LONG parm_block);
 /* Nonzero when an entry is a launchable application. */
 int desktop_browser_entry_is_launchable(const desktop_browser_window_t *browser,
                                         const desktop_browser_entry_t *entry);
+/* Resolve desktop.cfg/built-in associations and launch through AES shell. */
+int desktop_browser_launch_entry(const desktop_browser_window_t *browser,
+                                 const desktop_browser_entry_t *entry,
+                                 char *status, size_t status_size);
 /* One-character type marker shown before an entry name. */
 const char *
 desktop_browser_entry_prefix(const desktop_browser_window_t *browser,
@@ -272,9 +305,6 @@ void desktop_browser_list_draw_header(const desktop_browser_window_t *browser,
 void desktop_browser_list_draw_row(const desktop_browser_window_t *browser,
                                    const desktop_browser_entry_t *entry,
                                    WORD row_y);
-/* Draw a dotted rule below one populated list row. */
-void desktop_browser_list_draw_row_separator(
-    const desktop_browser_window_t *browser, WORD row_y);
 /* Return the sort mode belonging to a list header x coordinate. */
 WORD desktop_browser_list_sort_at(const desktop_browser_window_t *browser,
                                   WORD x);

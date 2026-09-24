@@ -1,6 +1,16 @@
 # Compilation artifacts, downloaded dependencies and extracted upstream sources
 /bin/
 /build/
+/build-*/
+
+# Downloaded CEF trees from older local builds. The configured dependency now
+# lives under the ignored build/deps directory.
+/include/cef/
+/lib/cef/
+
+# Python interpreter caches.
+**/__pycache__/
+*.py[cod]
 
 # Binaries we don't want in github.
 /docs/manuals/*.pdf

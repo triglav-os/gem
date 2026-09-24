@@ -15,6 +15,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 
 static int aes_fsel_has_wildcards(const char *text)
 {
@@ -201,26 +202,6 @@ int aes_fsel_join_path(const char *directory, const char *name, char *path,
     return rc >= 0 && (size_t)rc < path_size;
 }
 
-void aes_fsel_prefix_line(char *dst, size_t dst_size, const char *prefix,
-                          const char *value)
-{
-    size_t used = 0u;
-
-    if (dst == NULL || dst_size == 0u) {
-        return;
-    }
-
-    dst[0] = '\0';
-    if (prefix != NULL) {
-        strncpy(dst, prefix, dst_size - 1u);
-        dst[dst_size - 1u] = '\0';
-        used = strlen(dst);
-    }
-    if (value != NULL && used + 1u < dst_size) {
-        strncat(dst, value, dst_size - used - 1u);
-    }
-}
-
 static int aes_fsel_entry_compare(const void *left, const void *right)
 {
     const aes_fsel_entry_t *a = (const aes_fsel_entry_t *)left;
@@ -270,6 +251,7 @@ void aes_fsel_reload_entries(aes_fsel_state_t *state)
     gem_os_dirent_t dent;
     WORD count = 0;
     WORD selected = NIL;
+    WORD sort_start = 0;
     unsigned scanned = 0;
 
     if (state == NULL) {
@@ -282,10 +264,12 @@ void aes_fsel_reload_entries(aes_fsel_state_t *state)
     if (strcmp(state->directory, "/") != 0) {
         strcpy(state->entries[count].name, "..");
         state->entries[count].is_directory = 1;
+        state->entries[count].size_bytes = 0u;
         if (strcmp(state->selection, "..") == 0) {
             selected = count;
         }
         ++count;
+        sort_start = 1;
     }
 
     if (gem_os_dir_open(state->directory, &dir) != 0) {
@@ -295,6 +279,23 @@ void aes_fsel_reload_entries(aes_fsel_state_t *state)
                 break;
             if (strcmp(dent.name, ".") == 0 || strcmp(dent.name, "..") == 0) {
                 continue;
+            }
+            if (state->show_hidden == 0 &&
+                (dent.info.is_hidden != 0 || dent.name[0] == '.')) {
+                continue;
+            }
+            if (state->mode == AES_FSEL_DIRECTORY &&
+                dent.info.is_directory == 0) {
+                continue;
+            }
+            if (state->mode == AES_FSEL_LOCATION &&
+                dent.info.is_directory == 0) {
+                const char *dot = strrchr(dent.name, '.');
+                if (dot == NULL ||
+                    (strcasecmp(dot, ".st") != 0 &&
+                     strcasecmp(dot, ".msa") != 0)) {
+                    continue;
+                }
             }
             if (dent.info.is_directory == 0 &&
                 aes_fsel_match_pattern(state->pattern, dent.name) == 0) {
@@ -306,6 +307,7 @@ void aes_fsel_reload_entries(aes_fsel_state_t *state)
             state->entries[count]
                 .name[sizeof(state->entries[count].name) - 1u] = '\0';
             state->entries[count].is_directory = dent.info.is_directory ? 1 : 0;
+            state->entries[count].size_bytes = dent.info.size_bytes;
             if (strcmp(state->selection, dent.name) == 0) {
                 selected = count;
             }
@@ -314,8 +316,8 @@ void aes_fsel_reload_entries(aes_fsel_state_t *state)
         gem_os_dir_close(&dir);
     }
 
-    if (count > 1) {
-        qsort(&state->entries[1], (size_t)(count - 1),
+    if (count - sort_start > 1) {
+        qsort(&state->entries[sort_start], (size_t)(count - sort_start),
               sizeof(state->entries[0]), aes_fsel_entry_compare);
         selected = NIL;
         for (WORD i = 0; i < count; ++i) {
@@ -327,7 +329,8 @@ void aes_fsel_reload_entries(aes_fsel_state_t *state)
     }
 
     state->entry_count = count;
-    if (selected == NIL && count > 0 && state->selection[0] == '\0') {
+    if (selected == NIL && count > 0 && state->selection[0] == '\0' &&
+        state->mode != AES_FSEL_DIRECTORY) {
         selected = 0;
     }
     state->selected = selected;

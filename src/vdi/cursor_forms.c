@@ -12,12 +12,12 @@
 #include "vdi_internal.h"
 
 #include "gem/aes.h"
+#include "platform/os.h"
 
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 
 #define VDI_WORD_HEX(value) ((WORD)(UWORD)(value))
 
@@ -80,8 +80,6 @@ static const char *cursor_resource_path(void)
 {
     static char path[4096];
     const char *resource_dir = getenv("GEM_RESOURCE_DIR");
-    ssize_t length;
-    char *slash;
 
     if (resource_dir != NULL && resource_dir[0] != '\0') {
         if (snprintf(path, sizeof(path), "%s/cursors.rsc", resource_dir) <
@@ -89,20 +87,9 @@ static const char *cursor_resource_path(void)
             return path;
         }
     }
-    length = readlink("/proc/self/exe", path, sizeof(path) - 1u);
-    if (length > 0 && (size_t)length < sizeof(path)) {
-        path[length] = '\0';
-        slash = strrchr(path, '/');
-        if (slash != NULL) {
-            *slash = '\0';
-            if (strlen(path) + strlen("/../share/gem/cursors.rsc") <
-                sizeof(path)) {
-                strcat(path, "/../share/gem/cursors.rsc");
-                if (access(path, R_OK) == 0) {
-                    return path;
-                }
-            }
-        }
+    if (gem_os_find_file("bin/resources/cursors.rsc", path, sizeof(path)) !=
+        0) {
+        return path;
     }
 #ifdef GEM_BUILD_CURSOR_RSC
     return GEM_BUILD_CURSOR_RSC;
@@ -114,39 +101,43 @@ static const char *cursor_resource_path(void)
 static int vdi_load_binary_file(const char *path, uint8_t **data_out,
                                 size_t *size_out)
 {
-    FILE *stream;
-    long size;
+    int fd;
+    int64_t size;
     uint8_t *data;
+    size_t offset;
+    int32_t count;
 
     if (path == NULL || data_out == NULL || size_out == NULL) {
         return 0;
     }
 
-    stream = fopen(path, "rb");
-    if (stream == NULL) {
+    fd = gem_os_open_read(path);
+    if (fd < 0) {
         return 0;
     }
-    if (fseek(stream, 0L, SEEK_END) != 0) {
-        fclose(stream);
-        return 0;
-    }
-    size = ftell(stream);
-    if (size < 0 || fseek(stream, 0L, SEEK_SET) != 0) {
-        fclose(stream);
+    size = gem_os_seek(fd, 0, 2);
+    if (size < 0 || gem_os_seek(fd, 0, 0) < 0 || (uint64_t)size > SIZE_MAX) {
+        gem_os_close(fd);
         return 0;
     }
 
     data = malloc((size_t)size);
     if (data == NULL) {
-        fclose(stream);
+        gem_os_close(fd);
         return 0;
     }
-    if (size > 0 && fread(data, (size_t)size, 1, stream) != 1) {
-        free(data);
-        fclose(stream);
-        return 0;
+    offset = 0u;
+    while (offset < (size_t)size) {
+        count = gem_os_read(fd, data + offset,
+                            (uint32_t)((size_t)size - offset));
+        if (count <= 0) {
+            free(data);
+            gem_os_close(fd);
+            return 0;
+        }
+        offset += (size_t)count;
     }
-    fclose(stream);
+    gem_os_close(fd);
 
     *data_out = data;
     *size_out = (size_t)size;

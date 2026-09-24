@@ -11,6 +11,8 @@
 
 #include "platform/os.h"
 
+#include <string.h>
+
 /* A GEM tree has one parent per object; sibling tails point back to it.
  * Validate without recursion before AES walks any attacker-supplied links. */
 static int valid_menu_tree(const gem_rpc_menu_bar_req_t *req)
@@ -84,6 +86,38 @@ int gem_rpc_valid_request(uint16_t opcode, const void *payload, uint32_t size)
         case GEM_RPC_SCRP_READ:
             expected = 0;
             break;
+        case GEM_RPC_LOCATION_LIST:
+            expected = 0;
+            break;
+        case GEM_RPC_LOCATION_ADD:
+        case GEM_RPC_LOCATION_REMOVE:
+        case GEM_RPC_LOCATION_SELECT:
+            expected = sizeof(gem_rpc_location_req_t);
+            break;
+        case GEM_RPC_OVERLAY_CREATE:
+            expected = sizeof(gem_rpc_overlay_create_req_t);
+            break;
+        case GEM_RPC_OVERLAY_RESIZE:
+            expected = sizeof(gem_rpc_overlay_resize_req_t);
+            break;
+        case GEM_RPC_OVERLAY_MAP:
+            expected = sizeof(gem_rpc_overlay_map_req_t);
+            break;
+        case GEM_RPC_OVERLAY_UNMAP:
+        case GEM_RPC_OVERLAY_DESTROY:
+            expected = sizeof(gem_rpc_overlay_id_req_t);
+            break;
+        case GEM_RPC_OVERLAY_UPDATE: {
+            const gem_rpc_overlay_update_req_t *req = payload;
+            size_t bytes;
+
+            if (payload == NULL || size < sizeof(*req) || req->width == 0u ||
+                req->height == 0u || req->pitch < req->width * 4u)
+                return 0;
+            bytes = (size_t)req->pitch * req->height;
+            return bytes <= GEM_RPC_PAYLOAD_MAX - sizeof(*req) &&
+                   size == sizeof(*req) + bytes;
+        }
             REQUEST(EVNT_MULTI, gem_rpc_evnt_multi_req_t);
             REQUEST(GRAF_MOUSE, gem_rpc_graf_mouse_req_t);
             REQUEST(FORM_ALERT, gem_rpc_form_alert_req_t);
@@ -135,6 +169,7 @@ int gem_rpc_valid_request(uint16_t opcode, const void *payload, uint32_t size)
             REQUEST(MENU_CLICK, gem_rpc_menu_click_req_t);
             REQUEST(SCRP_WRITE, gem_rpc_path_t);
             REQUEST(FSEL_INPUT, gem_rpc_fsel_t);
+            REQUEST(FSEL_OPTIONS, gem_rpc_fsel_options_req_t);
             REQUEST(V_SHOW_C, gem_rpc_handle_word_req_t);
         default:
             return 0;
@@ -153,6 +188,15 @@ int gem_rpc_valid_request(uint16_t opcode, const void *payload, uint32_t size)
         const gem_rpc_pline_req_t *req = payload;
         if (req->count < 0 || req->count > 128)
             return 0;
+    }
+    if (opcode == GEM_RPC_FSEL_INPUT) {
+        const gem_rpc_fsel_t *req = payload;
+
+        return req->mode >= GEM_RPC_FSEL_OPEN &&
+               req->mode <= GEM_RPC_FSEL_LOCATION &&
+               memchr(req->path, '\0', sizeof(req->path)) != NULL &&
+               memchr(req->name, '\0', sizeof(req->name)) != NULL &&
+               memchr(req->title, '\0', sizeof(req->title)) != NULL;
     }
     if (opcode == GEM_RPC_MENU_BAR) {
         const gem_rpc_menu_bar_req_t *req = payload;

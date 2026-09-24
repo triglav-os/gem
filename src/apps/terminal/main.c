@@ -112,6 +112,20 @@ static void send_bytes(term_state_t *state, const char *bytes)
     (void)gem_os_pty_write(&state->pty, bytes, (uint32_t)strlen(bytes));
 }
 
+static void send_console_key(term_state_t *state, WORD key, WORD modifiers)
+{
+    unsigned char character = (unsigned char)(key & 0xff);
+    WORD message[8];
+
+    if (state->console_app_id <= 0 || character == 0) return;
+    if ((modifiers & K_CTRL) != 0 && character >= '@' && character <= 127)
+        character = (unsigned char)(character & 0x1f);
+    message[0] = GEM_MSG_CONSOLE_INPUT;
+    message[1] = character;
+    memset(message + 2, 0, sizeof(message) - 4u);
+    (void)appl_write(state->console_app_id, 8, message);
+}
+
 static int send_special_key(term_state_t *state, WORD scan, WORD modifiers)
 {
     const char *sequence = NULL;
@@ -408,6 +422,10 @@ int main(void)
         fprintf(stderr, "terminal: appl_init failed -- is gemd running?\n");
         return 1;
     }
+    {
+        WORD menu_id = menu_register(appl_id, "TERMINAL");
+        if (menu_id >= 0) (void)menu_unregister(menu_id);
+    }
     if (!init_terminal(&state)) {
         appl_exit();
         return 1;
@@ -472,7 +490,10 @@ int main(void)
             if ((kr & 0xff) == 27 && state.shell_alive == 0) {
                 done = 1;
             } else {
-                send_key(&state, kr, ks);
+                if (state.console_app_id > 0)
+                    send_console_key(&state, kr, ks);
+                else
+                    send_key(&state, kr, ks);
                 if (process_shell_output(&state, &dirty) != 0) {
                     draw_terminal(&state, &dirty);
                 }
@@ -481,6 +502,14 @@ int main(void)
 
         if ((event & MU_MESAG) != 0) {
             switch (msg[0]) {
+                case GEM_MSG_CONSOLE_REGISTER:
+                    state.console_app_id = msg[1];
+                    break;
+                case GEM_MSG_CONSOLE_OUTPUT:
+                    process_shell_byte(&state, (unsigned char)(msg[1] & 0xff));
+                    dirty = state.work;
+                    redraw_full = 1;
+                    break;
                 case WM_REDRAW: {
                     GRECT redraw_dirty;
 

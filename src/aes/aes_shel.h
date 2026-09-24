@@ -1,5 +1,5 @@
 /*
- * Declares the private AES shell service: global scrap-buffer ownership,
+ * Declares the private AES shell service: DESKTOP.INF compatibility,
  * per-child launch records and gemd caller identity integration.
  *
  * MIT License (see: LICENSE)
@@ -17,6 +17,9 @@ typedef struct shel_launch {
     char cmd[256];
     char tail[128];
 } shel_launch_t;
+
+/* Called after shel_put has committed a translated desktop.cfg update. */
+extern void (*aes_shel_config_changed_hook)(void);
 
 /* Reset global shell storage before AES begins accepting applications. */
 void aes_shel_reset(void);

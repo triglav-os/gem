@@ -20,19 +20,20 @@ live application when no active application or menu owner exists.
 
 ## Executed checks
 
-The updated `test_sample_session` starts Rasta, gemd and all applications,
-including the extracted MSA guest in Stout. It injects real Rasta HID packets
-and queries window geometry through an independent GEM RPC connection with a
-two-second reply timeout.
+The updated `test_sample_session` starts Rasta, gemd, every bundled application
+and Maestro. It injects real Rasta HID packets and queries window geometry
+through an independent GEM RPC connection with a two-second reply timeout. The
+session uses the same 1920×1080 framebuffer as the interactive F5 profile.
 
 - Against the previous input implementation, the regression failed: the first
   Stout drag did not reach the expected outer rectangle `(100, 102, 512, 373)`.
   See [before-fix execution](../../build/drag-before.log).
-- With the fix, Stout completed three successive drags. Terminal then moved
-  and handled its close button, exiting successfully. Each move checked actual
-  coordinates and a changed framebuffer; RPC replies remained responsive.
-  See [focused execution](../../build/drag-session.log) and
-  [session evidence](../../build/sample_session_test/state.json).
+- With the current application set, Maestro completes three successive drags;
+  Gemread, Gemscape and Terminal then move in sequence. Gemscape's CEF overlay
+  must remain clipped behind higher windows and follow its moved GEM work area.
+  Terminal handles its close button and exits successfully. Each move checks
+  actual coordinates and a changed framebuffer; RPC replies remain responsive.
+  See [session evidence](../../build/sample_session_test/state.json).
 
 These checks reproduce lost interaction and verify recovery of repeated
 window operations. They do not establish that every possible cause of an
@@ -45,15 +46,15 @@ Keep this interaction check in `make tests`. Restart the F5 session to load
 the rebuilt libraries and server. Future interactive regressions should add
 input and observable outcome checks rather than relying on live processes.
 
-The session test also captures the initial desktop, locates Workspace from
-its bitmap asset, moves Stout to expose the left edge of the Workspace label,
-and double-clicks that label while Terminal and all other applications remain
-running. Independent window queries verify that the file manager opens and
-closes. Evidence includes `desktop_ready.pbm`, `workspace_before.pbm` and
-`workspace_open.pbm` in `build/sample_session_test/`.
+The session test captures the initial desktop and verifies Desktop, Gemread,
+Gemscape, Maestro and Terminal remain responsive while all applications are
+running. Folder icons are supplied only by the active Desktop configuration;
+the launcher does not create a Workspace location. Evidence includes
+`desktop_ready.pbm` and the per-drag captures in
+`build/sample_session_test/`.
 
-The F5 check also leaves Desk open for three seconds with a partial RPC frame
-pending, then selects Desktop info above a window closer and keeps the alert
-open seven seconds. The client connection, window geometries and all sample
-application processes must survive. See [the Desktop info regression](DESKTOP.md) for the
+The F5 check also leaves the system menu open for three seconds with a partial
+RPC frame pending, then selects Shutdown above a window closer and keeps the
+confirmation open seven seconds. The client connection, window geometries and
+all sample application processes must survive. See [the modal menu regression](DESKTOP.md) for the
 reproduced disconnect and timeout-accounting fix.

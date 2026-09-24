@@ -236,27 +236,6 @@ void desktop_browser_list_draw_row(const desktop_browser_window_t *browser,
             (const BYTE *)type);
 }
 
-void desktop_browser_list_draw_row_separator(
-    const desktop_browser_window_t *browser, WORD row_y)
-{
-    WORD line[4];
-
-    if (browser == NULL) {
-        return;
-    }
-
-    line[0] = browser->work.g_x;
-    line[1] = (WORD)(row_y + DESKTOP_BROWSER_ROW_H - 1);
-    line[2] = (WORD)(browser->work.g_x + browser->work.g_w - 1);
-    line[3] = line[1];
-    (void)vsf_interior(g_desktop.vdi_handle, FIS_PATTERN);
-    (void)vsf_style(g_desktop.vdi_handle, 3);
-    vsf_color(g_desktop.vdi_handle, WHITE);
-    v_bar(g_desktop.vdi_handle, line);
-    (void)vsf_interior(g_desktop.vdi_handle, FIS_SOLID);
-    (void)vsf_style(g_desktop.vdi_handle, 1);
-}
-
 WORD desktop_browser_list_sort_at(const desktop_browser_window_t *browser,
                                   WORD x)
 {

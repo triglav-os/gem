@@ -68,6 +68,7 @@ typedef struct term_state {
     WORD max_line_len;
     WORD auto_follow;
     WORD shell_alive;
+    WORD console_app_id;
     WORD cursor_visible;
     WORD auto_wrap;
     WORD origin_mode;

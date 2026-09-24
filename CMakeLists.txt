@@ -72,6 +72,13 @@ endif()
 
 add_subdirectory(lib/platform/rasta)
 add_subdirectory(lib/platform/linux)
+add_subdirectory(lib/gemconf)
+add_subdirectory(lib/gemctl)
+add_subdirectory(lib/musashi)
+add_subdirectory(lib/fat12)
+add_subdirectory(lib/msa)
+add_subdirectory(lib/prg)
+add_subdirectory(lib/stout)
 add_subdirectory(tools/resgen)
 add_subdirectory(src/vdi)
 add_subdirectory(src/aes)
@@ -109,6 +116,8 @@ add_custom_target(gemix_package
     COMMAND ${CMAKE_COMMAND} -E copy
         $<TARGET_FILE:clock_gemd> ${GEMIX_BIN}/
     COMMAND ${CMAKE_COMMAND} -E copy
+        $<TARGET_FILE:stout> ${GEMIX_BIN}/
+    COMMAND ${CMAKE_COMMAND} -E copy
         $<TARGET_FILE:gem> ${GEMIX_LIB}/
     COMMAND ${CMAKE_COMMAND} -E copy
         $<TARGET_FILE:platform_linux> ${GEMIX_LIB}/
@@ -116,6 +125,18 @@ add_custom_target(gemix_package
         $<TARGET_FILE:aes> ${GEMIX_LIB}/
     COMMAND ${CMAKE_COMMAND} -E copy
         $<TARGET_FILE:vdi> ${GEMIX_LIB}/
+    COMMAND ${CMAKE_COMMAND} -E copy
+        $<TARGET_FILE:gemconf> ${GEMIX_LIB}/
+    COMMAND ${CMAKE_COMMAND} -E copy
+        $<TARGET_FILE:gemctl> ${GEMIX_LIB}/
+    COMMAND ${CMAKE_COMMAND} -E copy
+        $<TARGET_FILE:libstout> ${GEMIX_LIB}/
+    COMMAND ${CMAKE_COMMAND} -E copy
+        $<TARGET_FILE:fat12> ${GEMIX_LIB}/
+    COMMAND ${CMAKE_COMMAND} -E copy
+        $<TARGET_FILE:msa> ${GEMIX_LIB}/
+    COMMAND ${CMAKE_COMMAND} -E copy
+        $<TARGET_FILE:prg> ${GEMIX_LIB}/
     COMMAND ${CMAKE_COMMAND} -E copy
         ${PROJECT_SOURCE_DIR}/include/gem.h ${GEMIX_INCLUDE}/gem.h
     COMMAND ${CMAKE_COMMAND} -E make_directory ${GEMIX_INCLUDE}/gem
@@ -129,6 +150,13 @@ add_custom_target(gemix_package
         ${PROJECT_SOURCE_DIR}/include/gem/portab.h ${GEMIX_INCLUDE}/gem/
     COMMAND ${CMAKE_COMMAND} -E copy
         ${PROJECT_SOURCE_DIR}/include/gem/os.h ${GEMIX_INCLUDE}/gem/
+    COMMAND ${CMAKE_COMMAND} -E copy
+        ${PROJECT_SOURCE_DIR}/include/gem/gemconf.h ${GEMIX_INCLUDE}/gem/
+    COMMAND ${CMAKE_COMMAND} -E copy
+        ${PROJECT_SOURCE_DIR}/include/gem/gemctl.h ${GEMIX_INCLUDE}/gem/
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${GEMIX_INCLUDE}/stout
+    COMMAND ${CMAKE_COMMAND} -E copy
+        ${PROJECT_SOURCE_DIR}/include/stout/disk.h ${GEMIX_INCLUDE}/stout/
     COMMAND ${CMAKE_COMMAND} -E make_directory ${GEMIX_INCLUDE}/platform
     COMMAND ${CMAKE_COMMAND} -E copy
         ${PROJECT_SOURCE_DIR}/include/platform/os.h ${GEMIX_INCLUDE}/platform/
@@ -144,7 +172,8 @@ add_custom_target(gemix_package
         -DGEMIX_ROOT=${GEMIX_ROOT}
         -P ${PROJECT_SOURCE_DIR}/tools/scripts/package-gemix.cmake
     DEPENDS
-        gemd desktop terminal calc_gemd clock_gemd
+        gemd desktop terminal calc_gemd clock_gemd stout gemconf gemctl libstout
+        fat12 msa prg
         gem_runtime_fonts gem_runtime_cursors
         gem_runtime_desktop_icons gem_runtime_clock_numbers
     COMMENT "Assembling the Gemix Linux deployment tree"
@@ -157,9 +186,9 @@ add_custom_target(gem_sdk
         -DSOURCE_ROOT=${PROJECT_SOURCE_DIR}
         -DRESOURCE_ROOT=${GEM_RESOURCES_DIR}
         -DRESGEN=$<TARGET_FILE:resgen>
-        "-DGEM_LIBRARIES=$<TARGET_FILE:gem>;$<TARGET_FILE:aes>;$<TARGET_FILE:vdi>;$<TARGET_FILE:platform_linux>;$<TARGET_FILE:rasta>"
+        "-DGEM_LIBRARIES=$<TARGET_FILE:gem>;$<TARGET_FILE:aes>;$<TARGET_FILE:vdi>;$<TARGET_FILE:gemconf>;$<TARGET_FILE:gemctl>;$<TARGET_FILE:libstout>;$<TARGET_FILE:fat12>;$<TARGET_FILE:msa>;$<TARGET_FILE:prg>;$<TARGET_FILE:platform_linux>;$<TARGET_FILE:rasta>"
         -P ${PROJECT_SOURCE_DIR}/tools/scripts/gem_sdk.cmake
-    DEPENDS gem aes vdi platform_linux rasta gem_runtime_fonts
+    DEPENDS gem aes vdi gemconf gemctl libstout fat12 msa prg platform_linux rasta gem_runtime_fonts
         gem_runtime_cursors gem_runtime_alert_icons resgen
     COMMENT "Exporting the public GEM SDK"
     VERBATIM)

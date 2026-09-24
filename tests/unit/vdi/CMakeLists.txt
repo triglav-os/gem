@@ -49,12 +49,17 @@ target_compile_definitions(test_vdi
         GEM_BUILD_FONT_DIR="${GEM_RESOURCES_DIR}/fonts"
 )
 
+set_target_properties(test_vdi PROPERTIES
+    BUILD_WITH_INSTALL_RPATH FALSE
+    BUILD_RPATH "${GEM_LIBRARY_DIR}"
+)
+
 target_link_options(test_vdi
     PRIVATE
         $<$<CONFIG:Debug>:-fsanitize=address,undefined>
 )
 
-target_link_libraries(test_vdi PRIVATE m)
+target_link_libraries(test_vdi PRIVATE platform_linux m)
 
 add_test(NAME test_vdi COMMAND test_vdi)
 set_tests_properties(test_vdi PROPERTIES

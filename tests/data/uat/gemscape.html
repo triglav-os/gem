@@ -1,0 +1,36 @@
+<!doctype html>
+<!-- MIT License (see ../../LICENSE). Copyright (C) 2026 tomaz stih. -->
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Gemscape UAT</title>
+  <style>
+    html, body { margin: 0; width: 1200px; min-height: 1600px; }
+    body { background: white; color: black; font: 24px sans-serif; }
+    button { margin: 24px; width: 220px; height: 72px; font-size: 22px; }
+    #entry { position: absolute; left: 280px; top: 24px; width: 250px;
+             height: 64px; font-size: 22px; }
+    #typed { position: absolute; left: 280px; top: 105px; width: 270px;
+             height: 70px; border: 8px solid black; }
+    #result { margin: 24px; border: 8px solid black; width: 360px; height: 90px; }
+    #bottom { position: absolute; left: 700px; top: 1300px; width: 300px;
+              height: 180px; background: black; color: white; }
+  </style>
+</head>
+<body>
+  <button id="action" onclick="document.getElementById('result').style.background='black'">
+    Activate
+  </button>
+  <input id="entry" aria-label="Page input">
+  <div id="typed">Page keyboard target</div>
+  <div id="result">Waiting</div>
+  <div id="bottom">Scroll target</div>
+  <script>
+    const expected = "page.y-_=+[]{}\\|;:'\"`~,<>/?09";
+    document.getElementById('entry').addEventListener('input', function () {
+      if (this.value === expected)
+        document.getElementById('typed').style.background = 'black';
+    });
+  </script>
+</body>
+</html>

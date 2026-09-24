@@ -1,9 +1,8 @@
 /*
  * Implements the always-present hosted GEM system menu. A fixed three-bar
- * menu button sits at the left of the menu bar and drops a one-item popup
- * ("Shutdown") that is available whichever application, if any, owns the
- * rest of the bar. It is gemd's own menu. Rendering and tracking use the
- * same direct VDI path and synchronous HID polling as the classic tracker.
+ * menu button sits at the left of the menu bar and drops a popup containing
+ * registered GEM services, a separator and Shutdown. It is gemd's own menu.
+ * Service selections are delivered to their owner as AC_OPEN messages.
  *
  * MIT License (see: LICENSE)
  * Copyright (C) 2026 tomaz stih
@@ -29,12 +28,86 @@ enum {
     SYSTEM_GLYPH = 16,
     SYSTEM_PAD_LEFT = 6,
     SYSTEM_PAD_RIGHT = 1,
-    SYSTEM_ITEM_COUNT = 1
+    SYSTEM_SEPARATOR_HEIGHT = 7
 };
 
 int (*aes_system_shutdown_hook)(void);
+int (*aes_system_delete_hook)(void);
 
-static const char *const system_items[SYSTEM_ITEM_COUNT] = {" Shutdown "};
+static const char system_shutdown_text[] = "Shutdown";
+
+WORD aes_system_menu_register(WORD app_id, const char *text)
+{
+    WORD i;
+    const unsigned char *cursor = (const unsigned char *)text;
+
+    if (app_id <= 0 || text == NULL || text[0] == '\0' ||
+        strlen(text) >= AES_SYSTEM_ITEM_TEXT) {
+        return -1;
+    }
+    while (*cursor != '\0') {
+        if (*cursor < 32u) {
+            return -1;
+        }
+        ++cursor;
+    }
+    for (i = 0; i < AES_MAX_SYSTEM_ITEMS; ++i) {
+        aes_system_item_t *item = &aes_state.system_items[i];
+
+        if (item->used == 0) {
+            item->used = 1;
+            item->owner = app_id;
+            strcpy(item->text, text);
+            aes_trace("system_menu register app=%d id=%d text=%s", app_id, i,
+                      text);
+            return i;
+        }
+    }
+    return -1;
+}
+
+WORD aes_system_menu_unregister(WORD app_id, WORD menu_id)
+{
+    aes_system_item_t *item;
+
+    if (menu_id < 0 || menu_id >= AES_MAX_SYSTEM_ITEMS) {
+        return 0;
+    }
+    item = &aes_state.system_items[menu_id];
+    if (item->used == 0 || item->owner != app_id) {
+        return 0;
+    }
+    memset(item, 0, sizeof(*item));
+    aes_trace("system_menu unregister app=%d id=%d", app_id, menu_id);
+    return 1;
+}
+
+void aes_system_menu_unregister_owner(WORD app_id)
+{
+    WORD i;
+
+    for (i = 0; i < AES_MAX_SYSTEM_ITEMS; ++i) {
+        if (aes_state.system_items[i].used != 0 &&
+            aes_state.system_items[i].owner == app_id) {
+            aes_trace("system_menu unregister_owner app=%d id=%d", app_id, i);
+            memset(&aes_state.system_items[i], 0,
+                   sizeof(aes_state.system_items[i]));
+        }
+    }
+}
+
+static WORD system_registration_count(void)
+{
+    WORD i;
+    WORD count = 0;
+
+    for (i = 0; i < AES_MAX_SYSTEM_ITEMS; ++i) {
+        if (aes_state.system_items[i].used != 0) {
+            ++count;
+        }
+    }
+    return count;
+}
 
 WORD aes_system_menu_width(void)
 {
@@ -109,31 +182,55 @@ int aes_system_menu_hit(WORD x, WORD y)
 
 static void system_popup_rect(GRECT *rect)
 {
-    WORD width = 0;
+    WORD width = vdi_string_width(system_shutdown_text);
     WORD item;
+    WORD registrations = system_registration_count();
 
-    for (item = 0; item < SYSTEM_ITEM_COUNT; ++item) {
-        WORD w = vdi_string_width(system_items[item]);
+    for (item = 0; item < AES_MAX_SYSTEM_ITEMS; ++item) {
+        WORD w;
 
+        if (aes_state.system_items[item].used == 0) {
+            continue;
+        }
+        w = vdi_string_width(aes_state.system_items[item].text);
         if (w > width) {
             width = w;
         }
     }
     aes_set_rect(rect, 0, aes_menu_bar_height(), (WORD)(width + 8),
-                 (WORD)(SYSTEM_ITEM_COUNT * aes_menu_chrome_height() + 2));
+                 (WORD)((registrations + 1) * aes_menu_chrome_height() +
+                        (registrations != 0 ? SYSTEM_SEPARATOR_HEIGHT : 0) +
+                        2));
 }
 
 static WORD system_item_at(const GRECT *popup, WORD x, WORD y)
 {
     WORD item_height = aes_menu_chrome_height();
-    WORD relative;
+    WORD cursor;
+    WORD item;
 
     if (x < popup->g_x || x >= popup->g_x + popup->g_w || y < popup->g_y + 1 ||
         y >= popup->g_y + popup->g_h - 1) {
         return -1;
     }
-    relative = (WORD)((y - popup->g_y - 1) / item_height);
-    return (relative >= 0 && relative < SYSTEM_ITEM_COUNT) ? relative : -1;
+    cursor = (WORD)(popup->g_y + 1);
+    for (item = 0; item < AES_MAX_SYSTEM_ITEMS; ++item) {
+        if (aes_state.system_items[item].used == 0) {
+            continue;
+        }
+        if (y >= cursor && y < cursor + item_height) {
+            return (WORD)(AES_SYSTEM_MENU_REGISTERED + item);
+        }
+        cursor = (WORD)(cursor + item_height);
+    }
+    if (system_registration_count() != 0) {
+        if (y < cursor + SYSTEM_SEPARATOR_HEIGHT) {
+            return AES_SYSTEM_MENU_NONE;
+        }
+        cursor = (WORD)(cursor + SYSTEM_SEPARATOR_HEIGHT);
+    }
+    return (y >= cursor && y < cursor + item_height) ? AES_SYSTEM_MENU_SHUTDOWN
+                                                     : AES_SYSTEM_MENU_NONE;
 }
 
 static void system_draw_popup(const GRECT *popup, WORD highlight)
@@ -141,6 +238,7 @@ static void system_draw_popup(const GRECT *popup, WORD highlight)
     WORD item_height = aes_menu_chrome_height();
     WORD frame[4];
     WORD item;
+    WORD top;
 
     frame[0] = popup->g_x;
     frame[1] = popup->g_y;
@@ -151,12 +249,15 @@ static void system_draw_popup(const GRECT *popup, WORD highlight)
     vsl_color(aes_state.vdi_handle, aes_dark_color());
     v_rbox(aes_state.vdi_handle, frame);
 
-    for (item = 0; item < SYSTEM_ITEM_COUNT; ++item) {
-        WORD top = (WORD)(popup->g_y + 1 + item * item_height);
+    top = (WORD)(popup->g_y + 1);
+    for (item = 0; item < AES_MAX_SYSTEM_ITEMS; ++item) {
         WORD text_y = (WORD)(top + vdi_font_ascent());
         WORD ink = aes_dark_color();
 
-        if (item == highlight) {
+        if (aes_state.system_items[item].used == 0) {
+            continue;
+        }
+        if ((WORD)(AES_SYSTEM_MENU_REGISTERED + item) == highlight) {
             WORD bar[4] = {(WORD)(popup->g_x + 1), top,
                            (WORD)(popup->g_x + popup->g_w - 2),
                            (WORD)(top + item_height - 1)};
@@ -164,7 +265,35 @@ static void system_draw_popup(const GRECT *popup, WORD highlight)
             v_bar(aes_state.vdi_handle, bar);
             ink = aes_light_color();
         }
-        aes_draw_text((WORD)(popup->g_x + 4), text_y, ink, system_items[item]);
+        aes_draw_text((WORD)(popup->g_x + 4), text_y, ink,
+                      aes_state.system_items[item].text);
+        top = (WORD)(top + item_height);
+    }
+    if (system_registration_count() != 0) {
+        WORD line[4] = {(WORD)(popup->g_x + 4),
+                        (WORD)(top + SYSTEM_SEPARATOR_HEIGHT / 2),
+                        (WORD)(popup->g_x + popup->g_w - 5),
+                        (WORD)(top + SYSTEM_SEPARATOR_HEIGHT / 2)};
+
+        vsl_color(aes_state.vdi_handle, aes_dark_color());
+        v_pline(aes_state.vdi_handle, 2, line);
+        top = (WORD)(top + SYSTEM_SEPARATOR_HEIGHT);
+    }
+    {
+        WORD text_y = (WORD)(top + vdi_font_ascent());
+        WORD ink = aes_dark_color();
+
+        if (highlight == AES_SYSTEM_MENU_SHUTDOWN) {
+            WORD bar[4] = {(WORD)(popup->g_x + 1), top,
+                           (WORD)(popup->g_x + popup->g_w - 2),
+                           (WORD)(top + item_height - 1)};
+
+            vsf_color(aes_state.vdi_handle, aes_dark_color());
+            v_bar(aes_state.vdi_handle, bar);
+            ink = aes_light_color();
+        }
+        aes_draw_text((WORD)(popup->g_x + 4), text_y, ink,
+                      system_shutdown_text);
     }
 }
 
@@ -229,9 +358,7 @@ WORD aes_system_menu_track(const gem_hid_event_t *first_evt)
         if (evt.type == GEM_HID_MOUSE_BUTTON &&
             evt.button == GEM_HID_BUTTON_LEFT &&
             (evt.flags & GEM_HID_BUTTON_LEFT) == 0u) {
-            if (highlight == 0) {
-                chosen = AES_SYSTEM_MENU_SHUTDOWN;
-            }
+            chosen = highlight;
             break;
         }
     }
@@ -257,7 +384,19 @@ WORD aes_system_menu_track(const gem_hid_event_t *first_evt)
     vsf_color(aes_state.vdi_handle, aes_light_color());
     vsl_color(aes_state.vdi_handle, aes_dark_color());
 
-    if (chosen == AES_SYSTEM_MENU_SHUTDOWN) {
+    if (chosen >= AES_SYSTEM_MENU_REGISTERED &&
+        chosen < AES_SYSTEM_MENU_REGISTERED + AES_MAX_SYSTEM_ITEMS) {
+        WORD menu_id = (WORD)(chosen - AES_SYSTEM_MENU_REGISTERED);
+        aes_system_item_t *item = &aes_state.system_items[menu_id];
+
+        if (item->used != 0 && aes_find_app_by_id(item->owner) != NULL) {
+            WORD message[8] = {AC_OPEN, 0, 0, menu_id, 0, 0, 0, 0};
+
+            (void)appl_write(item->owner, (WORD)sizeof(message), message);
+        } else {
+            chosen = AES_SYSTEM_MENU_NONE;
+        }
+    } else if (chosen == AES_SYSTEM_MENU_SHUTDOWN) {
         if (form_alert(2, "[2][ Shut down GEM and | close all applications? ]"
                           "[ Shutdown | Cancel ]") == 1 &&
             aes_system_shutdown_hook != NULL) {

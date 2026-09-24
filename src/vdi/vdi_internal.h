@@ -88,6 +88,7 @@ WORD vdi_text_background_mode(void);
 WORD vdi_write_mode(void);
 void vdi_pump_events(void);
 void vdi_set_mouse_state(WORD x, WORD y, WORD status);
+void vdi_presenter_cursor_sync(void);
 void vdi_prepare_screen_write(void);
 void vdi_begin_update(void);
 void vdi_end_update(void);

@@ -97,14 +97,10 @@ static int gem_trash_home_root(char *root, size_t root_size)
 {
     char base[GEM_OS_PATH_MAX];
 
-    if (gem_os_getenv("XDG_DATA_HOME", base, sizeof(base)) != 0 &&
-        base[0] == '/') {
-        return gem_trash_join(base, "Trash", root, root_size);
-    }
-    if (gem_os_getenv("HOME", base, sizeof(base)) == 0 || base[0] != '/') {
+    if (gem_os_user_data_dir(base, sizeof(base)) == 0) {
         return 0;
     }
-    return gem_trash_join(base, ".local/share/Trash", root, root_size);
+    return gem_trash_join(base, "Trash", root, root_size);
 }
 
 static int gem_trash_store_dirs(const char *root, char *files,

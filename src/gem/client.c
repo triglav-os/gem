@@ -276,10 +276,12 @@ WORD evnt_multi(UWORD flags, UWORD bclk, UWORD bmsk, UWORD bst, UWORD m1flags,
                           sizeof(rsp))) {
             return 0;
         }
+        if (rsp.event == 0) {
+            gem_os_sleep_ms(1u);
+            continue;
+        }
         if ((flags & MU_TIMER) == 0u || rsp.event != MU_TIMER ||
             (uint32_t)(gem_os_ticks_ms() - timer_start) >= requested_timeout) {
-            if (rsp.event == 0)
-                gem_os_sleep_ms(1u);
             break;
         }
         /* Waiting belongs in this client, never in the shared server. */

@@ -5,6 +5,7 @@ add_executable(gemd
     dispatch_aes.c
     transport.c
     drawing.c
+    overlay.c
     aes_dispatch.c
     ../gem/aes_validate.c
     ../gem/tree_decode.c
@@ -22,7 +23,7 @@ target_include_directories(gemd
         ${PROJECT_SOURCE_DIR}/src/gem
 )
 
-target_link_libraries(gemd PRIVATE aes)
+target_link_libraries(gemd PRIVATE aes gemconf)
 
 set_target_properties(gemd PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${GEM_CORE_DIR}

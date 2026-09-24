@@ -118,6 +118,21 @@ int gem_os_find_file(const char *name, char *out, size_t out_size);
 /* Resolves an executable through the GEMix search order. */
 int gem_os_find_executable(const char *name, char *out, size_t out_size);
 
+/* Resolves an accessory name using the platform's accessory search path. */
+int gem_os_find_accessory(const char *name, char *out, size_t out_size);
+
+/* Resolves a startup program from the platform's AUTO search path. */
+int gem_os_find_auto_program(const char *name, char *out, size_t out_size);
+
+/* Returns the platform's per-user configuration directory. */
+int gem_os_user_config_dir(char *out, size_t out_size);
+
+/* Returns the platform's ordered system configuration directories. */
+int gem_os_system_config_dirs(char *out, size_t out_size);
+
+/* Returns the platform's per-user data directory. */
+int gem_os_user_data_dir(char *out, size_t out_size);
+
 /*
  * Starts a GEM child with a TOS-tail payload and child-only launch metadata.
  * `appl_id` is the AES id reserved before exec. Returns nonzero on success.
@@ -182,6 +197,13 @@ int gem_os_open_read(const char *path);
  * value on failure.
  */
 int gem_os_open_write(const char *path);
+
+/*
+ * Opens an existing `path` with GEMDOS-compatible access mode: zero for
+ * read-only, one for write-only, or two for read/write. The file is never
+ * created or truncated. Returns a file descriptor, or a negative value.
+ */
+int gem_os_open_existing(const char *path, int mode);
 
 /*
  * Closes the file descriptor `fd`.
@@ -249,6 +271,13 @@ int gem_os_unlink(const char *path);
  * Returns non-zero on success and zero on failure.
  */
 int gem_os_rename(const char *old_path, const char *new_path);
+
+/*
+ * Copies one file, symbolic link or directory tree to `new_path` without
+ * following symbolic links. The destination must not exist. Returns nonzero
+ * on success and removes a partial destination after failure.
+ */
+int gem_os_copy_path(const char *old_path, const char *new_path);
 
 /*
  * Moves one file, symbolic link or directory tree to `new_path`. It uses an

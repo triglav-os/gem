@@ -1,5 +1,5 @@
 /*
- * Implements GEM AES shell services with one mutex-protected global buffer,
+ * Implements GEM AES shell services with a mutex-protected DESKTOP.INF view,
  * per-child launch records and host process work delegated to platform/os.
  *
  * MIT License (see: LICENSE)
@@ -9,6 +9,7 @@
 #include "aes_shel.h"
 
 #include "aes_internal.h"
+#include "desktop_inf.h"
 #include "platform/os.h"
 
 #include <stdint.h>
@@ -20,14 +21,14 @@ typedef struct aes_shel_state {
     gem_os_mutex_t mutex;
     int initialized;
     int caller_pid;
-    unsigned char *buffer;
-    size_t buffer_size;
     char default_cmd[256];
     char default_dir[AES_PATH_LEN];
     shel_launch_t launches[AES_SHEL_LAUNCH_MAX];
 } aes_shel_state_t;
 
 static aes_shel_state_t shell_state;
+
+void (*aes_shel_config_changed_hook)(void);
 
 static int aes_shel_ensure_initialized(void)
 {
@@ -47,10 +48,7 @@ void aes_shel_reset(void)
         return;
     }
     gem_os_mutex_lock(&shell_state.mutex);
-    gem_os_free(shell_state.buffer);
     memset(shell_state.launches, 0, sizeof(shell_state.launches));
-    shell_state.buffer = NULL;
-    shell_state.buffer_size = 0u;
     shell_state.caller_pid = 0;
     shell_state.default_cmd[0] = '\0';
     shell_state.default_dir[0] = '\0';
@@ -277,56 +275,58 @@ WORD shel_read(char *cmd, char *tail)
 
 WORD shel_get(char *buf, WORD length)
 {
+    unsigned char *desktop_inf;
+    size_t desktop_inf_size = 0u;
     size_t copy_size;
+    WORD result = 0;
 
     if (aes_shel_ensure_initialized() == 0) {
         return 0;
     }
-    gem_os_mutex_lock(&shell_state.mutex);
-    if (length == SHEL_BUFSIZE) {
-        WORD result = (WORD)shell_state.buffer_size;
-
-        gem_os_mutex_unlock(&shell_state.mutex);
-        return result;
-    }
-    if (buf == NULL || length < 0) {
-        gem_os_mutex_unlock(&shell_state.mutex);
+    desktop_inf = gem_os_alloc(DESKTOP_INF_DATA_MAX);
+    if (desktop_inf == NULL) {
         return 0;
     }
+    gem_os_mutex_lock(&shell_state.mutex);
+    if (!desktop_inf_config_get(desktop_inf, DESKTOP_INF_DATA_MAX,
+                                &desktop_inf_size)) {
+        goto done;
+    }
+    if (length == SHEL_BUFSIZE) {
+        result = (WORD)desktop_inf_size;
+        goto done;
+    }
+    if (buf == NULL || length < 0) {
+        goto done;
+    }
     copy_size = (size_t)length;
-    if (copy_size > shell_state.buffer_size) {
-        copy_size = shell_state.buffer_size;
+    if (copy_size > desktop_inf_size) {
+        copy_size = desktop_inf_size;
     }
     if (copy_size != 0u) {
-        memcpy(buf, shell_state.buffer, copy_size);
+        memcpy(buf, desktop_inf, copy_size);
     }
+    result = 1;
+
+done:
     gem_os_mutex_unlock(&shell_state.mutex);
-    return 1;
+    gem_os_free(desktop_inf);
+    return result;
 }
 
 WORD shel_put(char *buf, WORD length)
 {
-    unsigned char *replacement = NULL;
-    unsigned char *previous;
+    int result;
 
-    if (length < 0 || (buf == NULL && length != 0) ||
-        aes_shel_ensure_initialized() == 0) {
+    if (length <= 0 || buf == NULL || aes_shel_ensure_initialized() == 0) {
         return 0;
     }
-    if (length != 0) {
-        replacement = gem_os_alloc((size_t)length);
-        if (replacement == NULL) {
-            return 0;
-        }
-        memcpy(replacement, buf, (size_t)length);
-    }
     gem_os_mutex_lock(&shell_state.mutex);
-    previous = shell_state.buffer;
-    shell_state.buffer = replacement;
-    shell_state.buffer_size = (size_t)length;
+    result = desktop_inf_config_put((const unsigned char *)buf, (size_t)length);
     gem_os_mutex_unlock(&shell_state.mutex);
-    gem_os_free(previous);
-    return 1;
+    if (result != 0 && aes_shel_config_changed_hook != NULL)
+        aes_shel_config_changed_hook();
+    return result != 0 ? 1 : 0;
 }
 
 WORD shel_find(char *path)

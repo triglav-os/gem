@@ -41,17 +41,18 @@ remain; it does not silently suppress reviewed warnings.
 | FAT12 | Sector multiplication could wrap; invalid geometry and oversized file sizes reached reads/allocations. Bounds now precede arithmetic, reads and allocation. | `test_security_bounds`, `security_disk` |
 | FAT traversal | Unsafe names could escape the destination; cyclic directories could recurse indefinitely. Names, path lengths, depth, entry counts and visited clusters are bounded. | `security_disk`: traversal, cycle and oversized-file cases |
 | MSA extraction | Destination symlinks/hardlinks could overwrite unrelated files. Extraction uses directory descriptors and refuses unsafe inode types, owners and link counts before truncation. | `security_disk`: normal/repeated extraction, symlink and hardlink refusal |
-| Stout | Guest VDI counts could overrun fixed stack arrays. Counts and guest spans are checked before copying; local argument arrays are initialized. | `security_guest`: excessive and negative word/point counts through real 68000 traps |
+| Stout | Guest VDI counts could overrun fixed stack arrays. Counts and guest spans are checked before copying; local argument arrays are initialized. System-vector dispatch and TOS trap stack ownership could regress while individual handlers still compiled. Writable FAT paths must remain inside the selected raw image, while host output must remain beneath the program's source directory without following symlinks. | `security_guest`: excessive and negative word/point counts, successful GEMDOS/BIOS/XBIOS vectors, caller-side stack cleanup, and nested relative `Fcreate` persisted into generated A: and host C: roots |
 | AES object drawing | A NULL clipping rectangle could reach `memcpy`. Missing clips now resolve to screen bounds. | Existing object/tree UAT and integration suite |
 | Sample bitmaps | Clock's resource lookup failure path did not free earlier cloned blocks. Partial-load cleanup now releases each prior allocation. Unused icon-loading paths were removed. | Sanitized builds and full sample session; residual analyzer notes below |
 | SoftFloat | A 64-bit shift boundary could invoke C undefined behavior. The 128-bit helper handles boundary counts explicitly. | `test_security_bounds`: counts 0–128 against repeated single-bit shifts |
 | Musashi generator | Unsigned EOF checks, body-limit indexing and unchecked argv copies were unsafe. EOF is signed; limits are checked before access; fatal exits are explicit. | Generated opcode build; empty/10,000-character path rejection under sanitizers |
 | Framebuffer | Rectangle end arithmetic could overflow; a replacement/truncated viewer framebuffer lost pixels outside a partial update. Widened arithmetic and full restoration on remapping/resize fix both. | `test_gemd_host`: extreme coordinates, replacement and truncation followed by a one-pixel update |
-| Desktop | Workspace suppressed the root-disk fallback on filtered container mounts; desktop/AES checker phases differed after dialog repaint. Disk fallback and background phase now agree. | Direct/proxy desktop UAT and prolonged Desktop info all-samples regression |
+| Desktop | Workspace suppressed the root-disk fallback on filtered container mounts; desktop/AES checker phases differed after dialog repaint. Disk fallback and background phase now agree. | Direct/proxy desktop UAT and prolonged system-alert all-samples regression |
 | Launch scripts | Old startup helpers killed unrelated processes. Helpers now execute only their selected viewer/server; session cleanup retains ownership checks. | Combined session startup/cleanup |
 | Reporting | Docker/custom-build reports linked to default-build artifacts. Evidence links now derive from the actual build directory. | `test_report` checks a nondefault build directory and a deliberately failing fixture |
-| AES shell | A single last-command slot would let concurrent applications observe another launch, while direct process/environment calls tied AES to Linux. Launch state is now keyed by reserved application id/PID; the global data blob is separately mutex-protected; executable search, child-only environment construction, spawning, inspection and reaping use the platform OS layer. | `test_aes_shell`, `test_aes_rpc` |
+| AES shell | A single last-command slot would let concurrent applications observe another launch, while direct process/environment calls tied AES to Linux. Launch state is keyed by reserved application id/PID. The historical global data area is an on-demand, bounded DESKTOP.INF projection of atomically saved `desktop.cfg`; its complete translation is mutex-protected and gemd reloads direct `libgemconf` replacements. Executable search, child-only environment construction, spawning, inspection and reaping use the platform OS layer. | `test_aes_shell`, `test_aes_rpc` |
 | Desktop Trash | A rename-only move failed when the per-volume Trash was unavailable or the home fallback crossed filesystems. The OS wrapper now stages the source name, performs a no-follow copy of supported entry types, restores on copy failure and retains the complete destination if staging cleanup fails. | `test_gem_trash`: cross-device nested `tools/scripts/tool.sh`; direct/proxy failed-drop UAT followed by immediate folder activation |
+| File Manager copy | Cross-window drops previously had no filesystem operation and a recursive implementation could follow links, recurse into its own destination or destroy a colliding path during cleanup. Normal-window drops now use a no-follow OS copy primitive, reject descendants and existing destinations, and bound cleanup to the destination parent. | `test_gem_trash`: regular file, nested directory, collision preservation and self-descendant rejection |
 
 Local vendor changes are recorded in [Musashi patch notes](../notes/MUSASHI_PATCHES.md).
 Public GEM APIs and legacy types retain their spelling and layout; private
@@ -93,11 +94,12 @@ desktop UAT in both modes, and the all-samples session with mouse/keyboard
 interaction and window-lifetime checks. These tests are automated and require
 no AI to run. See [the latest test report](LATEST.md) for each case's result.
 
-Rasta is downloaded from a TLS-verified, SHA-256-pinned source archive into
-`build/`; the default viewer is `bin/tools/rasta`. A sibling checkout is never
-required. The normal compiler toolchain is local. `make container` supplies
-it through Docker and was tested with isolated container outputs. See the
-[development guide](../guides/HOSTED_DEVELOPMENT.md) for dependencies and commands.
+Rasta and CEF are downloaded from TLS-verified, SHA-256-pinned archives into
+`build/`; the default viewer is `bin/tools/rasta`, and Gemscape loads CEF from
+the ignored build cache. A sibling checkout is never required. The normal
+compiler toolchain is local. `make container` supplies it through Docker and
+was tested with isolated container outputs. See the [development
+guide](../guides/HOSTED_DEVELOPMENT.md) for dependencies and commands.
 
 All sample-only disks, historical sample files and artwork live under
 `samples/data/`; generated sample assets live beside sample executables in
@@ -120,7 +122,7 @@ the previous code; the whole suite was rerun afterwards.
 | libgem menus | `menu_bar()` compared the full `ob_type`, so titles/entries with extended type bits sent no string while gemd requires one for the low byte, and the menu was rejected. The wrapper now masks the type like the server. | `test_aes_rpc`: extended-type title and entry accepted |
 | Linux backend | `gem_raster_init()` rejected the documented width/height `0` before the code that resolves it to the framebuffer size, so a native session without `GEM_VDI_WIDTH`/`HEIGHT` could not open. Only the format is checked early. | Build; native display UAT still requires hardware |
 | Terminal PTY | Closing a PTY waited unboundedly for a shell that ignores `SIGHUP`. A bounded wait now escalates to `SIGKILL`. | Sample session |
-| Rasta subscription | gemd sent `--inverse on`, but the patched viewer takes `--inverse` as a bare flag; it rejected the whole datagram with "unknown option: on", so a viewer started as the README describes (`rasta --inverse --port 5000`) kept its 320×200 defaults and `/tmp/rasta.framebuffer` and never showed GEM. The flag is now sent bare when enabled. | Every UAT fails on a rejected subscription; manual three-terminal start reconfigures to 992×1400 |
+| Rasta subscription | Updated the pinned Rasta viewer to native `--inverse off --bpp 32` support; GEM publishes display-ready BGRA pixels, so inversion must remain disabled during subscriber reconfiguration. | Rebuild the verified Rasta dependency and run `test_rasta_polarity`; manual startup uses the documented options |
 | UAT runner | Parallel sessions could pick the same probed UDP port and one viewer exited with "Address already in use". The runner restarts the viewer on a fresh port. | `make tests` |
 | Window exposure | When an application closed a window and exited, `gemd_cleanup_app` purged every queued message carrying its id as *sender*, including the `WM_REDRAW` hints the AES had just queued to the applications its window uncovered; their work areas kept showing the closed window (observed with the calculator closed over the terminal). Only messages addressed to the leaving application are dropped now. | `test_gemd_security`: a fresh peer covers another window, closes and exits; the covered application must still receive a `WM_REDRAW` spanning the exposed area |
 | gemd startup | An over-long `GEMD_SOCKET` path, or a failing `lstat`/`chmod`/`fcntl` on the new socket, made gemd exit silently. Each now reports the reason on stderr. | Manual: 108-byte socket path |
@@ -189,8 +191,8 @@ Stout and the desktop.
 ## Subsequent display-polarity correction
 
 The original audit runs above checked raw PBMs and missed the upstream viewer's
-opposite RGB mapping. The launchers now pass `--inverse`, supplied by a checked
-build patch in `tools/scripts/rasta_inverse.cmake`. The new `test_rasta_polarity`
+opposite RGB mapping. The launchers now pass `--inverse off`; the pinned latest
+Rasta source supplies the option natively. The new `test_rasta_polarity`
 checks decoded colors as well as flag parsing/reconfiguration; current run
 counts are recorded in [LATEST.md](LATEST.md). Earlier 84-test results retain
 their original scope.

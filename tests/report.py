@@ -54,7 +54,8 @@ def main():
              f'**{counts["PASS"]} passed, {counts["FAIL"]} failed, '
              f'{counts["SKIP"]} skipped; CTest exit status {status}.**', '',
              f'Command: `{" ".join(command)}`', '',
-             'Build: GCC Debug, Rasta platform, AddressSanitizer and UndefinedBehaviorSanitizer.', '',
+             'Build: GCC RelWithDebInfo, Rasta platform; UAT rejects AddressSanitizer '
+             'and UndefinedBehaviorSanitizer diagnostics.', '',
              f'[Complete execution log]({evidence_root}/tests.log) · '
              f'[Machine-readable JUnit results]({evidence_root}/test-results.xml)', '',
              '## Coverage', '',
@@ -70,7 +71,13 @@ def main():
              'digit entry, clear and 7 + 2 = 9. '
              'Both desktop variants verify disk, Workspace and Trash icons, open the '
              'file manager, navigate into a fixture directory and back, and close it. '
-             'They check compact Desk menus, Desktop info and File Open. Separate '
+             'They check the global Locations command and directory chooser, compact '
+             'Desk menus and File Open. Separate '
+             'Gemread scenarios verify its shared toolbar/status chrome, color BGRA '
+             'PDF pages, zoom, responsive resize and multipage thumbnail navigation; '
+             'Gemscape verifies complete punctuation input, browser focus, GEM cursor '
+             'visibility above CEF, navigation, redraw and scrollbar synchronization. '
+             'Separate '
              'Trash scenarios exercise icon-view double-clicks, an upside-down-T XOR '
              'icon/title contour, live Trash-title inversion before button-up, file '
              'and non-empty-folder moves, plus '
@@ -80,10 +87,10 @@ def main():
              'covers restore, collision handling, symlink-safe purge, same-volume '
              'store selection and cross-filesystem directory moves. The full '
              'sample session also opens Workspace through its exposed label while '
-             'all applications are running. It holds Desk open across a partial RPC frame '
-             'and verifies that Desktop info preserves all windows and client '
+             'all applications are running. It holds the system menu open across a partial RPC frame '
+             'and verifies that the Shutdown alert preserves all windows and client '
              'connections through a seven-second alert wait. '
-             'All 33 demos run through Rasta in direct and proxy modes. '
+             'All 34 demos run through Rasta in direct and proxy modes. '
              'UAT checks framebuffer references and scripted input; terminal cases verify a '
              'real shell command by reading its output file. The SDL viewer uses its dummy '
              'video driver unless UAT_SDL_DRIVER is set.', '',

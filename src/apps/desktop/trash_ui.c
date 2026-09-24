@@ -85,7 +85,7 @@ static int desktop_parent_directory(const char *path, char *parent,
 }
 
 /* Notify every in-process File Manager displaying the changed directory. */
-static void desktop_refresh_file_windows_for_item(const char *path)
+void desktop_refresh_file_windows_for_path(const char *path)
 {
     char parent[GEM_OS_PATH_MAX];
     WORD index;
@@ -105,32 +105,66 @@ static void desktop_refresh_file_windows_for_item(const char *path)
     }
 }
 
-static void desktop_trash_filesystem_entry(desktop_browser_entry_t *entry)
+static void desktop_trash_filesystem_selection(
+    desktop_browser_window_t *browser, WORD primary_index)
 {
     char alert[GEM_OS_PATH_MAX + 64];
     char changed_path[GEM_OS_PATH_MAX];
+    WORD index;
+    WORD item_count = 0;
+    WORD moved = 0;
+    desktop_browser_entry_t *primary = &browser->entries[primary_index];
 
-    (void)snprintf(changed_path, sizeof(changed_path), "%s", entry->path);
+    changed_path[0] = '\0';
+    for (index = 0; index < browser->entry_count; ++index) {
+        if (browser->entries[index].selected != 0 &&
+            browser->entries[index].is_parent == 0) ++item_count;
+    }
+    if (item_count == 0) return;
 
-    (void)snprintf(alert, sizeof(alert),
-                   "[2][ Move %.*s to Trash? ][ Trash | Cancel ]", 360,
-                   entry->name);
+    if (item_count == 1) {
+        (void)snprintf(alert, sizeof(alert),
+                       "[2][ Move %.*s to Trash? ][ Trash | Cancel ]", 360,
+                       primary->name);
+    } else {
+        (void)snprintf(
+            alert, sizeof(alert),
+            "[2][ Move %d selected items|to Trash? ][ Trash | Cancel ]",
+            item_count);
+    }
     if (form_alert(2, alert) != 1) {
         desktop_set_status("Move to Trash cancelled.");
         desktop_redraw(NULL);
         return;
     }
-    if (gem_trash_put(entry->path, NULL) != GEM_TRASH_OK) {
+    for (index = 0; index < browser->entry_count; ++index) {
+        desktop_browser_entry_t *entry = &browser->entries[index];
+
+        if (entry->selected == 0 || entry->is_parent != 0) continue;
+        if (changed_path[0] == '\0') {
+            (void)snprintf(changed_path, sizeof(changed_path), "%s",
+                           entry->path);
+        }
+        if (gem_trash_put(entry->path, NULL) != GEM_TRASH_OK) break;
+        ++moved;
+    }
+    if (moved != item_count) {
         (void)snprintf(alert, sizeof(alert),
                        "[3][ Cannot move %.*s to Trash. ][ OK ]", 360,
-                       entry->name);
+                       browser->entries[index].name);
         (void)form_alert(1, alert);
         desktop_set_status("Unable to move item to Trash.");
-    } else {
+    } else if (item_count == 1) {
         (void)snprintf(alert, sizeof(alert), "Moved %.*s to Trash.", 450,
-                       entry->name);
+                       primary->name);
         desktop_set_status(alert);
-        desktop_refresh_file_windows_for_item(changed_path);
+    } else {
+        (void)snprintf(alert, sizeof(alert), "Moved %d items to Trash.",
+                       item_count);
+        desktop_set_status(alert);
+    }
+    if (moved > 0) {
+        desktop_refresh_file_windows_for_path(changed_path);
         desktop_refresh_trash_windows();
     }
     desktop_redraw(NULL);
@@ -143,7 +177,7 @@ void desktop_trash_browser_entry(desktop_browser_window_t *browser, WORD index)
         browser->entries[index].is_parent != 0) {
         return;
     }
-    desktop_trash_filesystem_entry(&browser->entries[index]);
+    desktop_trash_filesystem_selection(browser, index);
 }
 
 static void desktop_purge_trash_entry(desktop_browser_entry_t *entry)
@@ -180,7 +214,7 @@ void desktop_delete_active_selection(void)
         return;
     }
     if (browser->backend == DESKTOP_BROWSER_FILES) {
-        desktop_trash_filesystem_entry(entry);
+        desktop_trash_filesystem_selection(browser, browser->selected_index);
     } else if (strcmp(browser->path, "trash://") == 0 &&
                entry->is_trash_root_item != 0) {
         desktop_purge_trash_entry(entry);
@@ -236,7 +270,7 @@ void desktop_restore_active_selection(void)
         desktop_set_status("Item restored to its original location.");
     }
     if (result == GEM_TRASH_OK) {
-        desktop_refresh_file_windows_for_item(restored_path);
+        desktop_refresh_file_windows_for_path(restored_path);
     }
     desktop_refresh_trash_windows();
 }

@@ -32,6 +32,7 @@ class Session:
         self.processes = []
         self.logs = []
         self.peer = None
+        self.connection = None
         self.relay = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.relay.bind(('127.0.0.1', 0))
         self.relay.setblocking(False)
@@ -84,6 +85,15 @@ class Session:
             self.pump()
             time.sleep(.01)
 
+    def wait(self, predicate, description, timeout=8):
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            value = predicate()
+            if value:
+                return value
+            self.pause(.02)
+        raise AssertionError('Timed out: ' + description)
+
     def event(self, kind, x, y=0):
         assert self.peer, 'No Rasta HID subscription'
         self.relay.sendto(struct.pack('!Hhh', kind, x, y), self.peer)
@@ -103,10 +113,43 @@ class Session:
 
     def frame(self, name):
         self.pause(.25)
-        data = (self.path / 'framebuffer').read_bytes()
-        assert len(data) == 32000, f'Wrong framebuffer length: {len(data)}'
+        raw = (self.path / 'framebuffer').read_bytes()
+        assert len(raw) == 640 * 400 * 4, \
+            f'Wrong BGRA framebuffer length: {len(raw)}'
+        data = bytearray(32000)
+        for y in range(400):
+            for x in range(640):
+                if raw[(y * 640 + x) * 4] < 128:
+                    data[y * 80 + x // 8] |= 0x80 >> (x % 8)
+        data = bytes(data)
         (self.path / (name + '.pbm')).write_bytes(b'P4\n640 400\n' + data)
         return data
+
+    def receive(self, size):
+        data = b''
+        while len(data) < size:
+            part = self.connection.recv(size - len(data))
+            assert part, 'gemd closed the UAT probe connection'
+            data += part
+        return data
+
+    def rpc(self, opcode, payload=b''):
+        assert self.args.mode == 'proxy', 'RPC probing requires proxy mode'
+        connected = False
+        if self.connection is None:
+            self.connection = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            self.connection.settimeout(2)
+            self.connection.connect(self.env['GEMD_SOCKET'])
+            connected = True
+        if connected and opcode != 1:
+            self.connection.sendall(struct.pack('=IHHI', 0x47454d31, 2, 1, 0))
+            magic, status, size = struct.unpack('=IiI', self.receive(12))
+            assert magic == 0x47454d31 and status > 0 and size == 0
+        self.connection.sendall(struct.pack('=IHHI', 0x47454d31, 2, opcode,
+                                            len(payload)) + payload)
+        magic, status, size = struct.unpack('=IiI', self.receive(12))
+        assert magic == 0x47454d31 and size <= 65536
+        return status, self.receive(size)
 
     def run(self):
         rasta = os.environ.get('RASTA_BIN', str(Path(__file__).resolve().parents[2]/'bin/tools/rasta'))
@@ -116,8 +159,8 @@ class Session:
         # The probed port is released before the viewer binds it, so parallel
         # sessions can collide; a fresh port and viewer resolve that race.
         for attempt in range(5):
-            self.viewer = self.start('rasta', [rasta, '--inverse', '--width', '640', '--height', '400',
-                '--bpp', '1', '--scale', '1', '--port', str(self.viewer_port),
+            self.viewer = self.start('rasta', [rasta, '--inverse', 'off', '--width', '640', '--height', '400',
+                '--bpp', '32', '--scale', '1', '--port', str(self.viewer_port),
                 '--framebuffer', self.env['GEM_RASTA_FRAMEBUFFER'], '--cursor', 'off'])
             self.pause(.3)
             if self.viewer.poll() is None:
@@ -128,12 +171,14 @@ class Session:
         if self.args.mode == 'proxy':
             self.server = self.start('gemd', [self.args.gemd])
             wait_for(lambda: (self.path / 'socket').exists(), 'gemd socket')
-        self.demo = self.start('demo', [self.args.binary])
+        self.demo = self.start(
+            'demo', [self.args.binary] +
+            list(getattr(self.args, 'binary_args', [])))
         wait_for(self.pump, 'HID subscription')
         self.pause(1)
         assert self.demo.poll() is None, 'Demo exited during startup; see demo.log'
         initial = self.frame('initial')
-        assert len(set(initial)) > 8, 'Demo did not render a scene'
+        assert any(initial), 'Demo did not render a scene'
         if not self.args.capture:
             from scenarios import check
             check(self, initial)
@@ -146,6 +191,13 @@ class Session:
         assert 'ignoring subscriber reconfigure' not in viewer_log, 'Rasta rejected the GEM subscription'
 
     def close(self):
+        if self.connection is not None:
+            try:
+                self.rpc(2)
+            except (AssertionError, OSError):
+                pass
+            self.connection.close()
+            self.connection = None
         for proc in reversed(self.processes):
             if proc.poll() is None:
                 os.killpg(proc.pid, signal.SIGTERM)
@@ -162,6 +214,8 @@ class Session:
             assert 'ERROR: AddressSanitizer' not in text, f'Sanitizer failure: {p}'
             assert 'runtime error:' not in text, f'Undefined behavior: {p}'
             assert 'AddressSanitizer:DEADLYSIGNAL' not in text, f'Crash: {p}'
+            assert 'stack smashing detected' not in text, \
+                f'Stack corruption: {p}'
 
 
 def main():

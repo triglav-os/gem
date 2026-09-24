@@ -31,6 +31,96 @@ struct stat g_socket_identity;
 int g_socket_bound;
 volatile sig_atomic_t g_stopping;
 gemd_session_t *g_modal_session;
+gemconf_t g_gemd_config;
+
+typedef struct gemd_config_identity {
+    dev_t device;
+    ino_t inode;
+    off_t size;
+    time_t modified_seconds;
+    long modified_nanoseconds;
+    int exists;
+} gemd_config_identity_t;
+
+static gemd_config_identity_t g_desktop_config_identity;
+static uint32_t g_desktop_config_checked_at;
+
+static gemd_config_identity_t gemd_desktop_config_identity(void)
+{
+    gemd_config_identity_t identity;
+    char path[GEM_OS_PATH_MAX];
+    struct stat info;
+
+    memset(&identity, 0, sizeof(identity));
+    if (gemconf_user_path(&g_gemd_config, path, sizeof(path)) != 0 &&
+        stat(path, &info) == 0) {
+        identity.device = info.st_dev;
+        identity.inode = info.st_ino;
+        identity.size = info.st_size;
+        identity.modified_seconds = info.st_mtim.tv_sec;
+        identity.modified_nanoseconds = info.st_mtim.tv_nsec;
+        identity.exists = 1;
+    }
+    return identity;
+}
+
+static int gemd_desktop_config_same(gemd_config_identity_t left,
+                                    gemd_config_identity_t right)
+{
+    return left.exists == right.exists && left.device == right.device &&
+           left.inode == right.inode && left.size == right.size &&
+           left.modified_seconds == right.modified_seconds &&
+           left.modified_nanoseconds == right.modified_nanoseconds;
+}
+
+static void gemd_desktop_config_notify(void)
+{
+    if (aes_state.desktop_owner_app_id != 0) {
+        WORD message[8] = {GEM_MSG_LOCATION_CHANGED, 0, 0, 0, 0, 0, 0, 0};
+
+        (void)appl_write(aes_state.desktop_owner_app_id, 16, message);
+    }
+}
+
+static void gemd_desktop_config_reload(void)
+{
+    gemconf_t replacement;
+
+    gemconf_init(&replacement);
+    if (gemconf_load(&replacement, "desktop") != 0) {
+        gemconf_clear(&g_gemd_config);
+        g_gemd_config = replacement;
+        g_desktop_config_identity = gemd_desktop_config_identity();
+        gemd_desktop_config_notify();
+    } else {
+        gemconf_clear(&replacement);
+    }
+}
+
+void gemd_desktop_config_saved(void)
+{
+    g_desktop_config_identity = gemd_desktop_config_identity();
+    gemd_desktop_config_notify();
+}
+
+static void gemd_desktop_config_watch(void)
+{
+    uint32_t now = gem_os_ticks_ms();
+    gemd_config_identity_t current;
+
+    if (now - g_desktop_config_checked_at < 100u) {
+        return;
+    }
+    g_desktop_config_checked_at = now;
+    current = gemd_desktop_config_identity();
+    if (!gemd_desktop_config_same(current, g_desktop_config_identity))
+        gemd_desktop_config_reload();
+}
+
+static void gemd_shell_config_changed(void)
+{
+    gemd_desktop_config_reload();
+}
 
 static void gemd_pump_hid(void)
 {
@@ -41,22 +131,47 @@ static void gemd_pump_hid(void)
     }
 
     for (unsigned i = 0; i < 128 && gem_hid_poll(&evt); ++i) {
+        uint64_t generations[GEMD_MAX_SESSIONS];
+        uint32_t io_started[GEMD_MAX_SESSIONS];
+        uint32_t accepted_at[GEMD_MAX_SESSIONS];
+        uint32_t update_started[GEMD_MAX_SESSIONS];
         uint32_t started = gem_os_ticks_ms();
+
+        for (size_t j = 0; j < GEMD_MAX_SESSIONS; ++j) {
+            generations[j] = g_sessions[j].generation;
+            io_started[j] = g_sessions[j].io.started;
+            accepted_at[j] = g_sessions[j].accepted_at;
+            update_started[j] = g_sessions[j].update_started;
+        }
+
+        /* A server-owned system command has no requesting session, but any
+         * confirmation panel it opens must still service every client. */
+        g_modal_session = NULL;
+        aes_wait_hook = gemd_service_modal;
         aes_dispatch_hid_event(&evt);
+        aes_wait_hook = NULL;
         uint32_t elapsed = gem_os_ticks_ms() - started;
 
-        /* Native menu/drag tracking waits for the user without servicing
-         * RPC sockets. That server-imposed pause is not client inactivity.
-         * Preserve each deadline's remaining time, including partial frames
-         * and replies queued immediately before the menu opened. */
+        /* Native tracking time is not client inactivity. Advance only a
+         * deadline which survived the dispatch unchanged: a modal system
+         * panel can service requests, accept clients and start fresh clocks
+         * while this call is still on the stack. */
         if (elapsed != 0) {
             for (size_t j = 0; j < GEMD_MAX_SESSIONS; ++j) {
                 gemd_session_t *session = &g_sessions[j];
-                if (session->fd < 0)
+
+                if (session->fd < 0 || session->generation != generations[j]) {
                     continue;
-                session->io.started += elapsed;
-                session->accepted_at += elapsed;
-                session->update_started += elapsed;
+                }
+                if (session->io.started == io_started[j]) {
+                    session->io.started += elapsed;
+                }
+                if (session->accepted_at == accepted_at[j]) {
+                    session->accepted_at += elapsed;
+                }
+                if (session->update_started == update_started[j]) {
+                    session->update_started += elapsed;
+                }
             }
         }
     }
@@ -130,10 +245,18 @@ int gemd_service_modal(void)
     gemd_drawing_t drawing;
     WORD app_id = aes_state.current_app_id;
     size_t i;
-    struct pollfd owner = {g_modal_session->fd, POLLRDHUP, 0};
-    if (g_stopping || poll(&owner, 1, 0) < 0 ||
-        (owner.revents & (POLLRDHUP | POLLHUP | POLLERR | POLLNVAL)))
+    struct pollfd owner = {-1, POLLRDHUP, 0};
+
+    if (g_stopping) {
         return 0;
+    }
+    if (g_modal_session != NULL) {
+        owner.fd = g_modal_session->fd;
+        if (poll(&owner, 1, 0) < 0 ||
+            (owner.revents & (POLLRDHUP | POLLHUP | POLLERR | POLLNVAL))) {
+            return 0;
+        }
+    }
     gemd_drawing_save(&drawing);
     gemd_accept_client();
     for (i = 0; i < GEMD_MAX_SESSIONS; ++i) {
@@ -143,7 +266,8 @@ int gemd_service_modal(void)
         aes_app_t *app = aes_find_app_by_id(session->app_id);
         if (session->fd < 0)
             continue;
-        if (app && app->update_depth && now - session->update_started > 5000u) {
+        if (g_modal_session != NULL && app && app->update_depth &&
+            now - session->update_started > 5000u) {
             if (session == g_modal_session) {
                 gemd_drawing_restore(&drawing);
                 aes_state.current_app_id = global[2] = app_id;
@@ -174,10 +298,11 @@ int gemd_service_modal(void)
          * afterwards: an earlier sample minus a newer timestamp wraps to
          * UINT32_MAX and would disconnect a healthy client immediately. */
         now = gem_os_ticks_ms();
-        if ((((session->io.header_read && !session->io.ready) ||
-              session->io.output_size) &&
-             now - session->io.started > 2000u) ||
-            (!session->app_id && now - session->accepted_at > 5000u)) {
+        if (g_modal_session != NULL &&
+            (((((session->io.header_read && !session->io.ready) ||
+                session->io.output_size) &&
+               now - session->io.started > 2000u)) ||
+             (!session->app_id && now - session->accepted_at > 5000u))) {
             aes_trace("modal transport timeout app=%d opcode=%u age=%u",
                       session->app_id, session->io.header.opcode,
                       now - session->io.started);
@@ -258,7 +383,13 @@ int main(void)
         g_sessions[i].fd = -1;
     }
 
+    gemconf_init(&g_gemd_config);
+    (void)gemconf_load(&g_gemd_config, "desktop");
+    g_desktop_config_identity = gemd_desktop_config_identity();
+    aes_shel_config_changed_hook = gemd_shell_config_changed;
+    aes_system_delete_hook = gemd_location_delete_event;
     if (!gemd_init_listener()) {
+        gemconf_clear(&g_gemd_config);
         gemd_shutdown();
         return 1;
     }
@@ -320,6 +451,7 @@ int main(void)
         }
         gemd_pump_hid();
         aes_shel_reap_children();
+        gemd_desktop_config_watch();
 
         for (k = 1; k < nfds; ++k) {
             gemd_session_t *session = poll_owner[k];
@@ -370,6 +502,8 @@ int main(void)
         gemd_pump_hid();
     }
 
+    aes_shel_config_changed_hook = NULL;
+    gemconf_clear(&g_gemd_config);
     gemd_shutdown();
     return 0;
 }

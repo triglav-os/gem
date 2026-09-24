@@ -30,6 +30,7 @@ def owned_files():
     return sorted(p for d in ('src', 'include', 'lib', 'samples', 'tests', 'tools')
                   for p in (ROOT / d).rglob('*') if p.suffix in ('.c', '.h')
                   and 'musashi' not in p.relative_to(ROOT).parts
+                  and 'cef' not in p.relative_to(ROOT).parts
                   and 'data' not in p.relative_to(ROOT).parts)
 
 
@@ -38,7 +39,10 @@ def standards(files):
     for path in files:
         text = path.read_text()
         name = str(path.relative_to(ROOT))
-        if not text.startswith('/*') or 'MIT License' not in text.split('*/')[0]:
+        header = text.split('*/')[0] if text.startswith('/*') else ''
+        license_marker = ('AGPL' if name.startswith('src/apps/gemread/')
+                          else 'MIT License')
+        if not text.startswith('/*') or license_marker not in header:
             errors.append(name + ': missing license/file header')
         if not re.fullmatch(r'[a-z][a-z0-9_]*\.[ch]', path.name):
             errors.append(name + ': filename is not lowercase snake_case')

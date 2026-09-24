@@ -213,7 +213,8 @@ int aes_form_apply_key(OBJECT *tree, WORD object, WORD key, WORD *idx)
     ascii = (WORD)(key & 0xffu);
     scancode = (WORD)((key >> 8) & 0xffu);
 
-    if (ascii == '\b' || scancode == 42 || scancode == 14) {
+    if (ascii == '\b' ||
+        (ascii == 0 && (scancode == 42 || scancode == 14))) {
         aes_form_delete_backward(tree, object, idx);
         return 1;
     }

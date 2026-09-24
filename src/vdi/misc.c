@@ -12,13 +12,14 @@
 #include "vdi_internal.h"
 #include "vdi_state.h"
 
-#include <stdio.h>
+#include "platform/os.h"
+
 #include <string.h>
 
 WORD v_bit_image(WORD handle, BYTE *filename, WORD aspect, WORD x_scale,
                  WORD y_scale, WORD h_align, WORD v_align, WORD xy[4])
 {
-    FILE *stream;
+    int fd;
 
     (void)aspect;
     (void)x_scale;
@@ -31,11 +32,11 @@ WORD v_bit_image(WORD handle, BYTE *filename, WORD aspect, WORD x_scale,
         return 0;
     }
 
-    stream = fopen((const char *)filename, "rb");
-    if (stream == NULL) {
+    fd = gem_os_open_read((const char *)filename);
+    if (fd < 0) {
         return 0;
     }
-    fclose(stream);
+    (void)gem_os_close(fd);
     return 1;
 }
 

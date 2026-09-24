@@ -255,15 +255,24 @@ static void ownership(int a, int b, WORD owned)
     puts("foreign window mutations and serialized process pointers rejected");
 }
 
+enum {
+    frame_width = 904,
+    frame_height = 900,
+    frame_pixel_bytes = 4,
+    frame_bytes = frame_width * frame_height * frame_pixel_bytes
+};
+
 static int bit(int x, int y)
 {
     FILE *file = fopen(getenv("GEM_RASTA_FRAMEBUFFER"), "rb");
     int byte;
-    assert(file && fseek(file, y * 113 + x / 8, SEEK_SET) == 0);
+    long offset = ((long)y * frame_width + x) * frame_pixel_bytes;
+
+    assert(file && fseek(file, offset, SEEK_SET) == 0);
     byte = fgetc(file);
     fclose(file);
     assert(byte != EOF);
-    return (byte & (0x80 >> (x % 8))) != 0;
+    return byte == 0;
 }
 
 static void drawing(int a, int b, int c)
@@ -370,25 +379,25 @@ static void locks(int healthy)
          "peers");
 }
 
-static void read_frame(unsigned char pixels[900 * 113])
+static void read_frame(unsigned char pixels[frame_bytes])
 {
     FILE *file = fopen(getenv("GEM_RASTA_FRAMEBUFFER"), "rb");
-    assert(file && fread(pixels, 1, 900 * 113, file) == 900 * 113);
+    assert(file && fread(pixels, 1, frame_bytes, file) == frame_bytes);
     assert(fclose(file) == 0);
 }
 
 static int frame_pixel(const unsigned char *pixels, int x, int y)
 {
-    return !!(pixels[y * 113 + x / 8] & (0x80 >> (x % 8)));
+    return pixels[((size_t)y * frame_width + x) * frame_pixel_bytes] == 0u;
 }
 
 static void alert_frame(const unsigned char *before)
 {
-    unsigned char after[900 * 113];
-    int left = 904, top = 900, right = -1, bottom = -1;
+    static unsigned char after[frame_bytes];
+    int left = frame_width, top = frame_height, right = -1, bottom = -1;
     read_frame(after);
-    for (int y = 0; y < 900; ++y) {
-        for (int x = 0; x < 904; ++x) {
+    for (int y = 0; y < frame_height; ++y) {
+        for (int x = 0; x < frame_width; ++x) {
             if (frame_pixel(before, x, y) == frame_pixel(after, x, y))
                 continue;
             if (x < left)
@@ -415,9 +424,9 @@ static void modal_waits(int healthy)
 {
     int owner = connect_peer();
     gem_rpc_form_alert_req_t alert = {1, "[1][Security regression][OK]"};
-    gem_rpc_fsel_t selector = {{0}, {0}, 0};
+    gem_rpc_fsel_t selector = {0};
     struct timespec pause = {0, 50000000};
-    unsigned char before[900 * 113];
+    static unsigned char before[frame_bytes];
     (void)start(owner);
     read_frame(before);
     send_request(owner, GEM_RPC_FORM_ALERT, &alert, sizeof(alert));
@@ -449,7 +458,7 @@ static uint32_t menu_hash(void)
     FILE *file = fopen(getenv("GEM_RASTA_FRAMEBUFFER"), "rb");
     int i, byte;
     assert(file);
-    for (i = 0; i < 22 * 113; ++i) {
+    for (i = 0; i < 22 * frame_width * frame_pixel_bytes; ++i) {
         byte = fgetc(file);
         assert(byte != EOF);
         hash = (hash ^ (unsigned char)byte) * 16777619u;

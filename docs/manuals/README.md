@@ -14,6 +14,6 @@ limits are described by [API transport](../architecture/API_TRANSPORT.md) and
 the [compatibility worklist](../notes/GAP_ANALYSIS.md).
 
 The upstream Musashi documentation accompanies the downloaded source under
-the ignored build tree; the recipe and patch are in `samples/lib/musashi/`.
+the ignored build tree; the recipe and patch are in `lib/musashi/`.
 `samples/data/imgview/IMG.TXT` is documentation accompanying historical test data;
 it is not the build or usage guide for this project.

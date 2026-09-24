@@ -10,6 +10,65 @@
 
 #include <string.h>
 
+int gem_location_list(gem_rpc_location_list_t *locations)
+{
+    int32_t status = 0;
+
+    if (locations == NULL ||
+        !gem_rpc_call(GEM_RPC_LOCATION_LIST, NULL, 0, &status, locations,
+                      sizeof(*locations))) {
+        return 0;
+    }
+    return status > 0;
+}
+
+int gem_location_add(const char *path)
+{
+    gem_rpc_location_req_t req = {{0}};
+    int32_t status = 0;
+
+    if (path == NULL) {
+        return 0;
+    }
+    strncpy(req.path, path, sizeof(req.path) - 1u);
+    if (!gem_rpc_call(GEM_RPC_LOCATION_ADD, &req, sizeof(req), &status, NULL,
+                      0)) {
+        return 0;
+    }
+    return (int)status;
+}
+
+int gem_location_remove(const char *path)
+{
+    gem_rpc_location_req_t req = {{0}};
+    int32_t status = 0;
+
+    if (path == NULL) {
+        return 0;
+    }
+    strncpy(req.path, path, sizeof(req.path) - 1u);
+    if (!gem_rpc_call(GEM_RPC_LOCATION_REMOVE, &req, sizeof(req), &status,
+                      NULL, 0)) {
+        return 0;
+    }
+    return (int)status;
+}
+
+int gem_location_select(const char *path)
+{
+    gem_rpc_location_req_t req = {{0}};
+    int32_t status = 0;
+
+    if (path != NULL) {
+        strncpy(req.path, path, sizeof(req.path) - 1u);
+    }
+    if (!gem_rpc_call(GEM_RPC_LOCATION_SELECT, &req, sizeof(req), &status,
+                      NULL, 0)) {
+        return 0;
+    }
+    return (int)status;
+}
+
 VOID v_hide_c(VDI_HANDLE handle)
 {
     gem_rpc_handle_req_t req = {handle};
@@ -90,24 +149,72 @@ WORD scrp_write(char *path)
     return (WORD)status;
 }
 
-WORD fsel_input(char *path, char *name, WORD *button)
+static WORD gem_client_fsel(char *path, char *name, WORD *button, WORD mode,
+                            const char *title)
 {
-    gem_rpc_fsel_t req = {{0}, {0}, 0};
-    gem_rpc_fsel_t rsp = {{0}, {0}, 0};
+    gem_rpc_fsel_t req = {0};
+    gem_rpc_fsel_t rsp = {0};
     int32_t status = 0;
 
-    if (path == NULL || name == NULL || button == NULL ||
-        strlen(path) >= sizeof(req.path) || strlen(name) >= sizeof(req.name))
+    if (path == NULL || name == NULL || button == NULL || title == NULL ||
+        strlen(path) >= sizeof(req.path) || strlen(name) >= sizeof(req.name) ||
+        strlen(title) >= sizeof(req.title)) {
         return 0;
+    }
     strcpy(req.path, path);
     strcpy(req.name, name);
+    strcpy(req.title, title);
+    req.mode = mode;
     if (!gem_rpc_call(GEM_RPC_FSEL_INPUT, &req, sizeof(req), &status, &rsp,
-                      sizeof(rsp)))
+                      sizeof(rsp))) {
         return 0;
+    }
     rsp.path[sizeof(rsp.path) - 1] = '\0';
     rsp.name[sizeof(rsp.name) - 1] = '\0';
     strcpy(path, rsp.path);
     strcpy(name, rsp.name);
     *button = rsp.button;
+    return (WORD)status;
+}
+
+WORD fsel_input(char *path, char *name, WORD *button)
+{
+    return gem_client_fsel(path, name, button, GEM_RPC_FSEL_OPEN, "Open File");
+}
+
+WORD fsel_exinput(char *path, char *name, WORD *button, char *title)
+{
+    return gem_client_fsel(path, name, button, GEM_RPC_FSEL_OPEN,
+                           title == NULL ? "Open File" : title);
+}
+
+WORD fsel_save(char *path, char *name, WORD *button)
+{
+    return gem_client_fsel(path, name, button, GEM_RPC_FSEL_SAVE, "Save File");
+}
+
+WORD fsel_directory(char *path, WORD *button)
+{
+    char name[2] = "";
+
+    return gem_client_fsel(path, name, button, GEM_RPC_FSEL_DIRECTORY,
+                           "Select Folder");
+}
+
+WORD fsel_location(char *path, char *name, WORD *button)
+{
+    return gem_client_fsel(path, name, button, GEM_RPC_FSEL_LOCATION,
+                           "Select Location");
+}
+
+WORD fsel_options(UWORD options, WORD setit)
+{
+    gem_rpc_fsel_options_req_t req = {options, setit};
+    int32_t status = 0;
+
+    if (!gem_rpc_call(GEM_RPC_FSEL_OPTIONS, &req, sizeof(req), &status, NULL,
+                      0u)) {
+        return 0;
+    }
     return (WORD)status;
 }

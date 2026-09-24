@@ -4,7 +4,7 @@ UAT means User Acceptance Testing: exercising a program as a user would and
 checking its observable results. These scenarios are automated Python scripts;
 running them requires the build tools and Rasta, not AI.
 
-`make` builds the complete project and two binaries for each of the 33 demos.
+`make` builds the complete project and two binaries for each of the 34 demos.
 `make tests` runs CTest's unit, integration and UAT suites. `make unit`,
 `make integration`, and `make uat` select a suite. Nested makefiles expose the
 same suites from `tests/` and each suite directory.
@@ -15,13 +15,14 @@ Full runs publish per-test results and proposed actions in
 
 - `tests/unit`: header, renderer, and malformed protocol checks.
 - `tests/integration`: real-server RPC, ownership/security, VDI and AES tests.
-- `tests/uat/demo1`–`demo33`: numbered acceptance scenarios and applications.
+- `tests/uat/demo1`–`demo34`: numbered acceptance scenarios and applications.
   Demo19 builds the Terminal application's sources instead of a duplicate.
 - `tests/include`: headers used only by acceptance fixtures and helpers.
 - `tests/uat/manual`: shared drawing implementation for demos 3–16.
-- `tests/uat/samples`: acceptance scripts for independent sample applications.
-  Calculator checks both shipped variants for visible buttons, digit entry,
-  clearing and `7 + 2 = 9`; captures live in `build/uat/calc_MODE/`.
+- `tests/uat/samples`: acceptance scripts for bundled and independent
+  applications. Calculator checks both shipped variants for visible buttons,
+  digit entry, clearing and `7 + 2 = 9`; Gemread and Gemscape have dedicated
+  application flows.
 - `tests/data/uat`: reviewed framebuffer checkpoints, shared by both modes.
 - `build/uat/demoN_MODE`: actual PBMs, process logs, and `result.json`.
 
@@ -40,7 +41,8 @@ datagram: a rejected reconfiguration fails the test, because a manually started
 viewer relies on it for its geometry and framebuffer path. A viewer that loses
 the ephemeral-port race against a parallel session is restarted on a new port. SDL dummy video is the default, so a
 window server is unnecessary. `RASTA_BIN` selects Rasta; `UAT_SDL_DRIVER`
-selects a visible SDL backend when desired. The tests use a 640×400 mono surface.
+selects a visible SDL backend when desired. Tests use a 640×400 BGRA viewer
+surface and decode its monochrome GEM pixels for PBM assertions.
 UAT enables AddressSanitizer and UndefinedBehaviorSanitizer with immediate
 failure; leak detection is disabled for these process-lifetime UI runs.
 The two small cursor regions are masked; all other checkpoint pixels must match.
@@ -94,11 +96,45 @@ parser.
 | 31 | Scrollback shell terminal | Real shell execution, visible output and shell exit |
 | 32 | Alert and error dialog launcher | Open note, accept it and verify returned button status |
 | 33 | Ten-field form_do editor | Type, Tab, type, accept, inspect saved-fields alert, dismiss |
+| 34 | Modern GEM file choosers | Render and cancel open, save and directory modes |
+
+Demo 34 enumerates the checked-in `demo34_fixture` directory instead of the
+host's changing `/tmp` contents. Its absolute checkout prefix is masked from
+reference comparison while the deterministic rows, controls and actions remain
+fully checked.
 
 The catalog describes representative acceptance paths, not exhaustive coverage
 of every combination or every historical GEM behavior. Integration tests cover
 additional entry points, bitmap round trips, attributes, resource bounds,
 editable-buffer ownership, callbacks, malformed requests and application isolation.
+
+## Gemread and Gemscape applications
+
+`uat_gemread_direct` and `uat_gemread_proxy` verify the visible File menu, its
+Open command, the document chooser, cancel restoration and a clean close from
+the initially empty viewer. They then type a filename containing `y` into the
+selector and require that selected PDF to render. `uat_gemread_pdf_proxy`
+builds a deterministic three-page color PDF, verifies direct BGRA color output,
+uses the thumbnail rail to move through all three pages, exercises the shared
+zoom toolbar and standard GEM vertical scrollbar, and requires resize to
+rerasterize the page for the new viewport. `uat_gemread_epub_proxy` builds a
+deterministic DRM-free EPUB 2 fixture, verifies MuPDF's reflow layout is
+rendered and performs the same zoom, scrollbar and resize checks. Both document
+tests also require the shared top toolbar and bottom status bar plus a standard
+GEM resize handle.
+
+`uat_gemscape_proxy` uses two local HTML pages without network access. It
+clicks a web-page button through CEF, scrolls a page using the GEM scrollbar,
+clicks a page input and types letters, digits and the complete printable HID
+punctuation set into that browser control,
+then scrolls using the GEM scrollbar. It separately types an address containing
+`y`, navigates with Enter, and uses the Back toolbar button. It then covers the
+browser client with another GEM application and clicks the still-exposed
+Gemscape title, requiring z-order, CEF content and the full client viewport to
+be restored. Cursor movement across the opaque CEF viewport must leave a
+visible GEM pointer at its new position and erase it from the old one. The test
+closes Gemscape normally and rejects sanitizer,
+undefined-behavior and stack-smashing diagnostics.
 
 ## Reference maintenance
 
@@ -122,22 +158,25 @@ The demos now state their intended tree structure and drawing colors explicitly.
 ## Desktop sample
 
 `uat_desktop_direct` and `uat_desktop_proxy` run the shipped desktop binaries
-with Rasta. They compare visible disk, Workspace and Trash pixels to the
+with Rasta. They compare the configured Workspace and Trash pixels to the
 source bitmap assets, double-click Workspace, enter `uat_child`, return to
 the parent and close the browser. Title and content changes establish
 navigation. The list-view checks require a header and visible Date, Size and
 Type metadata beside each name. They also require no initial row selection and
 a normal-background, system-font header aligned with the scrollbar arrow. The
-header and file-count status stay fixed while centered, dotted-separated rows
-scroll; the exposed background must be restored after closing. Fixtures and
+header and file-count status stay fixed while centered rows scroll; the exposed
+background must be restored after closing. Fixtures and
 captured PBMs live under `build/uat/desktop_<mode>/`. These checks use
-deterministic HID input and require no AI or manual clicking.
+deterministic HID input and require no AI or manual clicking. The fixture
+configures its session directory as the sole folder shortcut.
 
-Desktop checks also open/dismiss Desktop info, assert that Desk has no blank
-rows with zero or one browser windows, and reopen Workspace with File → Open.
-The F5 integration test clicks the exposed Workspace label with all
-applications running and checks the new window and its close through
-independent RPC.
+Desktop checks also open the three-line system menu, require distinct
+Add Location, Remove Location and Shutdown rows with separators, open/cancel
+the directory chooser, assert that Desk has no blank rows with one browser
+window, and reopen the configured Workspace with File → Open.
+The F5 integration test separately runs every bundled application plus
+Maestro, checks the Shutdown confirmation, and exercises overlapping window
+movement and redraw through real HID and independent RPC.
 
 `uat_trash_direct` and `uat_trash_proxy` open the Trash icon as a `trash://`
 File Manager, drop a non-empty folder and a file on the Trash icon, verify that
@@ -166,12 +205,12 @@ measured with equal left and right padding plus a distinct checkmark gutter
 after conventional leading checkmark blanks are removed from the visible item
 label. Menu demos exercise the same layout in direct and proxied modes.
 
-Desktop info is additionally exercised in the F5 integration session with a
+The Shutdown confirmation is additionally exercised in the F5 integration session with a
 three-second menu wait, a pending split RPC request and a seven-second alert
 wait. Every pre-existing window and sample process must survive selection and
 dismissal; this guards against transport expiry and modal timestamp races.
 
-The viewer runs with `--inverse` to display the GEM mono surface as black ink
+The viewer runs with `--inverse off --bpp 32` to display the GEM mono surface as black ink
 on white paper. PBM checkpoints inspect the shared bits before display decoding;
 `test_rasta_polarity` separately verifies the viewer's RGB mapping and retention
 of inverse mode after subscriber reconfiguration.

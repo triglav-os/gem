@@ -8,7 +8,7 @@ set_target_properties(test_aes_shell PROPERTIES BUILD_WITH_INSTALL_RPATH FALSE
 set_target_properties(test_shell_fixture PROPERTIES OUTPUT_NAME "clock.app")
 
 target_include_directories(test_aes_shell PRIVATE ${PROJECT_SOURCE_DIR}/include)
-target_link_libraries(test_aes_shell PRIVATE aes Threads::Threads)
+target_link_libraries(test_aes_shell PRIVATE aes gemconf Threads::Threads)
 target_compile_options(test_aes_shell PRIVATE -Wall -Wextra -pedantic -UNDEBUG
     $<$<CONFIG:Debug>:-g;-fsanitize=address,undefined>)
 target_link_options(test_aes_shell PRIVATE

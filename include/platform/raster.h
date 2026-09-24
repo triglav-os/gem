@@ -52,8 +52,9 @@ int gem_raster_resync(void);
 void gem_raster_shutdown(void);
 
 /*
- * Returns the current drawing surface managed by the raster backend.
- * The returned pointer remains owned by the backend.
+ * Returns the current drawing surface managed by the raster backend. A
+ * backend may use a shadow format for drawing and convert it at present
+ * time; the returned pointer remains owned by the backend.
  */
 gem_raster_surface_t *gem_raster_surface(void);
 
@@ -73,6 +74,38 @@ void gem_raster_clear(void);
  * Used for cheap mouse-cursor updates; out-of-range edges are clamped.
  */
 void gem_raster_present_rect(int x, int y, int width, int height);
+
+/*
+ * Keeps the software GEM pointer above presenter-only color overlays. The
+ * mask uses the standard 16-row GEM cursor form and refers to pixels already
+ * drawn in the monochrome shadow surface. Pass visible=0 to disable it.
+ */
+void gem_raster_cursor_update(int x, int y, const uint16_t mask[16],
+                              int visible);
+
+/*
+ * Presenter-only BGRA overlays.  GEM/VDI never draw into these buffers: the
+ * server copies application pixels here and the selected backend composites
+ * them over its monochrome shadow at present time.
+ */
+int gem_raster_overlay_create(uint32_t id, int x, int y, uint16_t width,
+                              uint16_t height);
+/* Resizes and repositions a presenter overlay. */
+int gem_raster_overlay_resize(uint32_t id, int x, int y, uint16_t width,
+                              uint16_t height);
+/* Copies a BGRA rectangle into an existing presenter overlay. */
+int gem_raster_overlay_update(uint32_t id, int x, int y, uint16_t width,
+                              uint16_t height, const uint8_t *bgra,
+                              uint16_t pitch);
+/* Destroys one presenter overlay by id. */
+void gem_raster_overlay_destroy(uint32_t id);
+/* Changes overlay visibility without destroying its pixels. */
+void gem_raster_overlay_set_visible(uint32_t id, int visible);
+/* Sets screen rectangles that temporarily occlude an overlay. */
+void gem_raster_overlay_set_occlusion(uint32_t id, const int *rects,
+                                      unsigned count);
+/* Destroys every presenter overlay owned by the backend. */
+void gem_raster_overlay_clear(void);
 
 /*
  * Updates one palette entry for indexed-color raster formats.

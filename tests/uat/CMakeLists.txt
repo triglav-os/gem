@@ -1,6 +1,6 @@
 # Every acceptance demo is built against both public API implementations.
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
-foreach(number RANGE 1 33)
+foreach(number RANGE 1 34)
     foreach(mode direct proxy)
         set(target demo${number}_${mode})
         if(number EQUAL 19)
@@ -14,6 +14,10 @@ foreach(number RANGE 1 33)
         endif()
         if(number GREATER_EQUAL 3 AND number LESS_EQUAL 16)
             target_sources(${target} PRIVATE manual/manual_demo.c)
+        endif()
+        if(number EQUAL 34)
+            target_compile_definitions(${target} PRIVATE
+                DEMO34_FIXTURE_DIR="${PROJECT_SOURCE_DIR}/tests/data/uat/demo34_fixture")
         endif()
             add_test(NAME uat_demo${number}_${mode}
                 COMMAND ${Python3_EXECUTABLE} -B ${CMAKE_CURRENT_SOURCE_DIR}/run.py
@@ -39,6 +43,24 @@ foreach(number RANGE 1 33)
             BUILD_WITH_INSTALL_RPATH FALSE
             BUILD_RPATH "${GEM_LIBRARY_DIR}")
     endforeach()
+endforeach()
+
+# Copy and Move drops between two normal File Manager windows.
+foreach(mode direct proxy)
+    if(mode STREQUAL "direct")
+        set(file_drop_desktop_target desktop_hosted)
+    else()
+        set(file_drop_desktop_target desktop)
+    endif()
+    add_test(NAME uat_file_drop_${mode}
+        COMMAND ${Python3_EXECUTABLE} -B
+            ${CMAKE_CURRENT_SOURCE_DIR}/samples/file_drop.py
+            --mode ${mode} --binary $<TARGET_FILE:${file_drop_desktop_target}>
+            --gemd $<TARGET_FILE:gemd> --artifacts ${CMAKE_BINARY_DIR}/uat
+            --resources ${GEM_RESOURCES_DIR})
+    set_tests_properties(uat_file_drop_${mode} PROPERTIES
+        ENVIRONMENT "RASTA_BIN=${GEM_TOOLS_DIR}/rasta"
+        LABELS "uat;${mode}" TIMEOUT 30)
 endforeach()
 
 # Trash drop, cancel-default confirmation and confirmed emptying.
@@ -84,6 +106,59 @@ foreach(mode direct proxy)
             --resources ${GEM_RESOURCES_DIR})
     set_tests_properties(uat_calc_${mode} PROPERTIES ENVIRONMENT "RASTA_BIN=${GEM_TOOLS_DIR}/rasta" LABELS "uat;${mode}" TIMEOUT 30)
 endforeach()
+
+# Gemread must expose a usable File/Open menu even before a document is open.
+foreach(mode direct proxy)
+    if(mode STREQUAL "direct")
+        set(gemread_target gemread_hosted)
+    else()
+        set(gemread_target gemread)
+    endif()
+    add_test(NAME uat_gemread_${mode}
+        COMMAND ${Python3_EXECUTABLE} -B
+            ${CMAKE_CURRENT_SOURCE_DIR}/samples/gemread.py
+            --mode ${mode} --binary $<TARGET_FILE:${gemread_target}>
+            --gemd $<TARGET_FILE:gemd> --artifacts ${CMAKE_BINARY_DIR}/uat
+            --resources ${GEM_RESOURCES_DIR})
+    set_tests_properties(uat_gemread_${mode} PROPERTIES
+        ENVIRONMENT "RASTA_BIN=${GEM_TOOLS_DIR}/rasta"
+        LABELS "uat;${mode}" TIMEOUT 45)
+endforeach()
+
+add_test(NAME uat_gemread_pdf_proxy
+    COMMAND ${Python3_EXECUTABLE} -B
+        ${CMAKE_CURRENT_SOURCE_DIR}/samples/gemread.py
+        --mode proxy --binary $<TARGET_FILE:gemread>
+        --pdf-fixture
+        --gemd $<TARGET_FILE:gemd> --artifacts ${CMAKE_BINARY_DIR}/uat
+        --resources ${GEM_RESOURCES_DIR})
+set_tests_properties(uat_gemread_pdf_proxy PROPERTIES
+    ENVIRONMENT "RASTA_BIN=${GEM_TOOLS_DIR}/rasta"
+    LABELS "uat;proxy" TIMEOUT 45)
+
+add_test(NAME uat_gemread_epub_proxy
+    COMMAND ${Python3_EXECUTABLE} -B
+        ${CMAKE_CURRENT_SOURCE_DIR}/samples/gemread.py
+        --mode proxy --binary $<TARGET_FILE:gemread> --epub-fixture
+        --gemd $<TARGET_FILE:gemd> --artifacts ${CMAKE_BINARY_DIR}/uat
+        --resources ${GEM_RESOURCES_DIR})
+set_tests_properties(uat_gemread_epub_proxy PROPERTIES
+    ENVIRONMENT "RASTA_BIN=${GEM_TOOLS_DIR}/rasta"
+    LABELS "uat;proxy" TIMEOUT 45)
+
+# Gemscape's build target prepares its verified CEF dependency. The UAT uses
+# local pages and therefore has no network dependency once the target is built.
+if(TARGET gemscape)
+    add_test(NAME uat_gemscape_proxy
+        COMMAND ${Python3_EXECUTABLE} -B
+            ${CMAKE_CURRENT_SOURCE_DIR}/samples/gemscape.py
+            --binary $<TARGET_FILE:gemscape> --cover $<TARGET_FILE:calc_gemd>
+            --gemd $<TARGET_FILE:gemd> --artifacts ${CMAKE_BINARY_DIR}/uat
+            --resources ${GEM_RESOURCES_DIR})
+    set_tests_properties(uat_gemscape_proxy PROPERTIES
+        ENVIRONMENT "RASTA_BIN=${GEM_TOOLS_DIR}/rasta"
+        LABELS "uat;proxy" TIMEOUT 75)
+endif()
 
 # Desktop icons and file manager navigation through the shipped binaries.
 foreach(mode direct proxy)

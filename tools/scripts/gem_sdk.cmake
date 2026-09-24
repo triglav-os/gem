@@ -1,9 +1,11 @@
 # Export only public GEM headers, libraries and runtime resources.
 file(MAKE_DIRECTORY "${SDK_ROOT}/include/gem" "${SDK_ROOT}/include/platform"
+    "${SDK_ROOT}/include/stout"
     "${SDK_ROOT}/lib" "${SDK_ROOT}/share/gem")
 file(COPY "${SOURCE_ROOT}/include/gem.h" DESTINATION "${SDK_ROOT}/include")
 file(COPY "${SOURCE_ROOT}/include/gem/" DESTINATION "${SDK_ROOT}/include/gem")
 file(COPY "${SOURCE_ROOT}/include/platform/os.h" DESTINATION "${SDK_ROOT}/include/platform")
+file(COPY "${SOURCE_ROOT}/include/stout/disk.h" DESTINATION "${SDK_ROOT}/include/stout")
 foreach(library IN LISTS GEM_LIBRARIES)
     file(COPY "${library}" DESTINATION "${SDK_ROOT}/lib")
 endforeach()

@@ -6,11 +6,18 @@ behavior is implemented. See the [audit](../tests/SECURITY_AUDIT.md) and
 
 - Add coverage-guided fuzzing for RSC relocation, RPC tree decoding, FAT12/MSA
   and PRG relocation. Keep minimized failures as regression fixtures.
+- Render file/program icons in Desktop and apply ordered
+  `[association.NNN]` rules: registered data patterns launch their executable,
+  while recognized GEM/TOS program files launch directly. The configuration
+  and DESKTOP.INF `#G/#F/#P/#D` translation already preserve these rules.
 - Reduce the remaining Clang analyzer diagnostics to small reproductions.
   Track bitmap ownership explicitly if integer-valued GEM pointer fields keep
   confusing analysis; preserve the public BITBLK representation.
 - Expand Atari conformance tests against original manuals and real application
   resources. An API being present does not establish every historical semantic.
+- Extend Stout's writable-volume support from raw `.ST` images to an explicitly
+  requested copy-on-write or MSA re-encoding mode. Current raw-image writes are
+  atomic but deliberately update the exact mounted image; `.MSA` stays read-only.
 - Add native framebuffer/input acceptance on supported hardware. The Linux
   backend can be compiled and analyzed in CI, but dummy SDL tests cannot verify
   framebuffer ioctls, device permissions or physical keyboard mappings.

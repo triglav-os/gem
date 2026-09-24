@@ -114,7 +114,7 @@ const char *rasta_inverse_mode(void)
         value = getenv("RASTA_INVERSE");
     }
     if (value == NULL || value[0] == '\0') {
-        return "on";
+        return "off";
     }
 
     if (strcmp(value, "off") == 0 || strcmp(value, "false") == 0 ||

@@ -9,6 +9,7 @@
  */
 
 #include "aes_internal.h"
+#include "system_menu.h"
 
 #include <stddef.h>
 #include <string.h>
@@ -107,17 +108,23 @@ WORD menu_register(WORD apid, char *name)
 {
     aes_app_t *app = aes_find_app_by_id(apid);
 
-    if (app == NULL || name == NULL) {
-        return 0;
+    if (app == NULL || name == NULL || apid != aes_state.current_app_id) {
+        return -1;
     }
-    strncpy(app->name, name, sizeof(app->name) - 1u);
-    app->name[sizeof(app->name) - 1u] = '\0';
-    return apid;
+    {
+        WORD menu_id = aes_system_menu_register(apid, name);
+
+        if (menu_id >= 0) {
+            strncpy(app->name, name, sizeof(app->name) - 1u);
+            app->name[sizeof(app->name) - 1u] = '\0';
+        }
+        return menu_id;
+    }
 }
 
 WORD menu_unregister(WORD mid)
 {
-    return (aes_find_app_by_id(mid) != NULL) ? 1 : 0;
+    return aes_system_menu_unregister(aes_state.current_app_id, mid);
 }
 
 WORD menu_click(WORD click, WORD setit)

@@ -26,6 +26,7 @@ static void aes_update_hover_mouse_cursor(WORD x, WORD y);
 aes_state_t aes_state;
 int (*aes_wait_hook)(void);
 int aes_external_input;
+int (*aes_hover_cursor_hook)(WORD x, WORD y);
 const GRECT *aes_modal_cover;
 
 __attribute__((weak)) int gem_builtin_rsrc_load(const char *filename);
@@ -138,6 +139,14 @@ static void aes_update_hover_mouse_cursor(WORD x, WORD y)
         return;
     }
 
+    if (desired == ARROW && aes_hover_cursor_hook != NULL) {
+        int custom = aes_hover_cursor_hook(x, y);
+
+        if (custom >= ARROW && custom <= OUTLN_CROSS) {
+            desired = (WORD)custom;
+        }
+    }
+
     if (desired == ARROW && aes_state.menu_visible == 0) {
         if (aes_state.edit_tree != NULL) {
             tree = aes_state.edit_tree;
@@ -214,6 +223,7 @@ void aes_reset_state(void)
     aes_state.edit_object = NIL;
     aes_state.mouse_base_cursor = ARROW;
     aes_state.mouse_applied_cursor = ARROW;
+    aes_hover_cursor_hook = NULL;
     aes_state.key_state = 0;
     global[3] = 0x1100;
     global[4] = 0;

@@ -31,11 +31,18 @@ static WORD aes_input_event_owner(const gem_hid_event_t *evt)
 {
     aes_window_t *window;
     WORD handle;
-    WORD fallback = aes_state.active_app_id != 0 ? aes_state.active_app_id
-                                                 : aes_state.menu_owner_app_id;
+    WORD fallback = aes_state.input_focus_app_id != 0
+                        ? aes_state.input_focus_app_id
+                        : (aes_state.active_app_id != 0
+                               ? aes_state.active_app_id
+                               : aes_state.menu_owner_app_id);
 
     if (evt == NULL) {
         return 0;
+    }
+    if (aes_state.modal_form_owner_app_id != 0 &&
+        aes_find_app_by_id(aes_state.modal_form_owner_app_id) != NULL) {
+        return aes_state.modal_form_owner_app_id;
     }
     /* A standalone form may have neither a window nor a menu. It still
      * needs an input recipient when gemd, rather than the form, polls HID. */
@@ -75,21 +82,42 @@ static void aes_activate_input_target(const gem_hid_event_t *evt)
         (evt->flags & evt->button) == 0u) {
         return;
     }
+    if (aes_state.modal_form_owner_app_id != 0) {
+        aes_state.input_focus_app_id = aes_state.modal_form_owner_app_id;
+        return;
+    }
 
     handle = wind_find((WORD)evt->x, (WORD)evt->y);
     if (handle == 0) {
-        /* Clicking the desktop background or the empty bar tops no window, so
-         * the menu bar must keep reflecting the current top window rather than
-         * springing the desktop owner's menu back over another app. The click
-         * still reaches the desktop owner as ordinary input (icon handling)
-         * through aes_input_event_owner. */
+        /* Clicking the desktop background or an exposed desktop icon gives
+         * keyboard focus to the desktop owner. Keep the visible menu bar on
+         * the current top window, but route the next key events to Desktop so
+         * icon actions such as Delete work after another window was moved. */
+        if (aes_state.desktop_owner_app_id != 0) {
+            aes_state.input_focus_app_id = aes_state.desktop_owner_app_id;
+        }
         return;
     }
 
     window = aes_find_window(handle);
     if (window != NULL) {
+        aes_state.input_focus_app_id = window->owner;
         aes_menu_switch_to_app(window->owner);
     }
+}
+
+static int aes_track_system_menu_event(const gem_hid_event_t *evt)
+{
+    if (aes_state.modal_form_owner_app_id != 0 || evt == NULL ||
+        evt->type != GEM_HID_MOUSE_BUTTON ||
+        evt->button != GEM_HID_BUTTON_LEFT ||
+        (evt->flags & GEM_HID_BUTTON_LEFT) == 0u ||
+        aes_system_menu_hit((WORD)evt->x, (WORD)evt->y) == 0) {
+        return 0;
+    }
+    aes_store_mouse_state(evt);
+    (void)aes_system_menu_track(evt);
+    return 1;
 }
 
 static void aes_queue_input_event(WORD app_id, const gem_hid_event_t *evt)
@@ -133,6 +161,13 @@ void aes_dispatch_hid_event(const gem_hid_event_t *evt)
 
     if (evt->type == GEM_HID_KEY) {
         aes_store_key_state(evt);
+        if (aes_system_delete_hook != NULL &&
+            ((evt->key & 0xff) == 127 || ((evt->key >> 8) & 0xff) == 0x4c ||
+             ((evt->key >> 8) & 0xff) == 0x53 ||
+             ((evt->key >> 8) & 0xff) == 0x7f) &&
+            aes_system_delete_hook() != 0) {
+            return;
+        }
         if (aes_state.menu_visible != 0 && aes_state.menu_tree != NULL &&
             aes_menu_key_event(aes_state.menu_tree, evt, mepbuff) != 0) {
             aes_post_menu_selection(mepbuff);
@@ -147,9 +182,7 @@ void aes_dispatch_hid_event(const gem_hid_event_t *evt)
         if (evt->type == GEM_HID_MOUSE_BUTTON) {
             aes_window_t *window;
             int chrome;
-            if ((evt->flags & evt->button) != 0u &&
-                aes_system_menu_hit((WORD)evt->x, (WORD)evt->y)) {
-                (void)aes_system_menu_track(evt);
+            if (aes_track_system_menu_event(evt) != 0) {
                 return;
             }
             window = aes_find_window(wind_find((WORD)evt->x, (WORD)evt->y));
@@ -254,6 +287,9 @@ WORD evnt_mesag(WORD msg[8])
             if (evt.type == GEM_HID_KEY) {
                 aes_store_key_state(&evt);
             }
+            if (aes_track_system_menu_event(&evt) != 0) {
+                continue;
+            }
             if (aes_state.menu_visible != 0 && aes_state.menu_tree != NULL &&
                 aes_menu_key_event(aes_state.menu_tree, &evt, msg) != 0) {
                 return 1;
@@ -323,6 +359,9 @@ WORD evnt_multi(UWORD flags, UWORD bclk, UWORD bmsk, UWORD bst, UWORD m1flags,
 
             if (!queued)
                 aes_activate_input_target(&evt);
+            if (!queued && aes_track_system_menu_event(&evt) != 0) {
+                continue;
+            }
             event_owner = aes_input_event_owner(&evt);
 
             if ((evt.type == GEM_HID_KEY || evt.type == GEM_HID_MOUSE_BUTTON) &&
@@ -333,21 +372,24 @@ WORD evnt_multi(UWORD flags, UWORD bclk, UWORD bmsk, UWORD bst, UWORD m1flags,
             if (!queued && evt.type == GEM_HID_KEY) {
                 aes_store_key_state(&evt);
             }
-            if (!queued && (flags & MU_MESAG) != 0u && mepbuff != NULL &&
+            if (!queued && aes_state.modal_form_owner_app_id == 0 &&
+                (flags & MU_MESAG) != 0u && mepbuff != NULL &&
                 aes_state.menu_visible != 0 && aes_state.menu_tree != NULL &&
                 aes_menu_key_event(aes_state.menu_tree, &evt, mepbuff) != 0) {
                 graf_mkstate(pmx, pmy, pmb, pks);
                 return MU_MESAG;
             }
 
-            if (!queued && (flags & MU_MESAG) != 0u && mepbuff != NULL &&
+            if (!queued && aes_state.modal_form_owner_app_id == 0 &&
+                (flags & MU_MESAG) != 0u && mepbuff != NULL &&
                 aes_state.menu_visible != 0 && aes_state.menu_tree != NULL &&
                 aes_menu_event(aes_state.menu_tree, &evt, mepbuff) != 0) {
                 graf_mkstate(pmx, pmy, pmb, pks);
                 return MU_MESAG;
             }
 
-            if (!queued && (flags & MU_MESAG) != 0u && mepbuff != NULL) {
+            if (!queued && aes_state.modal_form_owner_app_id == 0 &&
+                (flags & MU_MESAG) != 0u && mepbuff != NULL) {
                 WORD window_event = aes_track_window_interaction(
                     &evt, flags, mepbuff, pmx, pmy, pmb, pks);
 
@@ -420,14 +462,12 @@ WORD evnt_multi(UWORD flags, UWORD bclk, UWORD bmsk, UWORD bst, UWORD m1flags,
          * this application.  This also matches AES enter/leave semantics when
          * the condition is already true on entry.
          */
-        if ((flags & MU_M1) != 0u &&
-            evnt_mouse((WORD)m1flags, m1x, m1y, m1w, m1h, pmx, pmy, pmb,
-                       pks) != 0) {
+        if ((flags & MU_M1) != 0u && evnt_mouse((WORD)m1flags, m1x, m1y, m1w,
+                                                m1h, pmx, pmy, pmb, pks) != 0) {
             return MU_M1;
         }
-        if ((flags & MU_M2) != 0u &&
-            evnt_mouse((WORD)m2flags, m2x, m2y, m2w, m2h, pmx, pmy, pmb,
-                       pks) != 0) {
+        if ((flags & MU_M2) != 0u && evnt_mouse((WORD)m2flags, m2x, m2y, m2w,
+                                                m2h, pmx, pmy, pmb, pks) != 0) {
             return MU_M2;
         }
 

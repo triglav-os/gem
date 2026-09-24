@@ -36,6 +36,15 @@ static WORD vdi_cursor_pixel_raw(WORD x, WORD y);
 static void vdi_cursor_restore(void);
 static void vdi_cursor_draw(void);
 
+void vdi_presenter_cursor_sync(void)
+{
+    gem_raster_cursor_update(
+        (int)vdi_state.cursor_x, (int)vdi_state.cursor_y,
+        (const uint16_t *)(const void *)vdi_state.mouse_form.mf_mask,
+        vdi_state.open && vdi_state.cursor_hidden == 0 &&
+            vdi_state.cursor_drawn != 0);
+}
+
 WORD vdi_set_mouse_form(const MFORM *form)
 {
     if (form == NULL) {
@@ -49,6 +58,7 @@ WORD vdi_set_mouse_form(const MFORM *form)
     vdi_state.cursor_y =
         (WORD)(vdi_state.mouse_y - vdi_state.mouse_form.mf_yhot);
     vdi_cursor_draw();
+    vdi_presenter_cursor_sync();
     if (vdi_state.update_depth == 0) {
         gem_raster_present();
     } else {
@@ -80,6 +90,7 @@ void vdi_set_mouse_state(WORD x, WORD y, WORD status)
     vdi_state.cursor_x = (WORD)(x - hot_x);
     vdi_state.cursor_y = (WORD)(y - hot_y);
     vdi_cursor_draw();
+    vdi_presenter_cursor_sync();
     /*
      * Always push only the old/new 16x16 cursor boxes to the FB — even
      * while begin_update is nested (window drag). A full-screen present
@@ -105,6 +116,7 @@ void vdi_present_screen(void)
     }
 
     vdi_cursor_draw();
+    vdi_presenter_cursor_sync();
     if (vdi_state.cursor_hidden == 0 && vdi_state.cursor_drawn != 0) {
         vdi_mark_dirty(vdi_state.cursor_x, vdi_state.cursor_y,
                        (WORD)(vdi_state.cursor_x + 16),
@@ -125,6 +137,7 @@ void vdi_present_screen(void)
 void vdi_prepare_screen_write(void)
 {
     vdi_cursor_restore();
+    vdi_presenter_cursor_sync();
 }
 
 static void vdi_cursor_plot_raw(WORD x, WORD y, WORD color)

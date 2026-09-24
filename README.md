@@ -2,20 +2,25 @@
 
 GEM for Linux brings the classic GEM graphical environment to modern Linux. It
 provides the GEM Desktop, windows, menus and dialogs together with a file
-manager, terminal and sample applications.
+manager, terminal, document tools and the Stout Atari executable runner.
 
 GEM can run in a Rasta viewer on a hosted development machine, or directly on
 a Linux framebuffer with keyboard and mouse input from the Linux text console.
 
 ![GEM Desktop running its File Manager and Terminal](docs/images/screenshots/gem_desktop_2026_09_12.png)
 
-See [What's new](CHANGELOG.md) for recent changes.
+See [What's new](CHANGELOG.md) for recent changes. Bundled applications are
+under `src/apps/`; Gemread is a read-only document viewer licensed under
+AGPL-3.0-or-later. It uses MuPDF for PDF, XPS/OpenXPS, EPUB, MOBI, FB2, CBZ and
+CBT documents.
+Per-component settings and persistent Desktop locations use ordinary text
+files described in the [configuration guide](docs/guides/CONFIGURATION.md).
 
 ## Build
 
 Requires Linux, GCC/G++, GNU Make, CMake 3.20+, Git, Python 3, pkg-config,
 SDL2 development files and ImageMagick. The build downloads and verifies
-pinned Rasta and Musashi source archives into ignored `build/` storage.
+pinned Rasta, Musashi, MuPDF and CEF archives into ignored `build/` storage.
 Subsequent builds reuse them; no separate checkouts are needed.
 From the repository root:
 
@@ -34,7 +39,7 @@ Start these commands in three separate terminals, in order. Wait for gemd
 to report that it is listening before starting the desktop:
 
 ```sh
-./bin/tools/rasta --inverse --port 5000
+./bin/tools/rasta --inverse off --cursor off --bpp 32 --port 5000
 ./bin/core/gemd
 ./bin/apps/desktop
 ```

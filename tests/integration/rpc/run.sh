@@ -3,6 +3,7 @@ set -euo pipefail
 rpc_dir=$(mktemp -d /tmp/gem-rpc-test.XXXXXXXX)
 export GEMD_SOCKET="$rpc_dir/socket"
 export GEM_RASTA_FRAMEBUFFER="$rpc_dir/framebuffer"
+export XDG_CONFIG_HOME="$rpc_dir/config"
 export GEM_RASTA_PORT=5003 GEM_VDI_WIDTH=904 GEM_VDI_HEIGHT=900
 server_pid=
 cleanup() {
@@ -12,7 +13,9 @@ cleanup() {
         wait "$server_pid" 2>/dev/null || true
     fi
     cat "$rpc_dir/log" >&2
-    rm -f "$rpc_dir/socket" "$rpc_dir/framebuffer" "$rpc_dir/log" "$rpc_dir/target"
+    rm -f "$rpc_dir/socket" "$rpc_dir/framebuffer" "$rpc_dir/log" "$rpc_dir/target" "$rpc_dir/config/gem/desktop.cfg"
+    rmdir "$rpc_dir/config/gem" 2>/dev/null || true
+    rmdir "$rpc_dir/config" 2>/dev/null || true
     rmdir "$rpc_dir"
     exit "$status"
 }

@@ -47,6 +47,13 @@ def drag(session, source_x, source_y, target_x, target_y, capture=None):
     return moved
 
 
+def select_for_immediate_drag(session, x, y):
+    session.event(3, x, y)
+    session.event(10, x, y)
+    session.event(11, x, y)
+    session.pause(.05)
+
+
 def choose_file_item(session, y):
     session.event(3, 100, 10)
     session.event(10, 100, 10)
@@ -66,7 +73,7 @@ def toggle_icon_view(session, capture=None):
 
 
 def check(session, fixture, folder, open_folder, blocked_folder, xdg):
-    double_click(session, 52, 318)  # Workspace.
+    double_click(session, 52, 54)  # Configured Workspace location.
 
     # A stationary double-click in icon view must open rather than drag.
     root = session.frame('list_root')
@@ -108,6 +115,7 @@ def check(session, fixture, folder, open_folder, blocked_folder, xdg):
 
     # The test folder sorts before xdg. Drag its icon-and-title T contour.
     before = session.frame('before_folder_drop')
+    select_for_immediate_drag(session, 368, 94)
     hover = drag(session, 368, 94, 592, 348, capture='icon_drag')
     assert crop(hover, 568, 368, 64, 24) != \
         crop(before, 568, 368, 64, 24), \
@@ -125,6 +133,7 @@ def check(session, fixture, folder, open_folder, blocked_folder, xdg):
 
     # After the folder is removed, xdg is first and the fixture is first file.
     before_list_drag = session.frame('before_list_drag')
+    select_for_immediate_drag(session, 300, 126)
     list_hover = drag(session, 300, 126, 592, 348, capture='list_drag')
     assert crop(list_hover, 568, 368, 64, 24) != \
         crop(before_list_drag, 568, 368, 64, 24), \
@@ -208,6 +217,15 @@ def main():
     session.env['GEM_RASTA_FRAMEBUFFER'] = str(session.path / 'framebuffer')
     session.env['GEMD_SOCKET'] = str(session.path / 'socket')
     session.env['XDG_DATA_HOME'] = str(xdg)
+    shutil.rmtree(session.path / 'config', ignore_errors=True)
+    shutil.rmtree(session.path / '.config', ignore_errors=True)
+    config_home = session.path.parent / ('.trash-config-' + args.mode)
+    session.env['XDG_CONFIG_HOME'] = str(config_home)
+    config_dir = config_home / 'gem'
+    config_dir.mkdir(parents=True, exist_ok=True)
+    (config_dir / 'desktop.cfg').write_text(
+        '[desktop]\nshow_trash = true\nshow_hidden = false\n\n'
+        '[locations]\n' + str(session.path) + ' = Workspace\n')
     result = {'passed': False}
     try:
         try:

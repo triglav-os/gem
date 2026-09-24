@@ -1,6 +1,6 @@
 /*
- * Verifies home Trash moves, metadata, restore collisions, directories,
- * symlink-safe purge and emptying in an isolated XDG data directory.
+ * Verifies safe file/directory copies plus home Trash moves, metadata,
+ * restore collisions, symlink-safe purge and emptying in isolated storage.
  *
  * MIT License (see: LICENSE)
  * Copyright (C) 2026 tomaz stih
@@ -151,6 +151,46 @@ static void test_cross_device_directory_move(const char *work)
     assert(gem_os_remove_tree_under(destination, "/dev/shm") != 0);
 }
 
+static void test_copy_path(const char *work)
+{
+    char source[GEM_OS_PATH_MAX];
+    char destination[GEM_OS_PATH_MAX];
+    char nested[GEM_OS_PATH_MAX];
+    char copied[GEM_OS_PATH_MAX];
+
+    test_join(work, "copy-source.txt", source, sizeof(source));
+    test_join(work, "copy-destination.txt", destination,
+              sizeof(destination));
+    test_write(source, "copy-file");
+    assert(gem_os_copy_path(source, destination) != 0);
+    test_read(source, "copy-file");
+    test_read(destination, "copy-file");
+    assert(gem_os_copy_path(source, destination) == 0);
+    test_read(destination, "copy-file");
+
+    test_join(work, "copy-tree", source, sizeof(source));
+    test_join(source, "nested", nested, sizeof(nested));
+    assert(gem_os_mkdir_p(nested) != 0);
+    test_join(nested, "entry.txt", copied, sizeof(copied));
+    test_write(copied, "copy-tree");
+    test_join(work, "copied-tree", destination, sizeof(destination));
+    assert(gem_os_copy_path(source, destination) != 0);
+    test_join(destination, "nested/entry.txt", copied, sizeof(copied));
+    test_read(copied, "copy-tree");
+    test_join(source, "inside", destination, sizeof(destination));
+    assert(gem_os_copy_path(source, destination) == 0);
+    assert(gem_os_path_exists(destination) == 0);
+
+    test_join(work, "move-source.txt", source, sizeof(source));
+    test_join(work, "move-destination.txt", destination,
+              sizeof(destination));
+    test_write(source, "move-source");
+    test_write(destination, "move-destination");
+    assert(gem_os_move_path(source, destination) == 0);
+    test_read(source, "move-source");
+    test_read(destination, "move-destination");
+}
+
 int main(void)
 {
     char root[] = "/tmp/gem-trash-test-XXXXXX";
@@ -172,6 +212,7 @@ int main(void)
     assert(gem_os_mkdir_p(data) != 0);
     assert(gem_os_mkdir_p(work) != 0);
     assert(setenv("XDG_DATA_HOME", data, 1) == 0);
+    test_copy_path(work);
     test_cross_device_directory_move(work);
     test_other_mount(data);
 

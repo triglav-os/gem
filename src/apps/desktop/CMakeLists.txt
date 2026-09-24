@@ -2,6 +2,8 @@ add_executable(desktop
     desktop_assets.c
     main.c
     browser.c
+    browser_launch.c
+    browser_drop.c
     browser_list.c
     browser_view.c
     gem_trash.c
@@ -14,9 +16,10 @@ add_executable(desktop
 target_include_directories(desktop
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}
+        ${PROJECT_SOURCE_DIR}/src/gem
 )
 
-target_link_libraries(desktop PRIVATE gem)
+target_link_libraries(desktop PRIVATE gem gemconf libstout)
 
 set_target_properties(desktop PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${GEM_APPS_DIR}
@@ -46,6 +49,8 @@ add_executable(desktop_hosted
     desktop_assets.c
     main.c
     browser.c
+    browser_launch.c
+    browser_drop.c
     browser_list.c
     browser_view.c
     gem_trash.c
@@ -60,7 +65,8 @@ target_include_directories(desktop_hosted
         ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
-target_link_libraries(desktop_hosted PRIVATE aes vdi)
+target_link_libraries(desktop_hosted PRIVATE aes vdi gemconf libstout)
+target_compile_definitions(desktop_hosted PRIVATE GEM_DESKTOP_HOSTED=1)
 
 set_target_properties(desktop_hosted PROPERTIES
     OUTPUT_NAME desktop_hosted

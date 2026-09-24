@@ -202,7 +202,6 @@ WORD aes_track_move(const aes_track_t *track)
             evt.button == GEM_HID_BUTTON_LEFT &&
             (evt.flags & GEM_HID_BUTTON_LEFT) == 0u) {
             GRECT previous_outer = window->outer;
-            aes_window_t *previous_top = NULL;
 
             vdi_begin_update();
             v_hide_c(aes_state.vdi_handle);
@@ -213,8 +212,10 @@ WORD aes_track_move(const aes_track_t *track)
             v_show_c(aes_state.vdi_handle, 1);
             vdi_end_update();
             if (defer_raise != 0) {
-                previous_top = aes_find_top_window();
-                aes_raise_window(window);
+                /* Use the complete top-window path even for a stationary
+                 * title click. Besides z-order and title state it remaps
+                 * overlays and queues the newly exposed client repaint. */
+                aes_top_window(window);
             }
             window->previous_outer = previous_outer;
             aes_set_rect(&window->outer, drag_rect.g_x, drag_rect.g_y,
@@ -230,9 +231,6 @@ WORD aes_track_move(const aes_track_t *track)
             if (window->open != 0) {
                 aes_redraw_window_change(&window->previous_outer,
                                          &window->outer);
-            }
-            if (defer_raise != 0) {
-                aes_redraw_window_title_states(previous_top, window);
             }
             aes_queue_window_message(window, WM_MOVED, drag_rect.g_x,
                                      drag_rect.g_y, drag_rect.g_w,

@@ -8,18 +8,25 @@ import time
 REFERENCES = Path(__file__).resolve().parents[1] / 'data' / 'uat'
 
 
-def normalized(data):
+def normalized(data, demo=None):
     data = bytearray(data)
     # The software pointer is asynchronous and is not part of the scene.
     for y in range(24):
         data[y*80:y*80+3] = b'\0'*3
     for y in range(376,400):
         data[y*80+77:y*80+80] = b'\0'*3
+    # Demo 34 uses a checked-in fixture, but its absolute checkout prefix is
+    # intentionally excluded so references remain portable between clones.
+    if demo == 34:
+        for y in range(35, 59):
+            for x in range(76, 601):
+                data[y * 80 + x // 8] &= ~(0x80 >> (x % 8))
     return bytes(data)
 
 
 def checkpoint(session, name, data=None):
-    data = normalized(session.frame(name) if data is None else data)
+    data = normalized(session.frame(name) if data is None else data,
+                      session.args.demo)
     reference = REFERENCES / f'demo{session.args.demo}_{name}.pbm'
     if session.args.record:
         assert session.args.mode == 'direct', 'Record references from direct execution only'
@@ -181,3 +188,9 @@ def check(session, initial):
         session.key(40)
         changed(session,'saved_alert',initial)
         session.key(40); exited(session)
+    elif n==34:
+        session.key(41)
+        save=changed(session,'save',initial)
+        session.key(41)
+        changed(session,'directory',save)
+        session.key(41); exited(session)

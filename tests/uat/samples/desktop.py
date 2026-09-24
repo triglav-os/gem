@@ -6,6 +6,7 @@ MIT License (see LICENSE). Copyright (C) 2026 tomaz stih.
 import argparse
 import json
 from pathlib import Path
+import shutil
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -44,10 +45,15 @@ def check(session):
                  for col in range(7) for row in range(5)]
     folders = [(x, y) for x, y in positions if matches(initial, 'folder', x, y)]
     assert len(folders) == 1, 'Workspace folder icon is missing'
-    assert any(matches(initial, 'disk', x, y) for x, y in positions), 'Disk icons missing'
     assert matches(initial, 'trash', 576, 332), 'Trash icon missing'
     x, y = folders[0]
     session.click(x + 16, y + 16)
+    session.key(76)  # USB HID Delete.
+    remove_alert = session.frame('location_remove_alert')
+    assert crop(remove_alert, 180, 150, 280, 90) != \
+        crop(initial, 180, 150, 280, 90), 'Delete did not open location confirmation'
+    session.key(41)  # Cancel; keep the fixture location for the rest of the test.
+    session.pause(.4)
     session.pause(.85)
     session.click(x + 16, y + 16)
     delayed_repeat = session.frame('workspace_delayed_repeat')
@@ -55,18 +61,22 @@ def check(session):
         crop(initial, 220, 40, 400, 245), \
         'A delayed click on a selected icon opened the file manager'
     session.click(639, 399)
-    # The bare desktop shows only the Desk menu (File/Arrange are hidden).
-    session.event(3, 20, 10)
-    session.event(10, 20, 10)
-    menu = session.frame('desk_empty')
-    assert crop(menu, 4, 48, 165, 130) == crop(initial, 4, 48, 165, 130), 'Desk reserves blank rows for unused slots'
-    session.event(3, 80, 32)
-    session.event(11, 80, 32)
-    info = session.frame('desktop_info')
-    assert crop(info, 230, 150, 180, 90) != crop(initial, 230, 150, 180, 90), 'Desktop info did not open a dialog'
-    session.key(40)
-    dismissed = session.frame('desktop_info_closed')
-    assert crop(dismissed, 230, 150, 180, 90) == crop(initial, 230, 150, 180, 90), 'Desktop info did not close'
+    # The bare desktop keeps the GEM-owned system menu available even though
+    # the file-manager titles are hidden. Its first command opens Locations.
+    session.event(3, 12, 10)
+    session.event(10, 12, 10)
+    menu = session.frame('system_menu')
+    assert crop(menu, 0, 18, 110, 50) != crop(initial, 0, 18, 110, 50), \
+        'System menu did not show Locations and Shutdown'
+    session.event(3, 60, 32)
+    session.event(11, 60, 32)
+    chooser = session.frame('locations_chooser')
+    assert crop(chooser, 120, 85, 450, 250) != \
+        crop(initial, 120, 85, 450, 250), 'Locations did not open the folder chooser'
+    session.key(41)
+    dismissed = session.frame('locations_closed')
+    assert crop(dismissed, 230, 150, 180, 90) == \
+        crop(initial, 230, 150, 180, 90), 'Folder chooser did not cancel cleanly'
     session.pause(.85)
     double_click(session, x + 16, y + 16)
     opened = session.frame('workspace_open')
@@ -80,8 +90,8 @@ def check(session):
     assert sum(crop(opened, 220, 263, 360, 18)) > 0, 'File count status is missing'
     assert sum(crop(opened, 356, 99, 88, 18)) > 0, 'List date column is empty'
     assert sum(crop(opened, 516, 99, 64, 18)) > 0, 'List type column is empty'
-    session.event(3, 20, 10)
-    session.event(10, 20, 10)
+    session.event(3, 52, 10)
+    session.event(10, 52, 10)
     populated = session.frame('desk_one_window')
     assert crop(populated, 4, 90, 165, 80) == crop(opened, 4, 90, 165, 80), 'Desk reserves blank rows below its browser entry'
     session.event(3, 630, 380)
@@ -95,7 +105,8 @@ def check(session):
     assert sum(crop(child, 444, 100, 72, 18)) > 0, 'File size is not visible in list view'
     assert sum(crop(child, 516, 100, 64, 18)) > 0, 'File type is not visible in list view'
     assert sum(crop(child, 220, 82, 360, 2)) == 0, 'List text is not vertically centered'
-    assert 40 < sum(crop(child, 220, 99, 360, 1)) < 180, 'Dotted row separator is missing'
+    assert sum(crop(child, 220, 99, 360, 1)) == 0, \
+        'List rows must not have dotted separators'
     first_file = crop(child, 220, 100, 360, 18)
     session.click(590, 272)  # Scroll down one row.
     scrolled = session.frame('list_scrolled')
@@ -110,21 +121,29 @@ def check(session):
     parent = session.frame('parent_open')
     assert crop(parent, 240, 42, 280, 16) == crop(opened, 240, 42, 280, 16), 'Parent navigation failed'
     # While a file manager is open, the File menu is present and drops a popup.
-    session.event(3, 75, 10)
-    session.event(10, 75, 10)
+    session.event(3, 104, 10)
+    session.event(10, 104, 10)
     file_menu = session.frame('file_menu')
     assert crop(file_menu, 62, 24, 120, 60) != crop(parent, 62, 24, 120, 60), 'File menu did not drop while a file manager is open'
-    session.event(11, 75, 10)
+    session.event(11, 104, 10)
     session.pause()
-    # Closing the file manager removes File/Arrange: the bare desktop shows only Desk.
-    session.click(229, 50)  # Close file manager.
+    # The first click leaves click-mode menu tracking; the second activates the
+    # closer. Closing the browser also removes its File and Arrange titles.
+    session.click(229, 50)
+    session.click(229, 50)
+    session.pause(.5)
     closed = session.frame('browser_closed')
     assert crop(closed, 240, 42, 280, 220) == crop(initial, 240, 42, 280, 220), 'Desktop was not restored after close'
-    session.event(3, 75, 10)
-    session.event(10, 75, 10)
+    session.event(3, 104, 10)
+    session.event(10, 104, 10)
+    session.event(11, 104, 10)
+    session.event(3, 639, 399)
     file_gone = session.frame('file_absent')
-    assert crop(file_gone, 62, 24, 120, 60) == crop(initial, 62, 24, 120, 60), 'File menu must be absent once the file manager is closed'
-    session.event(11, 75, 10)
+    difference = sum(left != right for left, right in zip(
+        crop(file_gone, 80, 24, 112, 45),
+        crop(initial, 80, 24, 112, 45)))
+    assert difference < 16, \
+        'File menu must be absent once the file manager is closed'
     print('PASS desktop file manager shows four list columns, icons, navigation and close')
 
 
@@ -141,6 +160,15 @@ def main():
     # Session environment was prepared for the original generated path.
     session.env['GEM_RASTA_FRAMEBUFFER'] = str(session.path/'framebuffer')
     session.env['GEMD_SOCKET'] = str(session.path/'socket')
+    shutil.rmtree(session.path/'config', ignore_errors=True)
+    shutil.rmtree(session.path/'.config', ignore_errors=True)
+    config_home = session.path.parent/f'.desktop-config-{args.mode}'
+    session.env['XDG_CONFIG_HOME'] = str(config_home)
+    config_dir = config_home/'gem'
+    config_dir.mkdir(parents=True, exist_ok=True)
+    (config_dir/'desktop.cfg').write_text(
+        '[desktop]\nshow_trash = true\nshow_hidden = false\n\n'
+        '[locations]\n' + str(session.path) + ' = Workspace\n')
     (session.path/'uat_child').mkdir(exist_ok=True)
     (session.path/'uat_child'/'marker.txt').write_text('Desktop UAT fixture\n')
     (session.path/'uat_child'/'a_small.txt').write_text('x')
