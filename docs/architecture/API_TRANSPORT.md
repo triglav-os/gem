@@ -93,6 +93,15 @@ Ordinary client `evnt_multi` calls consume their queues without polling HID;
 synchronous modal panels retain their own input tracking. Window chrome
 consumes its mouse presses, including a drag's release, instead of replaying
 the original press into an application exposed by the moved window.
+An application-owned `form_dial`/`form_do` tree captures clicks inside its
+declared rectangle, while clicks and keyboard focus outside it continue to
+follow the target application. While that form waits, gemd services ordinary
+requests from other sessions and marks each in-flight request so a bounded
+`evnt_multi` poll cannot recursively dispatch itself. Standard alerts and file
+selectors remain the one shared, globally input-modal panel. The custom form
+is a z-ordered redraw layer: gemd keeps its decoded tree alive for the blocking
+`form_do`, clips both it and ordinary window drawing against higher layers, and
+repaints its visible fragments when covering windows move or close.
 Without an active application or menu, input falls back to the first live
 application so standalone forms can receive keyboard and mouse events.
 The top window's application owns the menu bar. An application without a

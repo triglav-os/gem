@@ -21,6 +21,24 @@
 static vdi_font_t g_vdi_fonts[vdi_max_fonts];
 static WORD g_vdi_current_font = vdi_font_id_system;
 static int g_vdi_fonts_loaded;
+static int g_vdi_small_font_metrics;
+
+static int copy_font_file_name(char *target, size_t target_size,
+                               const char *source)
+{
+    size_t length;
+
+    if (target == NULL || target_size == 0u || source == NULL) {
+        return 0;
+    }
+    length = strlen(source);
+    if (length >= target_size) {
+        target[0] = '\0';
+        return 0;
+    }
+    memcpy(target, source, length + 1u);
+    return 1;
+}
 
 uint16_t vdi_font_read_le16(const uint8_t *bytes)
 {
@@ -126,6 +144,11 @@ vdi_font_t *vdi_current_font(void)
     return find_font_by_id(g_vdi_current_font);
 }
 
+int vdi_small_font_metrics_active(void)
+{
+    return g_vdi_small_font_metrics;
+}
+
 static void clear_font_runtime(vdi_font_t *font)
 {
     if (font == NULL) {
@@ -204,8 +227,10 @@ static int load_font_file(vdi_font_t *font, WORD font_id, const char *file_name)
     int i;
     int path_length;
 
-    strncpy(stored_file_name, file_name, sizeof(stored_file_name) - 1u);
-    stored_file_name[sizeof(stored_file_name) - 1u] = '\0';
+    if (!copy_font_file_name(stored_file_name, sizeof(stored_file_name),
+                             file_name)) {
+        return 0;
+    }
     path_length = snprintf((char *)path, sizeof(path), "%s/%s", font_dir(),
                            stored_file_name);
     if (path_length < 0 || (size_t)path_length >= sizeof(path))
@@ -242,8 +267,8 @@ static int load_font_file(vdi_font_t *font, WORD font_id, const char *file_name)
 
     clear_font_runtime(font);
     font->font_id = font_id;
-    strncpy(font->file_name, stored_file_name, sizeof(font->file_name) - 1u);
-    font->file_name[sizeof(font->file_name) - 1u] = '\0';
+    (void)copy_font_file_name(font->file_name, sizeof(font->file_name),
+                              stored_file_name);
     memcpy(font->name, data + 4, 32u);
     font->name[32] = '\0';
     font->first_ade = (WORD)vdi_font_read_le16(data + 36);
@@ -351,12 +376,14 @@ static WORD reserve_font_slot(WORD preferred_slot, WORD font_id,
         return -1;
     }
 
+    if (strlen(file_name) >= sizeof(g_vdi_fonts[free_slot].file_name)) {
+        return -1;
+    }
     clear_font_slot(&g_vdi_fonts[free_slot]);
     g_vdi_fonts[free_slot].font_id = font_id;
-    strncpy(g_vdi_fonts[free_slot].file_name, file_name,
-            sizeof(g_vdi_fonts[free_slot].file_name) - 1u);
-    g_vdi_fonts[free_slot]
-        .file_name[sizeof(g_vdi_fonts[free_slot].file_name) - 1u] = '\0';
+    (void)copy_font_file_name(g_vdi_fonts[free_slot].file_name,
+                              sizeof(g_vdi_fonts[free_slot].file_name),
+                              file_name);
     g_vdi_fonts[free_slot].present = 1;
     return free_slot;
 }
@@ -430,6 +457,7 @@ int vdi_load_fonts(void)
 
     g_vdi_fonts_loaded = 1;
     g_vdi_current_font = vdi_font_id_system;
+    g_vdi_small_font_metrics = 0;
     return 1;
 }
 
@@ -485,13 +513,22 @@ void vdi_unload_fonts(void)
         clear_font_slot(&g_vdi_fonts[slot]);
     }
     g_vdi_current_font = vdi_font_id_system;
+    g_vdi_small_font_metrics = 0;
     g_vdi_fonts_loaded = 0;
 }
 
 WORD vdi_select_font(WORD font_id)
 {
-    WORD resolved = font_id_from_alias(font_id);
+    WORD resolved;
     vdi_font_t *font;
+
+    if (font_id == vdi_font_id_ibm_compat) {
+        resolved = vdi_font_id_system;
+    } else if (font_id == vdi_font_id_small_compat) {
+        resolved = vdi_font_id_small_internal;
+    } else {
+        resolved = font_id_from_alias(font_id);
+    }
 
     if (!vdi_load_fonts()) {
         return 0;
@@ -499,10 +536,12 @@ WORD vdi_select_font(WORD font_id)
     font = find_font_by_id(resolved);
     if (font == NULL || !load_font_slot(font)) {
         g_vdi_current_font = vdi_font_id_system;
+        g_vdi_small_font_metrics = 0;
         return g_vdi_current_font;
     }
 
     g_vdi_current_font = resolved;
+    g_vdi_small_font_metrics = font_id == vdi_font_id_small_compat;
     return g_vdi_current_font;
 }
 

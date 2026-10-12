@@ -25,6 +25,18 @@ static void aes_post_menu_selection(WORD mepbuff[8])
     (void)appl_write(aes_state.menu_owner_app_id, 8, mepbuff);
 }
 
+static int aes_event_hits_modal_form(const gem_hid_event_t *evt)
+{
+    const GRECT *rect = &aes_state.modal_form_rect;
+
+    return evt != NULL && evt->type == GEM_HID_MOUSE_BUTTON &&
+           aes_state.modal_form_owner_app_id != 0 && rect->g_w > 0 &&
+           rect->g_h > 0 && (WORD)evt->x >= rect->g_x &&
+           (WORD)evt->y >= rect->g_y &&
+           (WORD)evt->x < (WORD)(rect->g_x + rect->g_w) &&
+           (WORD)evt->y < (WORD)(rect->g_y + rect->g_h);
+}
+
 /* Route work-area presses to their window owner and desktop presses to
  * the application that owns the menu bar. */
 static WORD aes_input_event_owner(const gem_hid_event_t *evt)
@@ -40,7 +52,7 @@ static WORD aes_input_event_owner(const gem_hid_event_t *evt)
     if (evt == NULL) {
         return 0;
     }
-    if (aes_state.modal_form_owner_app_id != 0 &&
+    if (aes_event_hits_modal_form(evt) != 0 &&
         aes_find_app_by_id(aes_state.modal_form_owner_app_id) != NULL) {
         return aes_state.modal_form_owner_app_id;
     }
@@ -82,8 +94,16 @@ static void aes_activate_input_target(const gem_hid_event_t *evt)
         (evt->flags & evt->button) == 0u) {
         return;
     }
-    if (aes_state.modal_form_owner_app_id != 0) {
+    if (aes_event_hits_modal_form(evt) != 0) {
+        aes_window_t *top = aes_find_top_window();
+
         aes_state.input_focus_app_id = aes_state.modal_form_owner_app_id;
+        if (top != NULL && top->z_order > aes_state.modal_form_z) {
+            GRECT dirty = aes_state.modal_form_rect;
+
+            aes_state.modal_form_z = aes_state.next_window_z++;
+            aes_redraw_region(&dirty);
+        }
         return;
     }
 
@@ -108,8 +128,7 @@ static void aes_activate_input_target(const gem_hid_event_t *evt)
 
 static int aes_track_system_menu_event(const gem_hid_event_t *evt)
 {
-    if (aes_state.modal_form_owner_app_id != 0 || evt == NULL ||
-        evt->type != GEM_HID_MOUSE_BUTTON ||
+    if (evt == NULL || evt->type != GEM_HID_MOUSE_BUTTON ||
         evt->button != GEM_HID_BUTTON_LEFT ||
         (evt->flags & GEM_HID_BUTTON_LEFT) == 0u ||
         aes_system_menu_hit((WORD)evt->x, (WORD)evt->y) == 0) {

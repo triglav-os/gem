@@ -150,9 +150,16 @@ WORD form_do(OBJECT *tree, WORD startob)
 {
     WORD active;
     WORD idx = 0;
+    WORD result = NIL;
+    OBJECT *previous_modal_tree;
 
     if (tree == NULL) {
         return 0;
+    }
+
+    previous_modal_tree = aes_state.modal_form_tree;
+    if (aes_state.modal_form_owner_app_id == aes_state.current_app_id) {
+        aes_state.modal_form_tree = tree;
     }
 
     active = (aes_form_is_editable(tree, startob) != 0)
@@ -179,7 +186,7 @@ WORD form_do(OBJECT *tree, WORD startob)
         event = evnt_multi(MU_BUTTON | MU_KEYBD, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0,
                            0, 0, 0, NULL, 0, 0, &mx, &my, &mb, &ks, &kr, &br);
         if (event == 0 && aes_wait_hook != NULL)
-            return NIL;
+            goto done;
 
         if ((event & MU_KEYBD) != 0) {
             WORD ascii = (WORD)(kr & 0xffu);
@@ -189,9 +196,11 @@ WORD form_do(OBJECT *tree, WORD startob)
                 WORD cancel = aes_form_find_default_exit(tree);
 
                 if (cancel != NIL) {
-                    return cancel;
+                    result = cancel;
+                    goto done;
                 }
-                return 0;
+                result = 0;
+                goto done;
             }
             if (ascii == '\t' ||
                 (ascii == 0 && (scancode == 43 || scancode == 15))) {
@@ -214,7 +223,8 @@ WORD form_do(OBJECT *tree, WORD startob)
 
                 if (button != NIL) {
                     aes_form_flash_object(tree, button);
-                    return button;
+                    result = button;
+                    goto done;
                 }
             }
             if (active != NIL &&
@@ -241,7 +251,8 @@ WORD form_do(OBJECT *tree, WORD startob)
             }
             if ((tree[object].ob_flags & EXIT) != 0u) {
                 aes_form_flash_object(tree, object);
-                return object;
+                result = object;
+                goto done;
             }
             if ((tree[object].ob_flags & SELECTABLE) != 0u) {
                 WORD newobj = object;
@@ -254,6 +265,12 @@ WORD form_do(OBJECT *tree, WORD startob)
             }
         }
     }
+
+done:
+    if (aes_state.modal_form_tree == tree) {
+        aes_state.modal_form_tree = previous_modal_tree;
+    }
+    return result;
 }
 
 WORD form_dial(WORD flag, WORD x1, WORD y1, WORD w1, WORD h1, WORD x2, WORD y2,
@@ -274,6 +291,7 @@ WORD form_dial(WORD flag, WORD x1, WORD y1, WORD w1, WORD h1, WORD x2, WORD y2,
     if (flag == FMD_START || flag == FMD_GROW) {
         aes_state.modal_form_owner_app_id = aes_state.current_app_id;
         aes_set_rect(&aes_state.modal_form_rect, x2, y2, w2, h2);
+        aes_state.modal_form_z = aes_state.next_window_z++;
         aes_state.active_app_id = aes_state.current_app_id;
         aes_state.input_focus_app_id = aes_state.current_app_id;
     }
@@ -282,6 +300,8 @@ WORD form_dial(WORD flag, WORD x1, WORD y1, WORD w1, WORD h1, WORD x2, WORD y2,
         if (aes_state.modal_form_owner_app_id == aes_state.current_app_id) {
             aes_state.modal_form_owner_app_id = 0;
             aes_set_rect(&aes_state.modal_form_rect, 0, 0, 0, 0);
+            aes_state.modal_form_z = 0u;
+            aes_state.modal_form_tree = NULL;
         }
         aes_state.hover_tree = NULL;
         aes_set_rect(&dirty, x2, y2, w2, h2);

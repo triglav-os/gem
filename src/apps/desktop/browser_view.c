@@ -196,6 +196,7 @@ static void desktop_browser_icon_parts(
     WORD label_y;
     WORD label_left;
     WORD label_right;
+    WORD text_attributes[10] = {0};
     size_t label_len;
 
     (void)strncpy(label, entry->name, sizeof(label) - 1u);
@@ -205,7 +206,11 @@ static void desktop_browser_icon_parts(
     icon->g_w = asset->width;
     icon->g_h = asset->height;
 
-    previous_font = vst_font(g_desktop.vdi_handle, SMALL);
+    previous_font = DESKTOP_SYSTEM_FONT;
+    if (vqt_attributes(g_desktop.vdi_handle, text_attributes) != 0) {
+        previous_font = text_attributes[0];
+    }
+    (void)vst_font(g_desktop.vdi_handle, SMALL);
     vqt_extent(g_desktop.vdi_handle, label, extent);
     text_width = (WORD)(extent[2] - extent[0] + 1);
     label_len = strlen(label);

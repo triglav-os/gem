@@ -120,6 +120,20 @@ static int test_attribute_and_query_functions(void)
     ASSERT_TRUE(name[0] != '\0');
     ASSERT_TRUE(vqt_name(handle, font_count, name) != 0);
     ASSERT_TRUE(name[0] != '\0');
+    ASSERT_TRUE(vst_font(handle, 5) == 5);
+    ASSERT_TRUE(vdi_font_cell_width() == 8);
+    ASSERT_TRUE(vdi_font_text_height() == 16);
+    ASSERT_TRUE(vdi_string_width("ABC") == 24);
+    ASSERT_TRUE(vst_font(handle, -5) == -5);
+    ASSERT_TRUE(vdi_font_cell_width() == 6);
+    ASSERT_TRUE(vdi_font_text_height() == 6);
+    ASSERT_TRUE(vdi_string_width("ABC") == 18);
+    ASSERT_TRUE(vst_font(handle, -3) == -3);
+    ASSERT_TRUE(vdi_font_cell_width() == 8);
+    ASSERT_TRUE(vdi_font_text_height() == 16);
+    ASSERT_TRUE(vst_font(handle, 3) == 3);
+    ASSERT_TRUE(vdi_font_cell_width() == 8);
+    ASSERT_TRUE(vdi_font_text_height() == 16);
     ASSERT_TRUE(vqt_fontinfo(handle, NULL, NULL, distances, &charw, effects) ==
                 1);
     ASSERT_TRUE(charw > 0);

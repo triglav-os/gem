@@ -194,7 +194,7 @@ void desktop_browser_list_draw_row(const desktop_browser_window_t *browser,
     desktop_browser_columns_t columns;
     char name[64];
     char date[16];
-    char size[16];
+    char size[24];
     char type[16];
     int name_chars;
     WORD baseline;

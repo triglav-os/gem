@@ -18,6 +18,27 @@
 #include <sys/socket.h>
 
 static char g_gemd_selected_location[GEM_RPC_LOCATION_PATH_MAX];
+static gemd_session_t *g_user_callback_session;
+
+static void gemd_copy_text(char *target, size_t target_size,
+                           const char *source)
+{
+    size_t length;
+
+    if (target == NULL || target_size == 0u) {
+        return;
+    }
+    if (source == NULL) {
+        target[0] = '\0';
+        return;
+    }
+    length = strlen(source);
+    if (length >= target_size) {
+        length = target_size - 1u;
+    }
+    memmove(target, source, length);
+    target[length] = '\0';
+}
 
 static void gemd_location_label(const char *path, char *label,
                                 size_t label_size)
@@ -25,13 +46,12 @@ static void gemd_location_label(const char *path, char *label,
     const char *leaf = strrchr(path, '/');
 
     if (strcmp(path, "/") == 0) {
-        strncpy(label, "Root", label_size - 1u);
+        gemd_copy_text(label, label_size, "Root");
     } else if (leaf != NULL && leaf[1] != '\0') {
-        strncpy(label, leaf + 1, label_size - 1u);
+        gemd_copy_text(label, label_size, leaf + 1);
     } else {
-        strncpy(label, path, label_size - 1u);
+        gemd_copy_text(label, label_size, path);
     }
-    label[label_size - 1u] = '\0';
 }
 
 static int gemd_location_valid_directory(const char *path)
@@ -74,9 +94,9 @@ static int gemd_location_list(void *response, uint32_t *response_size)
              !gemd_location_is_image(path))) {
             continue;
         }
-        strncpy(entry->path, path, sizeof(entry->path) - 1u);
-        strncpy(entry->label, label != NULL ? label : "",
-                sizeof(entry->label) - 1u);
+        gemd_copy_text(entry->path, sizeof(entry->path), path);
+        gemd_copy_text(entry->label, sizeof(entry->label),
+                       label != NULL ? label : "");
         if (entry->label[0] == '\0') {
             gemd_location_label(entry->path, entry->label,
                                 sizeof(entry->label));
@@ -139,7 +159,7 @@ int gemd_location_delete_event(void)
         return 0;
     }
     memset(&req, 0, sizeof(req));
-    strncpy(req.path, g_gemd_selected_location, sizeof(req.path) - 1u);
+    gemd_copy_text(req.path, sizeof(req.path), g_gemd_selected_location);
     (void)gemd_location_remove(&req);
     return 1;
 }
@@ -151,11 +171,12 @@ void gemd_location_clear_selection(void)
 
 static WORD gemd_user_callback(LONG parameter)
 {
-    gemd_session_t *session = g_modal_session;
+    gemd_session_t *session = g_user_callback_session;
     gemd_io_t *saved;
     PARMBLK parm = *(PARMBLK *)(intptr_t)parameter;
     LONG result = 0;
     int finished = 0;
+    int handling_request;
     uint32_t started = gem_os_ticks_ms();
     if (!session)
         return 0;
@@ -164,6 +185,8 @@ static WORD gemd_user_callback(LONG parameter)
         return 0;
     gemd_drawing_save(&session->drawing);
     *saved = session->io;
+    handling_request = session->handling_request;
+    session->handling_request = 0;
     memset(&session->io, 0, sizeof(session->io));
     parm.pb_tree = parm.pb_parm = 0;
     gemd_reply(&session->io, INT32_MIN, &parm, sizeof(parm));
@@ -195,6 +218,7 @@ static WORD gemd_user_callback(LONG parameter)
     if (!finished)
         shutdown(session->fd, SHUT_RDWR);
     session->io = *saved;
+    session->handling_request = handling_request;
     free(saved);
     return (WORD)result;
 }
@@ -229,9 +253,7 @@ static WORD gemd_tree_draw(gemd_session_t *session, gem_tree_packet_t *tree)
             continue;
         WORD count = window || desktop
                          ? aes_clip_visible_rects(window, &damage, visible, 64)
-                         : 1;
-        if (!window && !desktop)
-            visible[0] = damage;
+                         : aes_clip_modal_form_rects(&damage, visible, 64);
         for (WORD j = 0; j < count; ++j)
             result = objc_draw(tree->objects, a[0], a[1], visible[j].g_x,
                                visible[j].g_y, visible[j].g_w, visible[j].g_h);
@@ -288,6 +310,7 @@ int32_t gemd_dispatch(gemd_session_t *session, const gem_rpc_header_t *header,
 
         case GEM_RPC_AES_TREE: {
             gem_tree_packet_t *tree = (gem_tree_packet_t *)response;
+            gemd_session_t *previous_callback_session;
             memcpy(tree, payload, sizeof(*tree));
             *response_size = sizeof(*tree);
             if (tree->operation > tree_slidebox || !gem_tree_decode(tree, 1))
@@ -312,6 +335,8 @@ int32_t gemd_dispatch(gemd_session_t *session, const gem_rpc_header_t *header,
                 aes_state.edit_object = session->edit_object;
                 aes_state.edit_index = session->edit_index;
             }
+            previous_callback_session = g_user_callback_session;
+            g_user_callback_session = session;
             switch (tree->operation) {
                 case tree_draw:
                     status = gemd_tree_draw(session, tree);
@@ -350,6 +375,7 @@ int32_t gemd_dispatch(gemd_session_t *session, const gem_rpc_header_t *header,
                         status = graf_slidebox(tree->objects, a[0], a[1], a[2]);
                     break;
             }
+            g_user_callback_session = previous_callback_session;
             if (tree->operation == tree_edit) {
                 session->edit_identity =
                     aes_state.edit_tree == tree->objects ? tree->identity : 0;
@@ -369,7 +395,8 @@ int32_t gemd_dispatch(gemd_session_t *session, const gem_rpc_header_t *header,
             gem_rpc_words8_t *rsp = (gem_rpc_words8_t *)response;
             memset(rsp, 0, sizeof(*rsp));
             if (aes_wait_hook == gemd_service_modal &&
-                session != g_modal_session) {
+                session != g_modal_session &&
+                aes_state.modal_form_owner_app_id == 0) {
                 rsp->values[0] = vdi_state.mouse_x;
                 rsp->values[1] = vdi_state.mouse_y;
                 rsp->values[2] = vdi_state.mouse_status;
@@ -452,8 +479,8 @@ int32_t gemd_dispatch(gemd_session_t *session, const gem_rpc_header_t *header,
                  gemd_location_is_image(req.path)) &&
                 gemconf_get(&g_gemd_config, "locations", req.path, NULL) !=
                     NULL) {
-                strncpy(g_gemd_selected_location, req.path,
-                        sizeof(g_gemd_selected_location) - 1u);
+                gemd_copy_text(g_gemd_selected_location,
+                               sizeof(g_gemd_selected_location), req.path);
             }
             status = 1;
         } break;
@@ -511,7 +538,8 @@ int32_t gemd_dispatch(gemd_session_t *session, const gem_rpc_header_t *header,
              */
             memset(rsp, 0, sizeof(*rsp));
             if (aes_wait_hook == gemd_service_modal &&
-                session != g_modal_session) {
+                session != g_modal_session &&
+                aes_state.modal_form_owner_app_id == 0) {
                 /* Classic synchronous panels keep input modal, but other
                  * processes can still receive redraws and advance timers. */
                 rsp->mx = vdi_state.mouse_x;

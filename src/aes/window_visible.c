@@ -74,8 +74,10 @@ WORD aes_build_visible_rects(WORD handle, GRECT out[], WORD max_rects)
 }
 
 /* Share occlusion clipping between client enumeration and AES painting. */
-WORD aes_clip_visible_rects(const aes_window_t *target, const GRECT *base,
-                            GRECT out[], WORD max_rects)
+static WORD aes_clip_layer_rects(const aes_window_t *target,
+                                 uint32_t target_z, int modal_form_target,
+                                 const GRECT *base, GRECT out[],
+                                 WORD max_rects)
 {
     GRECT pending[64];
     GRECT next_pending[64];
@@ -91,11 +93,11 @@ WORD aes_clip_visible_rects(const aes_window_t *target, const GRECT *base,
 
     aes_trace("visible_rects begin handle=%d base=%d,%d %dx%d target_z=%lu",
               handle, base->g_x, base->g_y, base->g_w, base->g_h,
-              (unsigned long)((target != NULL) ? target->z_order : 0u));
+              (unsigned long)target_z);
 
     pending[0] = *base;
 
-    for (i = 0; i <= AES_MAX_WINDOWS && pending_count > 0; ++i) {
+    for (i = 0; i <= AES_MAX_WINDOWS + 1 && pending_count > 0; ++i) {
         const aes_window_t *cover =
             i < AES_MAX_WINDOWS ? &aes_state.windows[i] : NULL;
         GRECT cover_rect;
@@ -105,14 +107,19 @@ WORD aes_clip_visible_rects(const aes_window_t *target, const GRECT *base,
         if (cover) {
             if (cover->used == 0 || cover->open == 0)
                 continue;
-            if (target != NULL &&
-                (cover->handle == handle || cover->z_order <= target->z_order))
+            if (cover->handle == handle || cover->z_order <= target_z)
                 continue;
             aes_window_cover_rect(cover, &cover_rect);
-        } else {
+        } else if (i == AES_MAX_WINDOWS) {
             if (!aes_modal_cover)
                 continue;
             cover_rect = *aes_modal_cover;
+        } else {
+            if (modal_form_target != 0 ||
+                aes_state.modal_form_owner_app_id == 0 ||
+                aes_state.modal_form_z <= target_z)
+                continue;
+            cover_rect = aes_state.modal_form_rect;
         }
         if (cover_rect.g_w <= 0 || cover_rect.g_h <= 0) {
             continue;
@@ -146,6 +153,20 @@ WORD aes_clip_visible_rects(const aes_window_t *target, const GRECT *base,
     aes_trace("visible_rects end handle=%d count=%d", handle, pending_count);
     memcpy(out, pending, (size_t)pending_count * sizeof(GRECT));
     return pending_count;
+}
+
+WORD aes_clip_visible_rects(const aes_window_t *target, const GRECT *base,
+                            GRECT out[], WORD max_rects)
+{
+    return aes_clip_layer_rects(target,
+                                target != NULL ? target->z_order : 0u, 0,
+                                base, out, max_rects);
+}
+
+WORD aes_clip_modal_form_rects(const GRECT *base, GRECT out[], WORD max_rects)
+{
+    return aes_clip_layer_rects(NULL, aes_state.modal_form_z, 1, base, out,
+                                max_rects);
 }
 
 static void aes_union_rects(const GRECT *left, const GRECT *right, GRECT *out)

@@ -40,10 +40,8 @@ static void aes_fsel_add_location(aes_fsel_state_t *state, const char *label,
         return;
     }
     location = &state->locations[state->location_count++];
-    strncpy(location->label, label, sizeof(location->label) - 1u);
-    location->label[sizeof(location->label) - 1u] = '\0';
-    strncpy(location->path, path, sizeof(location->path) - 1u);
-    location->path[sizeof(location->path) - 1u] = '\0';
+    aes_fsel_copy_text(location->label, sizeof(location->label), label);
+    aes_fsel_copy_text(location->path, sizeof(location->path), path);
     aes_fsel_normalize_dir(location->path);
 }
 
@@ -117,8 +115,7 @@ void aes_fsel_navigate(aes_fsel_state_t *state, const char *path, int remember)
         gem_os_stat_path(path, &info) == 0 || info.is_directory == 0) {
         return;
     }
-    strncpy(candidate, path, sizeof(candidate) - 1u);
-    candidate[sizeof(candidate) - 1u] = '\0';
+    aes_fsel_copy_text(candidate, sizeof(candidate), path);
     aes_fsel_normalize_dir(candidate);
     strcpy(state->directory, candidate);
     if (remember != 0 &&
@@ -135,10 +132,8 @@ void aes_fsel_navigate(aes_fsel_state_t *state, const char *path, int remember)
                 --state->history_index;
             }
         }
-        strncpy(state->history[state->history_count], state->directory,
-                sizeof(state->history[0]) - 1u);
-        state->history[state->history_count][sizeof(state->history[0]) - 1u] =
-            '\0';
+        aes_fsel_copy_text(state->history[state->history_count],
+                           sizeof(state->history[0]), state->directory);
         state->history_index = state->history_count++;
     }
     state->selection[0] = '\0';
@@ -160,8 +155,7 @@ void aes_fsel_enter_directory(aes_fsel_state_t *state, const char *name)
     if (state == NULL || name == NULL) {
         return;
     }
-    strncpy(path, state->directory, sizeof(path) - 1u);
-    path[sizeof(path) - 1u] = '\0';
+    aes_fsel_copy_text(path, sizeof(path), state->directory);
     if (strcmp(name, "..") == 0) {
         aes_fsel_parent_dir(path);
     } else if (aes_fsel_join_path(state->directory, name, path, sizeof(path)) ==

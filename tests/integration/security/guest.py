@@ -46,6 +46,89 @@ with tempfile.TemporaryDirectory(dir=workspace) as temporary:
         assert 'Sanitizer' not in result.stderr, result.stderr
         print('PASS: routed', name, 'trap', vector)
 
+    # Programs launched by the desktop have a parent basepage, whereas desk
+    # accessories do not. Several historical runtimes use this distinction
+    # to choose between their application and accessory event loops.
+    parent_test = bytes.fromhex(
+        '206f0004'                    # movea.l 4(sp),a0
+        '20280024'                    # move.l 36(a0),d0
+        '4a80'                        # tst.l d0
+        '6704'                        # beq.s failure
+        '70004e75'                    # success: moveq #0,d0; rts
+        '70014e75')                   # failure: moveq #1,d0; rts
+    accessory_test = bytes.fromhex(
+        '206f0004'                    # movea.l 4(sp),a0
+        '20280024'                    # move.l 36(a0),d0
+        '4a80'                        # tst.l d0
+        '6704'                        # beq.s success
+        '70014e75'                    # failure: moveq #1,d0; rts
+        '70004e75')                   # success: moveq #0,d0; rts
+    for suffix, code in (('.PRG', parent_test), ('.ACC', accessory_test)):
+        path = pathlib.Path(temporary) / ('parent' + suffix)
+        header = struct.pack('>H6IH', 0x601a, len(code), 0, 0, 0, 0, 0, 1)
+        path.write_bytes(header + code)
+        result = subprocess.run([str(stout), str(path)], capture_output=True,
+                                text=True, timeout=10)
+        assert result.returncode == 0, result.stderr
+    print('PASS: basepage parent distinguishes applications and accessories')
+
+    # These compatibility probes are used by GEMBench and other common ST
+    # programs before they create any windows. They must return through the
+    # real trap vectors instead of falling into the guest illegal-opcode path.
+    compatibility_calls = (
+        ('BIOS Setexc', bytes.fromhex(
+            '2f3cffffffff'            # move.l #-1,-(sp): inquire
+            '3f3c0005'                # move.w #5,-(sp): vector
+            '3f3c0005'                # move.w #5,-(sp): Setexc
+            '4e4d4fef0008'            # trap #13; lea 8(sp),sp
+            '70004e75')),
+        ('VDI vq_gdos', bytes.fromhex(
+            '70fe4e42'                # moveq #-2,d0; trap #2
+            '0c80fffffffe'            # cmpi.l #-2,d0
+            '6604'                    # bne.s failure
+            '70004e75'                # success
+            '70014e75')),              # failure
+        ('XBIOS Setcolor', bytes.fromhex(
+            '3f3c0123'                # move.w #0x123,-(sp): color
+            '3f3c0000'                # move.w #0,-(sp): index
+            '3f3c0007'                # move.w #7,-(sp): Setcolor
+            '4e4e5c8f'                # trap #14; addq.l #6,sp
+            '70004e75')),
+        ('XBIOS Setpalette', bytes.fromhex(
+            '2f08'                    # move.l a0,-(sp): 16-word palette
+            '3f3c0006'                # move.w #6,-(sp): Setpalette
+            '4e4e5c8f'                # trap #14; addq.l #6,sp
+            '70004e75')),
+        ('XBIOS Keytbl', bytes.fromhex(
+            '2f3cffffffff' * 3 +      # caps, shift and normal: no change
+            '3f3c0010'                # move.w #16,-(sp): Keytbl
+            '4e4e4fef000e'            # trap #14; lea 14(sp),sp
+            '70004e75')),
+        ('XBIOS Setprt', bytes.fromhex(
+            '3f3cffff'                # move.w #-1,-(sp): inquire
+            '3f3c0021'                # move.w #33,-(sp): Setprt
+            '4e4e588f'                # trap #14; addq.l #4,sp
+            '70004e75')),
+        ('XBIOS Blitmode', bytes.fromhex(
+            '3f3cffff'                # move.w #-1,-(sp): inquire
+            '3f3c0040'                # move.w #64,-(sp): Blitmode
+            '4e4e588f'                # trap #14; addq.l #4,sp
+            '4a40'                    # tst.w d0: no blitter is installed
+            '6604'                    # bne.s failure
+            '70004e75'                # success
+            '70014e75')),
+    )
+    for name, code in compatibility_calls:
+        path = pathlib.Path(temporary) / 'compat.prg'
+        header = struct.pack('>H6IH', 0x601a, len(code), 0, 0, 0, 0, 0, 1)
+        path.write_bytes(header + code)
+        result = subprocess.run([str(stout), str(path)], capture_output=True,
+                                text=True, timeout=10)
+        assert result.returncode == 0, result.stderr
+        assert 'unsupported' not in result.stderr, result.stderr
+        assert 'illegal opcode' not in result.stderr, result.stderr
+        print('PASS:', name, 'compatibility probe')
+
     # Run Fcreate/Fwrite/Fclose from a program stored on A:. Relative output,
     # including missing parent directories, must be allocated in the same
     # FAT12 image and survive Stout shutdown. Real TOS callers remove their

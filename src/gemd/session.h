@@ -44,6 +44,7 @@ typedef struct gemd_session {
     gemd_io_t io;
     uint32_t accepted_at;
     uint32_t update_started;
+    int handling_request;
     gemd_drawing_t drawing;
 } gemd_session_t;
 

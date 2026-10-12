@@ -138,6 +138,8 @@ typedef struct aes_state {
     WORD input_focus_app_id;
     WORD modal_form_owner_app_id;
     GRECT modal_form_rect;
+    uint32_t modal_form_z;
+    OBJECT *modal_form_tree;
     WORD menu_popup_root_direct;
     OBJECT *hover_tree;
     OBJECT *edit_tree;
@@ -309,6 +311,8 @@ WORD aes_subtract_rect(const GRECT *source, const GRECT *cover, GRECT out[4]);
 /* Clip a layer's damage against higher windows; NULL denotes the desktop. */
 WORD aes_clip_visible_rects(const aes_window_t *target, const GRECT *base,
                             GRECT out[], WORD max_rects);
+/* Clip a custom form layer against windows raised above it. */
+WORD aes_clip_modal_form_rects(const GRECT *base, GRECT out[], WORD max_rects);
 int aes_window_is_top(const aes_window_t *window);
 void aes_reset_state(void);
 int aes_ensure_vdi(void);

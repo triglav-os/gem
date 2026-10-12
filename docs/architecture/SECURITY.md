@@ -109,8 +109,13 @@ These panels are not independent per-application input-modal windows: the
 classic shared desktop still has one interactive standard panel at a time.
 Classic applications may also bracket a custom object tree with
 `form_dial(FMD_START/FMD_FINISH)`. gemd records that owner and rectangle so
-mouse and keyboard events cannot leak to a covered File Manager window; an
-unexpected client exit clears the ownership and redraws the exposed region.
+clicks inside the form stay with its owner, while another application's
+uncovered window, menu and keyboard focus remain usable. gemd continues
+servicing non-waiting requests from those applications and rejects recursive
+dispatch of a request already in progress. An unexpected client exit clears
+the ownership and redraws the exposed region. The decoded custom-form tree is
+retained only for the lifetime of its blocking `form_do` request; window and
+form repaint paths clip it through the same z-ordered visible-region model.
 
 `shel_write` executes as the gemd user and is not a privilege boundary. It
 does not invoke a command shell: the platform backend resolves an executable,

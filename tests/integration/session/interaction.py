@@ -293,6 +293,14 @@ class Interaction:
             self.event(kind, x + 10, y + 10)
         stout_process = next(p for p in self.session.processes
                              if p.args[0].endswith('/stout'))
+        # The close below is intentional. Stop treating Stout as a required
+        # long-lived child before waiting on later applications, otherwise a
+        # subsequent wait can misreport this verified clean exit as a crash.
+        for record in self.session.state['processes']:
+            if record['name'] == 'stout':
+                record['required'] = False
+                break
+        self.session.publish()
         self.session.wait(lambda: stout_process.poll() is not None,
                           'Stout guest to handle WM_CLOSED', 3)
         assert stout_process.returncode == 0, 'Stout failed while closing'

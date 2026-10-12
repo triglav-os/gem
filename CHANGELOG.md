@@ -6,7 +6,11 @@ Unreleased.
 
 ## Unreleased
 
-_Updated 2026-09-24._
+_Updated 2026-09-25._
+
+- Clean GCC builds now complete without project, test or downloaded-dependency
+  warnings; bounded text copies, file-selector history, window-title geometry,
+  font names and child-shell directory changes are checked explicitly.
 
 - CEF is now a pinned, checksum-verified build dependency cached under
   `build/deps` instead of a 1.5 GiB extracted binary tree in the repository.
@@ -64,7 +68,7 @@ _Updated 2026-09-24._
 - Replaced the file selector's custom scrollbar with the standard GEM window
   scrollbar (`UPARROW`, `DNARROW`, `VSLIDE`) in all selector modes.
 - Extended Stout's mounted-drive services with BIOS `Getbpb`, `Rwabs`,
-  `Mediach`, `Drvmap`, XBIOS `Getbpb`, `Floprd` and `Flopwr`
+  `Mediach`, `Drvmap` and XBIOS `Floprd` and `Flopwr`
   handling. F5 now launches the guest with the bundled MSA mounted.
 - Added a GEM Terminal console bridge for Stout BIOS/GEMDOS stdin and stdout.
 - Fixed disk-image location selection so the selected `.ST`/`.MSA` filename is
@@ -168,6 +172,36 @@ _Updated 2026-09-24._
 
 ### Fixed
 
+- Custom `form_dial`/`form_do` dialogs are now modal only to their owning
+  application. Other applications can receive input and continue issuing
+  drawing and event requests; recursive polling of an already active request
+  is guarded, fixing the gemd crash triggered by starting another application
+  while QIndex 1.6 was open. Standard alerts and file selectors remain global
+  synchronous panels. Custom forms also participate in the shared z-order and
+  retain their live tree while `form_do` waits, so a covering window clips the
+  form and closing that window reconstructs the exposed form exactly.
+- Stout's legacy TEDINFO bridge now follows classic AES object geometry:
+  unboxed text begins at the declared x-coordinate, boxed text uses its border
+  thickness, and only whole characters that fit the inner rectangle are drawn.
+  This fixes QIndex's exact-width percentage fields without changing native
+  hosted applications.
+- Stout's AES `graf_handle` adapter now reports the Atari high-resolution
+  8x16 character cell without changing hosted AES metrics. TEDINFO objects
+  honor the Atari 6x6 `SMALL` metrics in embedded resources such as QIndex 1.6,
+  while Desktop and File Manager icon labels retain their established unscaled
+  `SMALL` face. Stout `form_center` also reserves the 19-pixel high-resolution
+  menu strip instead of placing the top of tall dialogs underneath it.
+- The Rasta VDI startup handshake now waits for subscriber-driven framebuffer
+  reconfiguration before its first remap and present, closing an intermittent
+  gemd SIGBUS race during Desktop startup.
+- Stout now distinguishes launched applications from desk accessories through
+  the basepage parent field. Added the BIOS `Setexc`, XBIOS `Setpalette`,
+  `Setcolor`, `Keytbl`, `Setprt` and `Blitmode`, VDI text-attribute and
+  `vq_gdos` probes, plus AES `appl_find`, `objc_change` and `shel_find` used by
+  QIndex and GEMBench; standard XBIOS floppy argument offsets are now decoded
+  correctly. QIndex reaches and responds to its dialog, GEMBench no longer
+  falls into the illegal-opcode path, and GMap's Quit flow completes after its
+  own final information dialog is dismissed.
 - Stout now starts mounted-disk programs in their containing A: directory and
   implements A: `Dsetpath`, `Dgetpath`, `Fsfirst` and `Fsnext`, so programs on
   the Delta and QIndex disks can find relative resources and enumerate sibling
@@ -178,9 +212,10 @@ _Updated 2026-09-24._
 - File Manager now applies ordered `desktop.cfg` associations through the real
   AES `shel_write()` command-tail path. `.PRG`, `.TOS`, `.TTP`, `.APP`, `.GTP`
   and `.ACC` default to Stout, with mounted programs receiving both their A:
-  path and source image. Classic `form_dial` applications take modal input
-  ownership, remain above the launching File Manager, and restore the covered
-  area if the guest exits unexpectedly.
+  path and source image. Classic `form_dial` applications retain input inside
+  their dialog, remain above the launching File Manager, and restore the
+  covered area if the guest exits unexpectedly without blocking unrelated
+  applications.
 - Stout now skips optional linker-private symbol records it does not decode,
   while still locating and validating the declared relocation stream. BIOS
   `Kbshift` and XBIOS `Vsync` are routed for programs that poll keyboard state

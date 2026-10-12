@@ -63,8 +63,7 @@ static void aes_fsel_confirm_directory(aes_fsel_state_t *state)
     if (state == NULL) {
         return;
     }
-    strncpy(path, state->directory, sizeof(path) - 1u);
-    path[sizeof(path) - 1u] = '\0';
+    aes_fsel_copy_text(path, sizeof(path), state->directory);
     if (state->selected != NIL && state->selected < state->entry_count &&
         state->entries[state->selected].is_directory != 0) {
         if (strcmp(state->entries[state->selected].name, "..") == 0) {
@@ -75,8 +74,7 @@ static void aes_fsel_confirm_directory(aes_fsel_state_t *state)
             return;
         }
     }
-    strncpy(state->directory, path, sizeof(state->directory) - 1u);
-    state->directory[sizeof(state->directory) - 1u] = '\0';
+    aes_fsel_copy_text(state->directory, sizeof(state->directory), path);
     state->confirmed = 1;
     state->done = 1;
 }
@@ -268,8 +266,8 @@ static int aes_fsel_prepare(aes_fsel_state_t *state, char *pipath, char *pisel,
     state->selected = NIL;
     state->selected_location = NIL;
     state->last_click_entry = NIL;
-    strncpy(state->title, title == NULL ? "Open File" : title,
-            sizeof(state->title) - 1u);
+    aes_fsel_copy_text(state->title, sizeof(state->title),
+                       title == NULL ? "Open File" : title);
     if (mode == AES_FSEL_DIRECTORY || mode == AES_FSEL_LOCATION) {
         const char *initial = pipath;
 
@@ -277,7 +275,7 @@ static int aes_fsel_prepare(aes_fsel_state_t *state, char *pipath, char *pisel,
             gem_os_stat_path(initial, &info) == 0 || info.is_directory == 0) {
             initial = gem_os_getcwd(cwd, sizeof(cwd)) != 0 ? cwd : "/";
         }
-        strncpy(state->directory, initial, sizeof(state->directory) - 1u);
+        aes_fsel_copy_text(state->directory, sizeof(state->directory), initial);
         strcpy(state->pattern, "*");
         aes_fsel_normalize_dir(state->directory);
     } else {
@@ -290,8 +288,8 @@ static int aes_fsel_prepare(aes_fsel_state_t *state, char *pipath, char *pisel,
         info.is_directory == 0) {
         const char *fallback = gem_os_getcwd(cwd, sizeof(cwd)) != 0 ? cwd : "/";
 
-        strncpy(state->directory, fallback, sizeof(state->directory) - 1u);
-        state->directory[sizeof(state->directory) - 1u] = '\0';
+        aes_fsel_copy_text(state->directory, sizeof(state->directory),
+                           fallback);
     }
     if (aes_ensure_vdi() == 0) {
         return 0;
@@ -314,8 +312,8 @@ static int aes_fsel_prepare(aes_fsel_state_t *state, char *pipath, char *pisel,
     state->text_ascent = vdi_font_ascent();
     state->row_h = (WORD)(state->char_h + 5);
     aes_fsel_build_locations(state);
-    strncpy(state->history[0], state->directory,
-            sizeof(state->history[0]) - 1u);
+    aes_fsel_copy_text(state->history[0], sizeof(state->history[0]),
+                       state->directory);
     state->history_count = 1;
     state->history_index = 0;
     aes_fsel_reload_entries(state);

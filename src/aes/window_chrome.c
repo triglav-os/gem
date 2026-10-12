@@ -115,7 +115,7 @@ static void aes_draw_window_title(const aes_window_t *window,
     WORD title_y;
     WORD title_width;
     WORD available_width;
-    WORD title_x;
+    WORD title_x = 0;
     int has_closer;
     int has_fuller;
     int active_title;

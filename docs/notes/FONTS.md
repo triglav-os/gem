@@ -174,6 +174,19 @@ bring-up description of a tiny fallback in `_vdi.c` no longer describes the
 code. Public font/text entry points are in
 [src/vdi/text.c](../../src/vdi/text.c).
 
+Hosted AES retains its established 6x8 resource coordinate grid. Stout's
+`graf_handle()` trap adapter reports the Atari high-resolution 8x16 system
+character cell to emulated programs, so embedded Atari resources expand
+correctly without changing native application geometry. TEDINFO font selectors
+are applied while each object is drawn. Private Stout selectors distinguish
+guest `IBM` and `SMALL` TEDINFOs from native hosted objects; guest `SMALL` uses
+the Atari 6x6 cell, while native `SMALL` keeps its 8x16 cell so Desktop and File
+Manager icon labels retain their established face and size. Guest TEDINFO
+layout follows classic AES: positive border thickness defines the text inset,
+unboxed text has no synthetic margin, justification uses the resulting inner
+rectangle, and rendering stops before the first character that does not fit.
+The caller's VDI clip still provides window and redraw occlusion.
+
 Demo2 displays loaded fonts, and other [UAT demos](../tests/UAT.md) exercise
 font selection and metrics. Font parsing has additional unit coverage. Those
 checks do not imply scalable fonts, complete text effects, rotation or full

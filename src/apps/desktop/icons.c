@@ -231,6 +231,7 @@ void desktop_draw_icon_object(const desktop_icon_asset_t *asset,
     WORD max_text_width;
     WORD label_left;
     WORD label_right;
+    WORD text_attributes[10] = {0};
     size_t label_len;
 
     if (asset == NULL || label == NULL || rect == NULL) {
@@ -244,7 +245,11 @@ void desktop_draw_icon_object(const desktop_icon_asset_t *asset,
     icon_y = rect->g_y;
     desktop_draw_masked_icon(asset, icon_x, icon_y);
 
-    previous_font = vst_font(g_desktop.vdi_handle, SMALL);
+    previous_font = DESKTOP_SYSTEM_FONT;
+    if (vqt_attributes(g_desktop.vdi_handle, text_attributes) != 0) {
+        previous_font = text_attributes[0];
+    }
+    (void)vst_font(g_desktop.vdi_handle, SMALL);
     vqt_extent(g_desktop.vdi_handle, display_label, extent);
     text_width = (WORD)(extent[2] - extent[0] + 1);
     max_text_width = (WORD)(DESKTOP_ICON_STEP_X - 4);

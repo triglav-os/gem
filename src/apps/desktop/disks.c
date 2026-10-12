@@ -13,6 +13,26 @@
 #include <string.h>
 #include <strings.h>
 
+static void desktop_copy_text(char *target, size_t target_size,
+                              const char *source)
+{
+    size_t length;
+
+    if (target == NULL || target_size == 0u) {
+        return;
+    }
+    if (source == NULL) {
+        target[0] = '\0';
+        return;
+    }
+    length = strlen(source);
+    if (length >= target_size) {
+        length = target_size - 1u;
+    }
+    memmove(target, source, length);
+    target[length] = '\0';
+}
+
 static int desktop_path_space(const char *path, uint64_t *total_bytes,
                               uint64_t *avail_bytes)
 {
@@ -31,8 +51,7 @@ static void desktop_label_from_path(const char *path, char *label,
     }
 
     if (strcmp(path, "/") == 0) {
-        strncpy(label, "ROOT", label_size - 1u);
-        label[label_size - 1u] = '\0';
+        desktop_copy_text(label, label_size, "ROOT");
         return;
     }
 
@@ -43,8 +62,7 @@ static void desktop_label_from_path(const char *path, char *label,
         base = path;
     }
 
-    strncpy(label, base, label_size - 1u);
-    label[label_size - 1u] = '\0';
+    desktop_copy_text(label, label_size, base);
     for (i = 0; label[i] != '\0'; ++i) {
         if (label[i] == ' ' || label[i] == '_' || label[i] == '-') {
             new_word = 1;
@@ -83,11 +101,9 @@ static void desktop_add_folder_icon(const char *path, const char *label)
 
     entry = &g_desktop.icons[g_desktop.icon_count];
     memset(entry, 0, sizeof(*entry));
-    strncpy(entry->path, path, sizeof(entry->path) - 1u);
-    entry->path[sizeof(entry->path) - 1u] = '\0';
+    desktop_copy_text(entry->path, sizeof(entry->path), path);
     if (label != NULL && label[0] != '\0') {
-        strncpy(entry->label, label, sizeof(entry->label) - 1u);
-        entry->label[sizeof(entry->label) - 1u] = '\0';
+        desktop_copy_text(entry->label, sizeof(entry->label), label);
     } else {
         desktop_label_from_path(path, entry->label, sizeof(entry->label));
     }
@@ -232,14 +248,12 @@ static void desktop_location_label(const char *path, char *label,
     const char *leaf;
 
     if (strcmp(path, "/") == 0) {
-        strncpy(label, "Root", label_size - 1u);
-        label[label_size - 1u] = '\0';
+        desktop_copy_text(label, label_size, "Root");
         return;
     }
     leaf = strrchr(path, '/');
     leaf = leaf != NULL && leaf[1] != '\0' ? leaf + 1 : path;
-    strncpy(label, leaf, label_size - 1u);
-    label[label_size - 1u] = '\0';
+    desktop_copy_text(label, label_size, leaf);
 }
 #endif
 

@@ -3,6 +3,7 @@ target_include_directories(test_security_bounds PRIVATE
     $<TARGET_PROPERTY:musashi,BINARY_DIR>/generated)
 target_link_libraries(test_security_bounds PRIVATE fat12 musashi m)
 target_compile_options(test_security_bounds PRIVATE -Wall -Wextra -pedantic
+    -UNDEBUG
     $<$<CONFIG:Debug>:-g;-fsanitize=address,undefined>)
 target_link_options(test_security_bounds PRIVATE
     $<$<CONFIG:Debug>:-fsanitize=address,undefined>)

@@ -32,6 +32,25 @@ static int aes_fsel_has_wildcards(const char *text)
     return 0;
 }
 
+void aes_fsel_copy_text(char *target, size_t target_size, const char *source)
+{
+    size_t length;
+
+    if (target == NULL || target_size == 0u) {
+        return;
+    }
+    if (source == NULL) {
+        target[0] = '\0';
+        return;
+    }
+    length = strlen(source);
+    if (length >= target_size) {
+        length = target_size - 1u;
+    }
+    memmove(target, source, length);
+    target[length] = '\0';
+}
+
 void aes_fsel_normalize_dir(char *path)
 {
     size_t length;
@@ -88,8 +107,7 @@ void aes_fsel_split_input(const char *pipath, const char *pisel,
     }
 
     if (pisel != NULL && selection != NULL && selection_size > 0u) {
-        strncpy(selection, pisel, selection_size - 1u);
-        selection[selection_size - 1u] = '\0';
+        aes_fsel_copy_text(selection, selection_size, pisel);
     }
 
     if (pipath == NULL || pipath[0] == '\0') {
@@ -97,8 +115,7 @@ void aes_fsel_split_input(const char *pipath, const char *pisel,
             strcpy(cwd, ".");
         }
         if (directory != NULL && directory_size > 0u) {
-            strncpy(directory, cwd, directory_size - 1u);
-            directory[directory_size - 1u] = '\0';
+            aes_fsel_copy_text(directory, directory_size, cwd);
         }
         if (pattern != NULL && pattern_size > 0u) {
             strcpy(pattern, "*");
@@ -106,8 +123,7 @@ void aes_fsel_split_input(const char *pipath, const char *pisel,
         return;
     }
 
-    strncpy(source, pipath, sizeof(source) - 1u);
-    source[sizeof(source) - 1u] = '\0';
+    aes_fsel_copy_text(source, sizeof(source), pipath);
     slash = strrchr(source, '/');
     if (slash == NULL) {
         slash = strrchr(source, '\\');
@@ -117,15 +133,13 @@ void aes_fsel_split_input(const char *pipath, const char *pisel,
         *slash = '\0';
         if (directory != NULL && directory_size > 0u) {
             if (source[0] != '\0') {
-                strncpy(directory, source, directory_size - 1u);
-                directory[directory_size - 1u] = '\0';
+                aes_fsel_copy_text(directory, directory_size, source);
             } else {
                 strcpy(directory, "/");
             }
         }
         if (pattern != NULL && pattern_size > 0u) {
-            strncpy(pattern, slash + 1, pattern_size - 1u);
-            pattern[pattern_size - 1u] = '\0';
+            aes_fsel_copy_text(pattern, pattern_size, slash + 1);
         }
     } else {
         if (directory != NULL && directory_size > 0u) {
@@ -134,8 +148,7 @@ void aes_fsel_split_input(const char *pipath, const char *pisel,
             }
         }
         if (pattern != NULL && pattern_size > 0u) {
-            strncpy(pattern, source, pattern_size - 1u);
-            pattern[pattern_size - 1u] = '\0';
+            aes_fsel_copy_text(pattern, pattern_size, source);
         }
     }
 
@@ -146,8 +159,7 @@ void aes_fsel_split_input(const char *pipath, const char *pisel,
         strcpy(pattern, "*");
     } else if (pattern != NULL && aes_fsel_has_wildcards(pattern) == 0) {
         if (selection != NULL && selection[0] == '\0') {
-            strncpy(selection, pattern, selection_size - 1u);
-            selection[selection_size - 1u] = '\0';
+            aes_fsel_copy_text(selection, selection_size, pattern);
         }
         strcpy(pattern, "*");
     }
@@ -240,9 +252,8 @@ void aes_fsel_set_selection_from_index(aes_fsel_state_t *state)
         return;
     }
 
-    strncpy(state->selection, state->entries[state->selected].name,
-            sizeof(state->selection) - 1u);
-    state->selection[sizeof(state->selection) - 1u] = '\0';
+    aes_fsel_copy_text(state->selection, sizeof(state->selection),
+                       state->entries[state->selected].name);
 }
 
 void aes_fsel_reload_entries(aes_fsel_state_t *state)
@@ -302,10 +313,8 @@ void aes_fsel_reload_entries(aes_fsel_state_t *state)
                 continue;
             }
 
-            strncpy(state->entries[count].name, dent.name,
-                    sizeof(state->entries[count].name) - 1u);
-            state->entries[count]
-                .name[sizeof(state->entries[count].name) - 1u] = '\0';
+            aes_fsel_copy_text(state->entries[count].name,
+                               sizeof(state->entries[count].name), dent.name);
             state->entries[count].is_directory = dent.info.is_directory ? 1 : 0;
             state->entries[count].size_bytes = dent.info.size_bytes;
             if (strcmp(state->selection, dent.name) == 0) {

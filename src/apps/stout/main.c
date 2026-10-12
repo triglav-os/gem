@@ -149,7 +149,8 @@ static void stout_write_basepage(void)
     stout_write_u32(g_stout.basepage_address + 28u,
                     g_stout.program.header.bss_size);
     stout_write_u32(g_stout.basepage_address + 32u, g_stout.dta_address);
-    stout_write_u32(g_stout.basepage_address + 36u, 0u); /* No parent. */
+    stout_write_u32(g_stout.basepage_address + 36u,
+                    g_stout.parent_basepage_address);
     stout_write_u32(g_stout.basepage_address + 40u, 0u); /* Reserved. */
     stout_write_u32(g_stout.basepage_address + 44u, 0u); /* No environment. */
     memset(g_stout.ram + command, 0, 128u);
@@ -308,6 +309,8 @@ static int stout_boot(const char *path, const char *disk_path,
     g_stout.dta_address = STOUT_BASEPAGE + 0x80u;
     g_stout.program_kind = program_kind;
     g_stout.basepage_address = STOUT_BASEPAGE;
+    g_stout.parent_basepage_address =
+        program_kind == PRG_FILE_ACC ? 0u : STOUT_PARENT_BASEPAGE;
     g_stout.command_tail_length = tail_length;
     if (tail_length != 0u)
         memcpy(g_stout.command_tail, tail, tail_length);

@@ -123,6 +123,8 @@ void gemd_cleanup_app(WORD app_id)
 
         aes_state.modal_form_owner_app_id = 0;
         aes_set_rect(&aes_state.modal_form_rect, 0, 0, 0, 0);
+        aes_state.modal_form_z = 0u;
+        aes_state.modal_form_tree = NULL;
         if (exposed.g_w > 0 && exposed.g_h > 0)
             aes_redraw_region(&exposed);
     }

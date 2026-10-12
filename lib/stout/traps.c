@@ -190,6 +190,12 @@ typedef struct stout_tree_bridge {
     WORD count;
 } stout_tree_bridge_t;
 
+enum {
+    /* Private libvdi selectors for Atari-compatible TEDINFO layout. */
+    stout_ibm_font_compat = -3,
+    stout_small_font_compat = -5
+};
+
 static int stout_decode_draw_tree(uint32_t address, stout_tree_bridge_t *bridge)
 {
     WORD index;
@@ -215,6 +221,10 @@ static int stout_decode_draw_tree(uint32_t address, stout_tree_bridge_t *bridge)
             template = stout_read_u32(spec + 4u);
             valid = stout_read_u32(spec + 8u);
             text->te_font = stout_read_s16(spec + 12u);
+            if (text->te_font == IBM)
+                text->te_font = stout_ibm_font_compat;
+            else if (text->te_font == SMALL)
+                text->te_font = stout_small_font_compat;
             text->te_junk1 = stout_read_s16(spec + 14u);
             text->te_just = stout_read_s16(spec + 16u);
             text->te_color = stout_read_s16(spec + 18u);
@@ -793,6 +803,22 @@ static WORD stout_resource_coordinate(uint16_t packed, WORD cell)
     return (WORD)((packed & 0xffu) * (uint16_t)cell + pixels);
 }
 
+static void stout_resource_fix_coordinates(uint32_t address)
+{
+    stout_write_u16(address + 16u,
+                    (uint16_t)stout_resource_coordinate(
+                        stout_read_u16(address + 16u), 8));
+    stout_write_u16(address + 18u,
+                    (uint16_t)stout_resource_coordinate(
+                        stout_read_u16(address + 18u), 16));
+    stout_write_u16(address + 20u,
+                    (uint16_t)stout_resource_coordinate(
+                        stout_read_u16(address + 20u), 8));
+    stout_write_u16(address + 22u,
+                    (uint16_t)stout_resource_coordinate(
+                        stout_read_u16(address + 22u), 16));
+}
+
 static int stout_resource_fix_object(uint32_t address)
 {
     uint16_t type = stout_read_u16(address + 6u) & 0x00ffu;
@@ -825,18 +851,7 @@ static int stout_resource_fix_object(uint32_t address)
     }
     if (!okay)
         return 0;
-    stout_write_u16(address + 16u,
-                    (uint16_t)stout_resource_coordinate(
-                        stout_read_u16(address + 16u), 8));
-    stout_write_u16(address + 18u,
-                    (uint16_t)stout_resource_coordinate(
-                        stout_read_u16(address + 18u), 16));
-    stout_write_u16(address + 20u,
-                    (uint16_t)stout_resource_coordinate(
-                        stout_read_u16(address + 20u), 8));
-    stout_write_u16(address + 22u,
-                    (uint16_t)stout_resource_coordinate(
-                        stout_read_u16(address + 22u), 16));
+    stout_resource_fix_coordinates(address);
     return 1;
 }
 
@@ -1083,6 +1098,13 @@ static int stout_handle_aes(void)
             }
             stout_write_u16(pb.intout, (uint16_t)g_stout.app_id);
             return 1;
+        case 13: { /* appl_find */
+            char *name = stout_guest_string(stout_read_u32(pb.addrin));
+            WORD status = name != NULL ? appl_find(name) : 0;
+
+            stout_write_u16(pb.intout, (uint16_t)status);
+            return 1;
+        }
         case 30: { /* menu_bar */
             uint32_t tree = stout_read_u32(pb.addrin);
             WORD status;
@@ -1227,6 +1249,29 @@ static int stout_handle_aes(void)
             free(tree);
             return 1;
         }
+        case 47: { /* objc_change */
+            stout_tree_bridge_t *tree =
+                (stout_tree_bridge_t *)calloc(1u, sizeof(*tree));
+            uint32_t tree_address = stout_read_u32(pb.addrin);
+            WORD result;
+
+            if (tree == NULL)
+                return 0;
+            if (!stout_decode_draw_tree(tree_address, tree) || intin0 < 0 ||
+                intin0 >= tree->count) {
+                free(tree);
+                return 0;
+            }
+            result = objc_change(
+                tree->objects, intin0, intin1, intin2, intin3, intin4,
+                stout_read_s16(pb.intin + 10u),
+                stout_read_s16(pb.intin + 12u),
+                stout_read_s16(pb.intin + 14u));
+            stout_store_tree_fields(tree_address, tree);
+            stout_write_u16(pb.intout, (uint16_t)result);
+            free(tree);
+            return 1;
+        }
         case 50: { /* form_do */
             stout_tree_bridge_t *tree =
                 (stout_tree_bridge_t *)calloc(1u, sizeof(*tree));
@@ -1256,6 +1301,9 @@ static int stout_handle_aes(void)
             return 1;
         }
         case 54: { /* form_center */
+            /* Atari high resolution uses gl_hbox = gl_hchar + 3. */
+            enum { atari_high_menu_height = 19 };
+            LONG available;
             WORD x;
             WORD y;
             WORD w;
@@ -1266,8 +1314,11 @@ static int stout_handle_aes(void)
                 return 0;
             w = stout_read_s16(tree_address + 20u);
             h = stout_read_s16(tree_address + 22u);
-            x = (WORD)((STOUT_SCREEN_WIDTH - w) / 2u);
-            y = (WORD)((STOUT_SCREEN_HEIGHT - h) / 2u);
+            available = (LONG)STOUT_SCREEN_WIDTH - w;
+            x = available > 0 ? (WORD)(available / 2) : 0;
+            available = (LONG)STOUT_SCREEN_HEIGHT - atari_high_menu_height - h;
+            y = (WORD)(atari_high_menu_height +
+                       (available > 0 ? available / 2 : 0));
             if (g_stout.trace_traps != 0)
                 fprintf(stderr,
                         "stout: AES center tree=0x%08x root=%d,%d %dx%d -> "
@@ -1386,17 +1437,16 @@ static int stout_handle_aes(void)
             return 1;
         }
         case 77: {
-            WORD wchar;
-            WORD hchar;
-            WORD wbox;
-            WORD hbox;
-            WORD handle = graf_handle(&wchar, &hchar, &wbox, &hbox);
+            WORD handle = graf_handle(NULL, NULL, NULL, NULL);
 
             stout_write_u16(pb.intout + 0u, (uint16_t)handle);
-            stout_write_u16(pb.intout + 2u, (uint16_t)wchar);
-            stout_write_u16(pb.intout + 4u, (uint16_t)hchar);
-            stout_write_u16(pb.intout + 6u, (uint16_t)wbox);
-            stout_write_u16(pb.intout + 8u, (uint16_t)hbox);
+            /* Atari high resolution uses the 8x16 system character cell.
+             * Keep these guest metrics out of hosted AES: native resources
+             * use the established hosted 6x8 coordinate grid. */
+            stout_write_u16(pb.intout + 2u, 8u);
+            stout_write_u16(pb.intout + 4u, 16u);
+            stout_write_u16(pb.intout + 6u, 8u);
+            stout_write_u16(pb.intout + 8u, 16u);
             return 1;
         }
         case 78: {
@@ -1537,14 +1587,37 @@ static int stout_handle_aes(void)
             return 1;
         case 114: { /* rsrc_obfix */
             uint32_t tree = stout_read_u32(pb.addrin);
-            uint32_t object = tree + (uint32_t)(uint16_t)intin0 *
-                                        stout_object_size;
+            uint32_t object;
             int loaded = tree >= g_stout.resource_address &&
                          tree < g_stout.resource_address +
                                     g_stout.resource_size;
-            int status = loaded || stout_valid_range(object, stout_object_size);
+            int status = 0;
+
+            if (intin0 >= 0 &&
+                (uint32_t)(uint16_t)intin0 <=
+                    (UINT32_MAX - tree) / stout_object_size) {
+                object = tree +
+                         (uint32_t)(uint16_t)intin0 * stout_object_size;
+                status = stout_valid_range(object, stout_object_size);
+                if (status != 0 && !loaded)
+                    stout_resource_fix_coordinates(object);
+            }
 
             stout_write_u16(pb.intout, status != 0 ? 1u : 0u);
+            return 1;
+        }
+        case 124: { /* shel_find */
+            uint32_t path_address = stout_read_u32(pb.addrin);
+            uint8_t *data = NULL;
+            size_t size = 0u;
+            WORD status = 0;
+
+            if (stout_guest_string(path_address) != NULL &&
+                stout_gemdos_read_file(path_address, &data, &size)) {
+                status = 1;
+            }
+            free(data);
+            stout_write_u16(pb.intout, (uint16_t)status);
             return 1;
         }
         default:
@@ -1751,6 +1824,14 @@ static int stout_handle_vdi(void)
             status = vswr_mode(handle, intin[0]);
             stout_write_u16(pb.intout, (uint16_t)status);
             return 1;
+        case 38: { /* vqt_attributes */
+            WORD attributes[10] = {0};
+
+            status = vqt_attributes(handle, attributes);
+            stout_copy_words_to_guest(pb.intout, attributes, 6u);
+            stout_copy_words_to_guest(pb.ptsout, attributes + 6u, 4u);
+            return status != 0;
+        }
         case 39:
             status = vst_alignment(handle, intin[0], intin[1]);
             stout_write_u16(pb.intout, (uint16_t)status);
@@ -1896,6 +1977,12 @@ int stout_handle_trap(int trap)
         case STOUT_GEMDOS_TRAP:
             return stout_handle_gemdos();
         case STOUT_AES_VDI_TRAP:
+            /* vq_gdos uses the trap directly instead of a VDI parameter
+             * block.  Report the ROM-compatible "no GDOS" result. */
+            if ((uint16_t)stout_get_reg(M68K_REG_D0) == 0xfffeu) {
+                stout_set_reg(M68K_REG_D0, 0xfffffffeu);
+                return 1;
+            }
             if (stout_handle_aes()) {
                 return 1;
             }

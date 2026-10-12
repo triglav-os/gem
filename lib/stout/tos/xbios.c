@@ -167,6 +167,14 @@ void stout_xbios_init(void)
         stout_write_u16(record + 12u, (STOUT_IOREC_BUFFER_SIZE * 3u) / 4u);
     }
     memset(g_stout.ram + STOUT_KBDVECS_BASE, 0, STOUT_KBDVECS_SIZE);
+    memset(g_stout.ram + STOUT_KEYTAB_UNSHIFT, 0, 128u);
+    memset(g_stout.ram + STOUT_KEYTAB_SHIFT, 0, 128u);
+    memset(g_stout.ram + STOUT_KEYTAB_CAPS, 0, 128u);
+    stout_write_u32(STOUT_KEYTAB_BASE + 0u, STOUT_KEYTAB_UNSHIFT);
+    stout_write_u32(STOUT_KEYTAB_BASE + 4u, STOUT_KEYTAB_SHIFT);
+    stout_write_u32(STOUT_KEYTAB_BASE + 8u, STOUT_KEYTAB_CAPS);
+    memset(g_stout.screen_palette, 0, sizeof(g_stout.screen_palette));
+    g_stout.screen_palette[0] = 0x0777u;
 }
 
 int stout_handle_xbios(void)
@@ -209,6 +217,37 @@ int stout_handle_xbios(void)
             stout_set_reg(M68K_REG_D0, valid != 0 ? 0u : 0xffffffffu);
             return 1;
         }
+        case 6: { /* Setpalette */
+            uint32_t address;
+            size_t index;
+
+            if (!stout_valid_range(sp, 6u))
+                return 0;
+            address = stout_read_u32(sp + 2u);
+            if (!stout_valid_range(address, sizeof(g_stout.screen_palette)))
+                return 0;
+            for (index = 0u; index < 16u; ++index)
+                g_stout.screen_palette[index] =
+                    stout_read_u16(address + (uint32_t)index * 2u);
+            return 1;
+        }
+        case 7: { /* Setcolor */
+            uint16_t index;
+            int16_t color;
+            uint16_t previous;
+
+            if (!stout_valid_range(sp, 6u))
+                return 0;
+            index = stout_read_u16(sp + 2u);
+            color = stout_read_s16(sp + 4u);
+            if (index >= 16u)
+                return 0;
+            previous = g_stout.screen_palette[index];
+            if (color != -1)
+                g_stout.screen_palette[index] = (uint16_t)color;
+            stout_set_reg(M68K_REG_D0, previous);
+            return 1;
+        }
         case 14: { /* Iorec */
             uint16_t device = stout_read_u16(sp + 2u);
 
@@ -218,34 +257,71 @@ int stout_handle_xbios(void)
                                                    : 0xffffffffu);
             return 1;
         }
+        case 16: { /* Keytbl */
+            size_t index;
+
+            if (!stout_valid_range(sp, 14u))
+                return 0;
+            for (index = 0u; index < 3u; ++index) {
+                uint32_t table = stout_read_u32(sp + 2u +
+                                                (uint32_t)index * 4u);
+
+                if (table == 0xffffffffu)
+                    continue;
+                if (!stout_valid_range(table, 128u))
+                    return 0;
+                stout_write_u32(STOUT_KEYTAB_BASE + (uint32_t)index * 4u,
+                                table);
+            }
+            stout_set_reg(M68K_REG_D0, STOUT_KEYTAB_BASE);
+            return 1;
+        }
+        case 33: { /* Setprt */
+            int16_t requested;
+            uint16_t previous;
+
+            if (!stout_valid_range(sp, 4u))
+                return 0;
+            requested = stout_read_s16(sp + 2u);
+            previous = g_stout.printer_config;
+            if (requested != -1)
+                g_stout.printer_config = (uint16_t)requested;
+            stout_set_reg(M68K_REG_D0, previous);
+            return 1;
+        }
         case 34: /* Kbdvbase */
             stout_set_reg(M68K_REG_D0, STOUT_KBDVECS_BASE);
             return 1;
         case 37: /* Vsync */
             gem_os_sleep_ms(20u);
             return 1;
-        case 7:
-            if (!g_stout.disk_mounted)
-                return 0;
-            stout_write_guest_bpb();
-            stout_set_reg(M68K_REG_D0, g_stout.bpb_address);
-            return 1;
         case 8: {
-            uint32_t buffer = stout_read_u32(sp + 2u);
-            uint16_t drive = stout_read_u16(sp + 6u);
-            uint16_t sector = stout_read_u16(sp + 8u);
-            uint16_t track = stout_read_u16(sp + 10u);
-            uint16_t side = stout_read_u16(sp + 12u);
-            uint16_t count = stout_read_u16(sp + 14u);
+            uint32_t buffer;
+            uint16_t drive;
+            uint16_t sector;
+            uint16_t track;
+            uint16_t side;
+            uint16_t count;
             const fat12_image_t *fat = stout_disk_fat12(&g_stout.disk);
-            uint32_t first = fat != NULL && fat->bpb.sectors_per_track != 0
+            uint32_t first;
+            uint16_t index;
+            int ok;
+
+            if (!stout_valid_range(sp, 20u))
+                return 0;
+            buffer = stout_read_u32(sp + 2u);
+            drive = stout_read_u16(sp + 10u);
+            sector = stout_read_u16(sp + 12u);
+            track = stout_read_u16(sp + 14u);
+            side = stout_read_u16(sp + 16u);
+            count = stout_read_u16(sp + 18u);
+            first = fat != NULL && fat->bpb.sectors_per_track != 0
                                  ? ((uint32_t)track * fat->bpb.sides + side) *
                                            fat->bpb.sectors_per_track +
                                        sector - 1u
                                  : 0xffffffffu;
-            uint16_t index;
-            int ok =
-                g_stout.disk_mounted && drive == 0u && first != 0xffffffffu;
+            ok = g_stout.disk_mounted && drive == 0u && sector != 0u &&
+                 first != 0xffffffffu;
             for (index = 0u; ok && index < count; ++index) {
                 uint32_t address = buffer + (uint32_t)index * 512u;
                 ok = stout_valid_range(address, 512u) &&
@@ -256,21 +332,32 @@ int stout_handle_xbios(void)
             return 1;
         }
         case 9: {
-            uint32_t buffer = stout_read_u32(sp + 2u);
-            uint16_t drive = stout_read_u16(sp + 6u);
-            uint16_t sector = stout_read_u16(sp + 8u);
-            uint16_t track = stout_read_u16(sp + 10u);
-            uint16_t side = stout_read_u16(sp + 12u);
-            uint16_t count = stout_read_u16(sp + 14u);
+            uint32_t buffer;
+            uint16_t drive;
+            uint16_t sector;
+            uint16_t track;
+            uint16_t side;
+            uint16_t count;
             const fat12_image_t *fat = stout_disk_fat12(&g_stout.disk);
-            uint32_t first = fat != NULL && fat->bpb.sectors_per_track != 0
+            uint32_t first;
+            uint16_t index;
+            int ok;
+
+            if (!stout_valid_range(sp, 20u))
+                return 0;
+            buffer = stout_read_u32(sp + 2u);
+            drive = stout_read_u16(sp + 10u);
+            sector = stout_read_u16(sp + 12u);
+            track = stout_read_u16(sp + 14u);
+            side = stout_read_u16(sp + 16u);
+            count = stout_read_u16(sp + 18u);
+            first = fat != NULL && fat->bpb.sectors_per_track != 0
                                  ? ((uint32_t)track * fat->bpb.sides + side) *
                                            fat->bpb.sectors_per_track +
                                        sector - 1u
                                  : 0xffffffffu;
-            uint16_t index;
-            int ok =
-                g_stout.disk_mounted && drive == 0u && first != 0xffffffffu;
+            ok = g_stout.disk_mounted && drive == 0u && sector != 0u &&
+                 first != 0xffffffffu;
 
             for (index = 0u; ok && index < count; ++index) {
                 uint32_t address = buffer + (uint32_t)index * 512u;
@@ -282,9 +369,6 @@ int stout_handle_xbios(void)
             stout_set_reg(M68K_REG_D0, ok ? 0u : 0xffffffffu);
             return 1;
         }
-        case 10:
-            stout_set_reg(M68K_REG_D0, g_stout.disk_mounted ? 5u : 4u);
-            return 1;
         case 38: { /* Supexec: call a guest routine in supervisor context. */
             uint32_t function = stout_read_u32(sp + 2u);
             uint32_t return_pc = stout_get_reg(M68K_REG_PC);
@@ -307,6 +391,11 @@ int stout_handle_xbios(void)
             stout_set_reg(M68K_REG_PC, function);
             return 1;
         }
+        case 64: /* Blitmode: Stout exposes no hardware blitter. */
+            if (!stout_valid_range(sp, 4u))
+                return 0;
+            stout_set_reg(M68K_REG_D0, 0u);
+            return 1;
         default:
             fprintf(stderr, "stout: unsupported XBIOS opcode %u\n", opcode);
             return 0;

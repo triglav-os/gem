@@ -177,6 +177,33 @@ static void gemd_pump_hid(void)
     }
 }
 
+static int gemd_request_may_wait(const gem_rpc_header_t *header,
+                                 const uint8_t *payload)
+{
+    if (header == NULL || payload == NULL) {
+        return 0;
+    }
+    if (header->opcode == GEM_RPC_FORM_ALERT ||
+        header->opcode == GEM_RPC_FSEL_INPUT) {
+        return 1;
+    }
+    if (header->opcode == GEM_RPC_AES_TREE) {
+        const gem_tree_packet_t *tree = (const gem_tree_packet_t *)payload;
+
+        return tree->operation == tree_form_do ||
+               tree->operation == tree_watchbox ||
+               tree->operation == tree_slidebox;
+    }
+    if (header->opcode == GEM_RPC_AES_EXT) {
+        const gem_aes_packet_t *packet = (const gem_aes_packet_t *)payload;
+
+        return packet->function == rpc_form_error ||
+               packet->function == rpc_graf_rubbox ||
+               packet->function == rpc_graf_dragbox;
+    }
+    return 0;
+}
+
 int gemd_handle_request(gemd_session_t *session)
 {
     const gem_rpc_header_t header = session->io.header;
@@ -185,6 +212,9 @@ int gemd_handle_request(gemd_session_t *session)
     uint32_t response_size = 0u;
     int32_t status;
 
+    if (session->handling_request != 0) {
+        return 0;
+    }
     if (!gem_rpc_valid_request(header.opcode, payload, header.size)) {
         gemd_reply(&session->io, -1, NULL, 0);
         return 1;
@@ -193,6 +223,7 @@ int gemd_handle_request(gemd_session_t *session)
         gemd_reply(&session->io, 0, NULL, 0);
         return 1;
     }
+    session->handling_request = 1;
     if (gemd_vdi_request(header.opcode)) {
         gemd_drawing_t server;
         gemd_drawing_save(&server);
@@ -219,10 +250,7 @@ int gemd_handle_request(gemd_session_t *session)
         }
         gemd_drawing_restore(&server);
     } else {
-        if (header.opcode == GEM_RPC_FORM_ALERT ||
-            header.opcode == GEM_RPC_FSEL_INPUT ||
-            header.opcode == GEM_RPC_AES_TREE ||
-            header.opcode == GEM_RPC_AES_EXT) {
+        if (gemd_request_may_wait(&header, payload)) {
             g_modal_session = session;
             aes_wait_hook = gemd_service_modal;
         }
@@ -233,6 +261,7 @@ int gemd_handle_request(gemd_session_t *session)
             g_modal_session = NULL;
         }
     }
+    session->handling_request = 0;
     gemd_reply(&session->io, status, response, response_size);
     return 1;
 }
@@ -309,11 +338,10 @@ int gemd_service_modal(void)
             gemd_close_session(session);
             continue;
         }
-        if (session->io.ready && gemd_session_may_run(session) &&
-            session->io.header.opcode != GEM_RPC_FORM_ALERT &&
-            session->io.header.opcode != GEM_RPC_FSEL_INPUT &&
-            session->io.header.opcode != GEM_RPC_AES_TREE &&
-            session->io.header.opcode != GEM_RPC_AES_EXT)
+        if (session->io.ready && session->handling_request == 0 &&
+            gemd_session_may_run(session) &&
+            !gemd_request_may_wait(&session->io.header,
+                                   session->io.payload))
             (void)gemd_handle_request(session);
     }
     gemd_drawing_restore(&drawing);

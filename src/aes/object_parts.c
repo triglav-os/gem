@@ -88,7 +88,9 @@ int aes_is_dialog_frame_object(const OBJECT *tree, WORD object, WORD parent)
 void aes_draw_ted_object(const OBJECT *tree, WORD object, const OBJECT *obj,
                          const TEDINFO *ted, const WORD rect[4])
 {
+    char clipped_text[256];
     const char *text;
+    const char *rendered_text;
     WORD text_x;
     WORD text_y;
     WORD text_width;
@@ -97,22 +99,77 @@ void aes_draw_ted_object(const OBJECT *tree, WORD object, const OBJECT *obj,
     WORD caret_bottom;
     WORD caret_x;
     WORD text_color;
+    WORD attributes[10] = {0};
+    WORD previous_font = 0;
+    WORD text_left;
+    WORD text_right;
+    WORD text_top;
+    WORD text_bottom;
+    WORD inset;
+    size_t text_length;
+    int classic_ted;
 
     if (obj == NULL || ted == NULL) {
         return;
     }
 
+    if (vqt_attributes(aes_state.vdi_handle, attributes) != 0) {
+        previous_font = attributes[0];
+    }
+    (void)vst_font(aes_state.vdi_handle, ted->te_font);
+
     text = (const char *)(intptr_t)ted->te_ptext;
-    text_x = (WORD)(rect[0] + 2);
+    aes_draw_trace("ted object=%d type=%u font=%d just=%d rect=%d,%d-%d,%d "
+                   "text=\"%s\"",
+                   object, (unsigned)obj->ob_type, ted->te_font, ted->te_just,
+                   rect[0], rect[1], rect[2], rect[3],
+                   text != NULL ? text : "");
+    classic_ted = ted->te_font == -3 || ted->te_font == -5;
+    inset = classic_ted != 0 && ted->te_thickness > 0 ? ted->te_thickness : 0;
+    text_left = classic_ted != 0 ? (WORD)(rect[0] + inset)
+                                 : (WORD)(rect[0] + 2);
+    text_top = (WORD)(rect[1] + inset);
+    text_right = (WORD)(rect[2] - inset);
+    text_bottom = (WORD)(rect[3] - inset);
+    if (text_right < text_left) {
+        text_right = text_left;
+    }
+    if (text_bottom < text_top) {
+        text_bottom = text_top;
+    }
+    text_x = text_left;
     text_color = aes_dark_color();
-    text_width = (WORD)vdi_string_width(text != NULL ? text : "");
+    rendered_text = text != NULL ? text : "";
+    if (classic_ted != 0) {
+        text_length = 0u;
+        text_width = 0;
+        while (rendered_text[text_length] != '\0' &&
+               text_length + 1u < sizeof(clipped_text)) {
+            WORD width = vdi_char_cell_width(rendered_text[text_length]);
+
+            if (width <= 0 ||
+                (LONG)text_width + width > text_right - text_left + 1) {
+                break;
+            }
+            clipped_text[text_length] = rendered_text[text_length];
+            text_width = (WORD)(text_width + width);
+            ++text_length;
+        }
+        clipped_text[text_length] = '\0';
+        rendered_text = clipped_text;
+    } else {
+        text_width = (WORD)vdi_string_width(rendered_text);
+    }
     caret_width = text_width;
 
     if (obj->ob_type == G_FTEXT || obj->ob_type == G_FBOXTEXT) {
         text_y =
-            (WORD)(rect[1] +
-                   ((rect[3] - rect[1] + 1 - vdi_font_text_height()) > 0
-                        ? (rect[3] - rect[1] + 1 - vdi_font_text_height()) / 2
+            (WORD)(text_top +
+                   ((text_bottom - text_top + 1 - vdi_font_text_height()) > 0
+                        ? (text_bottom - text_top +
+                           (classic_ted != 0 ? 2 : 1) -
+                           vdi_font_text_height()) /
+                              2
                         : 0) +
                    vdi_font_ascent());
         caret_top = (WORD)(text_y - vdi_font_ascent() + 1);
@@ -124,7 +181,7 @@ void aes_draw_ted_object(const OBJECT *tree, WORD object, const OBJECT *obj,
             aes_draw_hline(rect[0], rect[2], rect[3], aes_dark_color());
             aes_draw_vline(rect[0], rect[1], rect[3], aes_dark_color());
             aes_draw_vline(rect[2], rect[1], rect[3], aes_dark_color());
-            text_x = (WORD)(rect[0] + 3);
+            text_x = classic_ted != 0 ? text_left : (WORD)(rect[0] + 3);
             if (caret_top < rect[1] + 1) {
                 caret_top = (WORD)(rect[1] + 1);
             }
@@ -172,9 +229,12 @@ void aes_draw_ted_object(const OBJECT *tree, WORD object, const OBJECT *obj,
         }
     } else if (obj->ob_type == G_BOXTEXT) {
         text_y =
-            (WORD)(rect[1] +
-                   ((rect[3] - rect[1] + 1 - vdi_font_text_height()) > 0
-                        ? (rect[3] - rect[1] + 1 - vdi_font_text_height()) / 2
+            (WORD)(text_top +
+                   ((text_bottom - text_top + 1 - vdi_font_text_height()) > 0
+                        ? (text_bottom - text_top +
+                           (classic_ted != 0 ? 2 : 1) -
+                           vdi_font_text_height()) /
+                              2
                         : 0) +
                    vdi_font_ascent());
         aes_fill_rect(rect[0], rect[1], rect[2], rect[3], aes_light_color());
@@ -184,14 +244,24 @@ void aes_draw_ted_object(const OBJECT *tree, WORD object, const OBJECT *obj,
         aes_draw_vline(rect[2], rect[1], rect[3], aes_dark_color());
     } else {
         text_y =
-            (WORD)(rect[1] +
-                   ((rect[3] - rect[1] + 1 - vdi_font_text_height()) > 0
-                        ? (rect[3] - rect[1] + 1 - vdi_font_text_height()) / 2
+            (WORD)(text_top +
+                   ((text_bottom - text_top + 1 - vdi_font_text_height()) > 0
+                        ? (text_bottom - text_top +
+                           (classic_ted != 0 ? 2 : 1) -
+                           vdi_font_text_height()) /
+                              2
                         : 0) +
                    vdi_font_ascent());
     }
 
-    if (ted->te_just == TE_RIGHT) {
+    if (classic_ted != 0) {
+        if (ted->te_just == TE_RIGHT) {
+            text_x = (WORD)(text_right - text_width + 1);
+        } else if (ted->te_just == TE_CNTR) {
+            text_x = (WORD)(text_left +
+                            (text_right - text_left + 2 - text_width) / 2);
+        }
+    } else if (ted->te_just == TE_RIGHT) {
         text_x = (WORD)(rect[2] - text_width - 1);
         if (text_x < rect[0] + 2) {
             text_x = (WORD)(rect[0] + 2);
@@ -203,7 +273,12 @@ void aes_draw_ted_object(const OBJECT *tree, WORD object, const OBJECT *obj,
         }
     }
 
-    aes_draw_text(text_x, text_y, text_color, text);
+    if (text_bottom - text_top + 1 >= vdi_font_text_height()) {
+        aes_draw_text(text_x, text_y, text_color, rendered_text);
+    }
+    if (previous_font != 0) {
+        (void)vst_font(aes_state.vdi_handle, previous_font);
+    }
 }
 
 void aes_draw_dialog_frame(const WORD rect[4])

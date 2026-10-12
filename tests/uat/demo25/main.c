@@ -8,6 +8,7 @@
  */
 
 #include <gem.h>
+#include <stdio.h>
 #include <string.h>
 
 enum {
@@ -72,11 +73,8 @@ void init_object(OBJECT *object, UWORD type, UWORD flags, UWORD state,
 
 void update_status(demo25_state_t *state, const char *prefix)
 {
-    strcpy(state->status, prefix);
-    strcat(state->status, " ");
-    strcat(state->status, state->name);
-    strcat(state->status, " / ");
-    strcat(state->status, state->city);
+    (void)snprintf(state->status, sizeof(state->status), "%s %.23s / %.23s",
+                   prefix, state->name, state->city);
     state->tree[D25_STATUS].ob_spec = (LONG)(intptr_t)state->status;
 }
 

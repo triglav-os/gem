@@ -34,6 +34,10 @@
 #define STOUT_IOREC_BUFFER_SIZE 256u
 #define STOUT_KBDVECS_BASE 0x00003600u
 #define STOUT_KBDVECS_SIZE 36u
+#define STOUT_KEYTAB_BASE 0x00003800u
+#define STOUT_KEYTAB_UNSHIFT 0x00003900u
+#define STOUT_KEYTAB_SHIFT 0x00003980u
+#define STOUT_KEYTAB_CAPS 0x00003a00u
 #define STOUT_LINEA_BASE 0x00005000u
 #define STOUT_LINEA_FONTS 0x00005200u
 #define STOUT_LINEA_VECTORS 0x00005220u
@@ -46,6 +50,7 @@
 #define STOUT_BASEPAGE 0x00008000u
 #define STOUT_LOAD_ADDRESS (STOUT_BASEPAGE + 0x100u)
 #define STOUT_STOP_ADDRESS 0x00007000u
+#define STOUT_PARENT_BASEPAGE 0x00007400u
 #define STOUT_GEMDOS_TRAP 1
 #define STOUT_AES_VDI_TRAP 2
 #define STOUT_LINEA_TRAP 12
@@ -114,6 +119,7 @@ typedef struct stout_state {
     int trace_traps;
     prg_file_kind_t program_kind;
     uint32_t basepage_address;
+    uint32_t parent_basepage_address;
     uint8_t command_tail[128];
     size_t command_tail_length;
     stout_disk_t disk;
@@ -136,6 +142,7 @@ typedef struct stout_state {
     uint32_t physical_screen;
     uint16_t screen_resolution;
     uint16_t screen_palette[16];
+    uint16_t printer_config;
     WORD vdi_handle;
     uint32_t menu_guest_address;
     WORD menu_object_count;

@@ -328,7 +328,7 @@ VOID v_ellpie(WORD handle, WORD x, WORD y, WORD xrad, WORD yrad, WORD begang,
     WORD points[VDI_POLYGON_MAX_POINTS * 2];
     WORD count;
 
-    if (!vdi_valid_handle(handle)) {
+    if (!vdi_valid_handle(handle) || xrad < 0 || yrad < 0) {
         return;
     }
 

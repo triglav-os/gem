@@ -34,6 +34,25 @@ int stout_handle_bios(void)
         stout_set_reg(M68K_REG_D0, 1u);
         return 1;
     }
+    if (opcode == 5u) { /* Setexc */
+        uint16_t vector;
+        uint32_t handler;
+        uint32_t address;
+        uint32_t previous;
+
+        if (!stout_valid_range(sp, 8u))
+            return 0;
+        vector = stout_read_u16(sp + 2u);
+        handler = stout_read_u32(sp + 4u);
+        address = (uint32_t)vector * 4u;
+        if (!stout_valid_range(address, 4u))
+            return 0;
+        previous = stout_read_u32(address);
+        if (handler != 0xffffffffu)
+            stout_write_u32(address, handler);
+        stout_set_reg(M68K_REG_D0, previous);
+        return 1;
+    }
     if (opcode == 10u) { /* Drvmap: C: plus A: when an image is mounted. */
         stout_set_reg(M68K_REG_D0, g_stout.disk_mounted ? 5u : 4u);
         return 1;

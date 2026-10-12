@@ -21,6 +21,7 @@ static void aes_window_draw_cover_rect(const aes_window_t *window, GRECT *out);
 static void aes_queue_desktop_redraw(const GRECT *dirty);
 static void aes_queue_window_redraw(const aes_window_t *window,
                                     const GRECT *dirty);
+static void aes_redraw_modal_form(const GRECT *dirty);
 
 void aes_present_window_frame(const aes_window_t *window)
 {
@@ -86,6 +87,27 @@ static void aes_window_draw_cover_rect(const aes_window_t *window, GRECT *out)
     }
 
     aes_expand_window_damage_rect(&window->outer, out);
+}
+
+static void aes_redraw_modal_form(const GRECT *dirty)
+{
+    GRECT damage;
+    GRECT visible[64];
+    WORD count;
+    WORD piece;
+
+    if (dirty == NULL || aes_state.modal_form_tree == NULL ||
+        aes_state.modal_form_owner_app_id == 0 ||
+        aes_intersect_rects(&aes_state.modal_form_rect, dirty, &damage) == 0) {
+        return;
+    }
+
+    count = aes_clip_modal_form_rects(&damage, visible, 64);
+    for (piece = 0; piece < count; ++piece) {
+        (void)objc_draw(aes_state.modal_form_tree, ROOT, MAX_DEPTH,
+                        visible[piece].g_x, visible[piece].g_y,
+                        visible[piece].g_w, visible[piece].g_h);
+    }
 }
 
 void aes_redraw_region(const GRECT *dirty)
@@ -176,6 +198,7 @@ void aes_redraw_region(const GRECT *dirty)
         WORD painted_count = 0;
         WORD a;
         WORD b;
+        int modal_painted = 0;
 
         for (a = 0; a < (WORD)AES_MAX_WINDOWS; ++a) {
             GRECT cover_rect;
@@ -203,6 +226,12 @@ void aes_redraw_region(const GRECT *dirty)
             GRECT frame_damage;
             int redraw_work = 0;
 
+            if (modal_painted == 0 && aes_state.modal_form_tree != NULL &&
+                painted[a]->z_order > aes_state.modal_form_z) {
+                aes_redraw_modal_form(&damage);
+                modal_painted = 1;
+            }
+
             aes_trace("redraw_region draw handle=%d z=%lu outer=%d,%d %dx%d",
                       painted[a]->handle, (unsigned long)painted[a]->z_order,
                       painted[a]->outer.g_x, painted[a]->outer.g_y,
@@ -229,6 +258,9 @@ void aes_redraw_region(const GRECT *dirty)
             if (redraw_work != 0) {
                 aes_queue_window_redraw(painted[a], &damage);
             }
+        }
+        if (modal_painted == 0) {
+            aes_redraw_modal_form(&damage);
         }
     }
     vs_clip(aes_state.vdi_handle, 0, clip);

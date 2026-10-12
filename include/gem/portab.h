@@ -36,7 +36,9 @@
 #define YES 1               /* Historical affirmative constant. */
 #define NO 0                /* Historical negative constant. */
 #define FOREVER for (;;)    /* Infinite loop helper macro. */
-#define NULL 0              /* Historical null integer constant. */
+#ifndef NULL
+#define NULL 0 /* Historical null integer constant. */
+#endif
 #define NULLPTR ((void *)0) /* Explicit null pointer constant. */
 #define TRUE (1)            /* Historical boolean true constant. */
 #define FALSE (0)           /* Historical boolean false constant. */

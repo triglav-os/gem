@@ -100,6 +100,89 @@ static void application_ids(void)
     assert(appl_exit());
 }
 
+static OBJECT *expected_modal_tree;
+
+static int stop_form_wait(void)
+{
+    assert(aes_state.modal_form_tree == expected_modal_tree);
+    return 0;
+}
+
+static void custom_form_input_scope(void)
+{
+    gem_hid_event_t event;
+    GRECT visible[64];
+    OBJECT form_tree[1];
+    WORD visible_count;
+    aes_app_t *dialog_app;
+    aes_app_t *window_app;
+    WORD dialog_id;
+    WORD window_id;
+
+    aes_reset_state();
+    aes_state.initialized = 1;
+    dialog_id = appl_init();
+    window_id = appl_init();
+    dialog_app = aes_find_app_by_id(dialog_id);
+    window_app = aes_find_app_by_id(window_id);
+    assert(dialog_app != NULL && window_app != NULL);
+
+    aes_state.windows[0].used = 1;
+    aes_state.windows[0].handle = 1;
+    aes_state.windows[0].owner = window_id;
+    aes_state.windows[0].open = 1;
+    aes_state.windows[0].z_order = 1u;
+    aes_state.next_window_z = 2u;
+    aes_set_rect(&aes_state.windows[0].outer, 200, 200, 100, 100);
+    aes_state.windows[0].work = aes_state.windows[0].outer;
+
+    aes_state.current_app_id = dialog_id;
+    assert(form_dial(FMD_START, 0, 0, 0, 0, 10, 20, 100, 80));
+    assert(aes_state.modal_form_z == 2u);
+
+    memset(form_tree, 0, sizeof(form_tree));
+    form_tree[ROOT].ob_next = NIL;
+    form_tree[ROOT].ob_head = NIL;
+    form_tree[ROOT].ob_tail = NIL;
+    expected_modal_tree = form_tree;
+    aes_wait_hook = stop_form_wait;
+    assert(form_do(form_tree, NIL) == NIL);
+    assert(aes_state.modal_form_tree == NULL);
+    aes_wait_hook = NULL;
+
+    memset(&event, 0, sizeof(event));
+    event.type = GEM_HID_MOUSE_BUTTON;
+    event.flags = GEM_HID_BUTTON_LEFT;
+    event.button = GEM_HID_BUTTON_LEFT;
+    event.x = 250;
+    event.y = 250;
+    aes_dispatch_hid_event(&event);
+    assert(window_app->input_event_count == 1);
+    assert(dialog_app->input_event_count == 0);
+    assert(aes_state.input_focus_app_id == window_id);
+
+    aes_state.windows[0].z_order = 3u;
+    aes_state.next_window_z = 4u;
+    event.x = 50;
+    event.y = 50;
+    aes_dispatch_hid_event(&event);
+    assert(window_app->input_event_count == 1);
+    assert(dialog_app->input_event_count == 1);
+    assert(aes_state.input_focus_app_id == dialog_id);
+    assert(aes_state.modal_form_z == 4u);
+
+    aes_set_rect(&aes_state.windows[0].outer, 40, 30, 30, 30);
+    aes_state.windows[0].work = aes_state.windows[0].outer;
+    aes_state.windows[0].z_order = 5u;
+    visible_count =
+        aes_clip_modal_form_rects(&aes_state.modal_form_rect, visible, 64);
+    assert(visible_count > 0);
+    for (WORD i = 0; i < visible_count; ++i) {
+        assert(aes_rects_intersect(&visible[i], &aes_state.windows[0].outer) ==
+               0);
+    }
+}
+
 static void selector_patterns(void)
 {
     static const struct {
@@ -204,6 +287,7 @@ int main(void)
 {
     framebuffer_paths();
     application_ids();
+    custom_form_input_scope();
     selector_patterns();
     selector_hidden_entries();
     text_editor_hid_collisions();

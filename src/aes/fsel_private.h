@@ -41,6 +41,9 @@ enum {
     AES_FSEL_CONTROL_SCROLL_DOWN = 7
 };
 
+/* Copy text into a chooser buffer, truncating it with a final null byte. */
+void aes_fsel_copy_text(char *target, size_t target_size, const char *source);
+
 typedef struct aes_fsel_entry {
     char name[AES_PATH_LEN];
     uint64_t size_bytes;

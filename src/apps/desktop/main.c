@@ -36,7 +36,7 @@ void desktop_update_desk_menu_labels(void)
     static const WORD menu_items[6] = {MENU_DESK_1, MENU_DESK_2, MENU_DESK_3,
                                        MENU_DESK_4, MENU_DESK_5, MENU_DESK_6};
     OBJECT *tree = g_desktop.menu_tree;
-    WORD item_index;
+    size_t item_index;
     WORD used_count = 0;
     desktop_browser_window_t *active =
         desktop_find_browser_by_handle(g_desktop.active_browser_handle);
@@ -50,10 +50,10 @@ void desktop_update_desk_menu_labels(void)
     for (item_index = 0; item_index < 6; ++item_index) {
         OBJECT *item = &tree[menu_items[item_index]];
         desktop_browser_window_t *browser =
-            desktop_browser_for_desk_slot(item_index);
+            desktop_browser_for_desk_slot((WORD)item_index);
 
         item->ob_next =
-            item_index < 5 ? menu_items[item_index + 1] : MENU_DESK_BOX;
+            item_index < 5u ? menu_items[item_index + 1u] : MENU_DESK_BOX;
 
         g_desktop.desk_menu_labels[item_index][0] = '\0';
         if (browser != NULL) {

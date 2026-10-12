@@ -1,10 +1,10 @@
 # Automated GEM test report
 
-UTC: 2026-09-23T09:34:15+00:00 to 2026-09-23T09:38:06+00:00
+UTC: 2026-09-24T21:30:36+00:00 to 2026-09-24T21:39:24+00:00
 
-**98 passed, 0 failed, 0 skipped; CTest exit status 0.**
+**101 passed, 0 failed, 0 skipped; CTest exit status 0.**
 
-Command: `ctest --test-dir /home/tstih/data/triglav-os/gem/build --output-on-failure --parallel 2 --output-junit /home/tstih/data/triglav-os/gem/build/test-results.xml`
+Command: `ctest --test-dir /home/tstih/data/triglav-os/gem/build --output-on-failure --parallel 1 --output-junit /home/tstih/data/triglav-os/gem/build/test-results.xml`
 
 Build: GCC RelWithDebInfo, Rasta platform; UAT rejects AddressSanitizer and UndefinedBehaviorSanitizer diagnostics.
 
@@ -20,104 +20,107 @@ Passing these cases establishes the documented coverage, not every possible inpu
 
 | Test | Result | Seconds | Evidence |
 | --- | --- | ---: | --- |
-| test_report | PASS | 0.05 | [CTest log](../../build/tests.log) |
-| test_vdi | PASS | 0.00 | [CTest log](../../build/tests.log) |
+| test_report | PASS | 0.14 | [CTest log](../../build/tests.log) |
+| test_vdi | PASS | 0.01 | [CTest log](../../build/tests.log) |
 | test_gem_header | PASS | 0.00 | [CTest log](../../build/tests.log) |
-| test_api_surface | PASS | 0.10 | [CTest log](../../build/tests.log) |
-| test_protocol | PASS | 0.00 | [CTest log](../../build/tests.log) |
-| test_aes_shell | PASS | 0.00 | [CTest log](../../build/tests.log) |
-| test_gem_trash | PASS | 0.33 | [CTest log](../../build/tests.log) |
-| test_terminal_vt100 | PASS | 0.00 | [CTest log](../../build/tests.log) |
-| test_gemconf | PASS | 0.01 | [CTest log](../../build/tests.log) |
-| test_security_bounds | PASS | 0.00 | [CTest log](../../build/tests.log) |
-| test_rasta_polarity | PASS | 0.00 | [CTest log](../../build/tests.log) |
-| test_gem_rpc | PASS | 0.14 | [CTest log](../../build/tests.log) |
-| test_gemd_security | PASS | 6.37 | [CTest log](../../build/tests.log) |
-| test_gemd_host | PASS | 0.00 | [CTest log](../../build/tests.log) |
-| test_vdi_rpc | PASS | 0.14 | [CTest log](../../build/tests.log) |
-| test_aes_rpc | PASS | 0.16 | [CTest log](../../build/tests.log) |
-| test_sample_session | PASS | 34.82 | [Session state](../../build/sample_session_test/state.json) |
-| security_disk | PASS | 0.06 | [CTest log](../../build/tests.log) |
-| security_guest | PASS | 0.05 | [CTest log](../../build/tests.log) |
-| uat_demo1_direct | PASS | 2.12 | [Artifacts](../../build/uat/demo1_direct/result.json) |
-| uat_demo1_proxy | PASS | 2.19 | [Artifacts](../../build/uat/demo1_proxy/result.json) |
-| uat_demo2_direct | PASS | 2.09 | [Artifacts](../../build/uat/demo2_direct/result.json) |
-| uat_demo2_proxy | PASS | 2.17 | [Artifacts](../../build/uat/demo2_proxy/result.json) |
-| uat_demo3_direct | PASS | 2.16 | [Artifacts](../../build/uat/demo3_direct/result.json) |
-| uat_demo3_proxy | PASS | 2.19 | [Artifacts](../../build/uat/demo3_proxy/result.json) |
-| uat_demo4_direct | PASS | 2.13 | [Artifacts](../../build/uat/demo4_direct/result.json) |
-| uat_demo4_proxy | PASS | 2.21 | [Artifacts](../../build/uat/demo4_proxy/result.json) |
-| uat_demo5_direct | PASS | 2.10 | [Artifacts](../../build/uat/demo5_direct/result.json) |
-| uat_demo5_proxy | PASS | 2.18 | [Artifacts](../../build/uat/demo5_proxy/result.json) |
-| uat_demo6_direct | PASS | 2.09 | [Artifacts](../../build/uat/demo6_direct/result.json) |
-| uat_demo6_proxy | PASS | 2.17 | [Artifacts](../../build/uat/demo6_proxy/result.json) |
-| uat_demo7_direct | PASS | 2.18 | [Artifacts](../../build/uat/demo7_direct/result.json) |
-| uat_demo7_proxy | PASS | 2.19 | [Artifacts](../../build/uat/demo7_proxy/result.json) |
-| uat_demo8_direct | PASS | 2.16 | [Artifacts](../../build/uat/demo8_direct/result.json) |
-| uat_demo8_proxy | PASS | 2.19 | [Artifacts](../../build/uat/demo8_proxy/result.json) |
-| uat_demo9_direct | PASS | 2.19 | [Artifacts](../../build/uat/demo9_direct/result.json) |
-| uat_demo9_proxy | PASS | 2.21 | [Artifacts](../../build/uat/demo9_proxy/result.json) |
-| uat_demo10_direct | PASS | 2.15 | [Artifacts](../../build/uat/demo10_direct/result.json) |
-| uat_demo10_proxy | PASS | 2.17 | [Artifacts](../../build/uat/demo10_proxy/result.json) |
-| uat_demo11_direct | PASS | 2.14 | [Artifacts](../../build/uat/demo11_direct/result.json) |
-| uat_demo11_proxy | PASS | 2.20 | [Artifacts](../../build/uat/demo11_proxy/result.json) |
-| uat_demo12_direct | PASS | 2.14 | [Artifacts](../../build/uat/demo12_direct/result.json) |
-| uat_demo12_proxy | PASS | 2.17 | [Artifacts](../../build/uat/demo12_proxy/result.json) |
-| uat_demo13_direct | PASS | 2.15 | [Artifacts](../../build/uat/demo13_direct/result.json) |
-| uat_demo13_proxy | PASS | 2.17 | [Artifacts](../../build/uat/demo13_proxy/result.json) |
-| uat_demo14_direct | PASS | 2.17 | [Artifacts](../../build/uat/demo14_direct/result.json) |
-| uat_demo14_proxy | PASS | 2.18 | [Artifacts](../../build/uat/demo14_proxy/result.json) |
-| uat_demo15_direct | PASS | 2.16 | [Artifacts](../../build/uat/demo15_direct/result.json) |
-| uat_demo15_proxy | PASS | 2.18 | [Artifacts](../../build/uat/demo15_proxy/result.json) |
-| uat_demo16_direct | PASS | 2.15 | [Artifacts](../../build/uat/demo16_direct/result.json) |
-| uat_demo16_proxy | PASS | 2.12 | [Artifacts](../../build/uat/demo16_proxy/result.json) |
-| uat_demo17_direct | PASS | 2.95 | [Artifacts](../../build/uat/demo17_direct/result.json) |
-| uat_demo17_proxy | PASS | 2.95 | [Artifacts](../../build/uat/demo17_proxy/result.json) |
-| uat_demo18_direct | PASS | 2.82 | [Artifacts](../../build/uat/demo18_direct/result.json) |
-| uat_demo18_proxy | PASS | 5.90 | [Artifacts](../../build/uat/demo18_proxy/result.json) |
-| uat_demo19_direct | PASS | 19.75 | [Artifacts](../../build/uat/demo19_direct/result.json) |
-| uat_demo19_proxy | PASS | 19.75 | [Artifacts](../../build/uat/demo19_proxy/result.json) |
-| uat_demo20_direct | PASS | 3.29 | [Artifacts](../../build/uat/demo20_direct/result.json) |
-| uat_demo20_proxy | PASS | 3.09 | [Artifacts](../../build/uat/demo20_proxy/result.json) |
-| uat_demo21_direct | PASS | 3.79 | [Artifacts](../../build/uat/demo21_direct/result.json) |
-| uat_demo21_proxy | PASS | 3.83 | [Artifacts](../../build/uat/demo21_proxy/result.json) |
-| uat_demo22_direct | PASS | 3.01 | [Artifacts](../../build/uat/demo22_direct/result.json) |
-| uat_demo22_proxy | PASS | 3.08 | [Artifacts](../../build/uat/demo22_proxy/result.json) |
-| uat_demo23_direct | PASS | 2.95 | [Artifacts](../../build/uat/demo23_direct/result.json) |
-| uat_demo23_proxy | PASS | 3.02 | [Artifacts](../../build/uat/demo23_proxy/result.json) |
-| uat_demo24_direct | PASS | 3.69 | [Artifacts](../../build/uat/demo24_direct/result.json) |
-| uat_demo24_proxy | PASS | 3.70 | [Artifacts](../../build/uat/demo24_proxy/result.json) |
-| uat_demo25_direct | PASS | 3.99 | [Artifacts](../../build/uat/demo25_direct/result.json) |
-| uat_demo25_proxy | PASS | 4.04 | [Artifacts](../../build/uat/demo25_proxy/result.json) |
-| uat_demo26_direct | PASS | 3.72 | [Artifacts](../../build/uat/demo26_direct/result.json) |
-| uat_demo26_proxy | PASS | 3.72 | [Artifacts](../../build/uat/demo26_proxy/result.json) |
-| uat_demo27_direct | PASS | 2.21 | [Artifacts](../../build/uat/demo27_direct/result.json) |
-| uat_demo27_proxy | PASS | 2.23 | [Artifacts](../../build/uat/demo27_proxy/result.json) |
-| uat_demo28_direct | PASS | 2.93 | [Artifacts](../../build/uat/demo28_direct/result.json) |
-| uat_demo28_proxy | PASS | 2.99 | [Artifacts](../../build/uat/demo28_proxy/result.json) |
-| uat_demo29_direct | PASS | 2.96 | [Artifacts](../../build/uat/demo29_direct/result.json) |
-| uat_demo29_proxy | PASS | 2.96 | [Artifacts](../../build/uat/demo29_proxy/result.json) |
-| uat_demo30_direct | PASS | 2.97 | [Artifacts](../../build/uat/demo30_direct/result.json) |
-| uat_demo30_proxy | PASS | 2.95 | [Artifacts](../../build/uat/demo30_proxy/result.json) |
-| uat_demo31_direct | PASS | 15.07 | [Artifacts](../../build/uat/demo31_direct/result.json) |
-| uat_demo31_proxy | PASS | 15.12 | [Artifacts](../../build/uat/demo31_proxy/result.json) |
-| uat_demo32_direct | PASS | 3.44 | [Artifacts](../../build/uat/demo32_direct/result.json) |
-| uat_demo32_proxy | PASS | 3.47 | [Artifacts](../../build/uat/demo32_proxy/result.json) |
-| uat_demo33_direct | PASS | 4.09 | [Artifacts](../../build/uat/demo33_direct/result.json) |
-| uat_demo33_proxy | PASS | 4.11 | [Artifacts](../../build/uat/demo33_proxy/result.json) |
-| uat_demo34_direct | PASS | 3.42 | [Artifacts](../../build/uat/demo34_direct/result.json) |
-| uat_demo34_proxy | PASS | 3.42 | [Artifacts](../../build/uat/demo34_proxy/result.json) |
-| uat_trash_direct | PASS | 20.29 | [Artifacts](../../build/uat/trash_direct/result.json) |
-| uat_trash_proxy | PASS | 20.38 | [Artifacts](../../build/uat/trash_proxy/result.json) |
-| uat_calc_direct | PASS | 5.69 | [Artifacts](../../build/uat/calc_direct/result.json) |
-| uat_calc_proxy | PASS | 5.74 | [Artifacts](../../build/uat/calc_proxy/result.json) |
-| uat_gemread_direct | PASS | 9.98 | [Artifacts](../../build/uat/gemread_direct/result.json) |
-| uat_gemread_proxy | PASS | 9.98 | [Artifacts](../../build/uat/gemread_proxy/result.json) |
-| uat_gemread_pdf_proxy | PASS | 7.48 | [Artifacts](../../build/uat/gemread_pdf_proxy/result.json) |
-| uat_gemread_epub_proxy | PASS | 4.40 | [Artifacts](../../build/uat/gemread_epub_proxy/result.json) |
-| uat_gemscape_proxy | PASS | 45.36 | [Artifacts](../../build/uat/gemscape_proxy/result.json) |
-| uat_desktop_direct | PASS | 16.18 | [Artifacts](../../build/uat/desktop_direct/result.json) |
-| uat_desktop_proxy | PASS | 16.04 | [Artifacts](../../build/uat/desktop_proxy/result.json) |
+| test_api_surface | PASS | 0.12 | [CTest log](../../build/tests.log) |
+| test_protocol | PASS | 0.01 | [CTest log](../../build/tests.log) |
+| test_aes_shell | PASS | 0.61 | [CTest log](../../build/tests.log) |
+| test_gem_trash | PASS | 0.65 | [CTest log](../../build/tests.log) |
+| test_terminal_vt100 | PASS | 0.01 | [CTest log](../../build/tests.log) |
+| test_gemconf | PASS | 0.02 | [CTest log](../../build/tests.log) |
+| test_prg | PASS | 0.00 | [CTest log](../../build/tests.log) |
+| test_security_bounds | PASS | 0.01 | [CTest log](../../build/tests.log) |
+| test_rasta_polarity | PASS | 0.01 | [CTest log](../../build/tests.log) |
+| test_gem_rpc | PASS | 0.27 | [CTest log](../../build/tests.log) |
+| test_gemd_security | PASS | 6.60 | [CTest log](../../build/tests.log) |
+| test_gemd_host | PASS | 0.01 | [CTest log](../../build/tests.log) |
+| test_vdi_rpc | PASS | 0.36 | [CTest log](../../build/tests.log) |
+| test_aes_rpc | PASS | 0.42 | [CTest log](../../build/tests.log) |
+| test_sample_session | PASS | 45.43 | [Session state](../../build/sample_session_test/state.json) |
+| security_disk | PASS | 0.16 | [CTest log](../../build/tests.log) |
+| security_guest | PASS | 0.33 | [CTest log](../../build/tests.log) |
+| uat_demo1_direct | PASS | 2.30 | [Artifacts](../../build/uat/demo1_direct/result.json) |
+| uat_demo1_proxy | PASS | 2.35 | [Artifacts](../../build/uat/demo1_proxy/result.json) |
+| uat_demo2_direct | PASS | 2.29 | [Artifacts](../../build/uat/demo2_direct/result.json) |
+| uat_demo2_proxy | PASS | 2.41 | [Artifacts](../../build/uat/demo2_proxy/result.json) |
+| uat_demo3_direct | PASS | 2.35 | [Artifacts](../../build/uat/demo3_direct/result.json) |
+| uat_demo3_proxy | PASS | 2.28 | [Artifacts](../../build/uat/demo3_proxy/result.json) |
+| uat_demo4_direct | PASS | 2.41 | [Artifacts](../../build/uat/demo4_direct/result.json) |
+| uat_demo4_proxy | PASS | 2.37 | [Artifacts](../../build/uat/demo4_proxy/result.json) |
+| uat_demo5_direct | PASS | 2.31 | [Artifacts](../../build/uat/demo5_direct/result.json) |
+| uat_demo5_proxy | PASS | 2.41 | [Artifacts](../../build/uat/demo5_proxy/result.json) |
+| uat_demo6_direct | PASS | 2.25 | [Artifacts](../../build/uat/demo6_direct/result.json) |
+| uat_demo6_proxy | PASS | 2.30 | [Artifacts](../../build/uat/demo6_proxy/result.json) |
+| uat_demo7_direct | PASS | 2.50 | [Artifacts](../../build/uat/demo7_direct/result.json) |
+| uat_demo7_proxy | PASS | 2.37 | [Artifacts](../../build/uat/demo7_proxy/result.json) |
+| uat_demo8_direct | PASS | 2.34 | [Artifacts](../../build/uat/demo8_direct/result.json) |
+| uat_demo8_proxy | PASS | 2.33 | [Artifacts](../../build/uat/demo8_proxy/result.json) |
+| uat_demo9_direct | PASS | 2.41 | [Artifacts](../../build/uat/demo9_direct/result.json) |
+| uat_demo9_proxy | PASS | 2.33 | [Artifacts](../../build/uat/demo9_proxy/result.json) |
+| uat_demo10_direct | PASS | 2.27 | [Artifacts](../../build/uat/demo10_direct/result.json) |
+| uat_demo10_proxy | PASS | 2.38 | [Artifacts](../../build/uat/demo10_proxy/result.json) |
+| uat_demo11_direct | PASS | 2.47 | [Artifacts](../../build/uat/demo11_direct/result.json) |
+| uat_demo11_proxy | PASS | 2.22 | [Artifacts](../../build/uat/demo11_proxy/result.json) |
+| uat_demo12_direct | PASS | 2.35 | [Artifacts](../../build/uat/demo12_direct/result.json) |
+| uat_demo12_proxy | PASS | 2.37 | [Artifacts](../../build/uat/demo12_proxy/result.json) |
+| uat_demo13_direct | PASS | 2.32 | [Artifacts](../../build/uat/demo13_direct/result.json) |
+| uat_demo13_proxy | PASS | 2.34 | [Artifacts](../../build/uat/demo13_proxy/result.json) |
+| uat_demo14_direct | PASS | 2.33 | [Artifacts](../../build/uat/demo14_direct/result.json) |
+| uat_demo14_proxy | PASS | 2.39 | [Artifacts](../../build/uat/demo14_proxy/result.json) |
+| uat_demo15_direct | PASS | 2.31 | [Artifacts](../../build/uat/demo15_direct/result.json) |
+| uat_demo15_proxy | PASS | 2.30 | [Artifacts](../../build/uat/demo15_proxy/result.json) |
+| uat_demo16_direct | PASS | 2.32 | [Artifacts](../../build/uat/demo16_direct/result.json) |
+| uat_demo16_proxy | PASS | 2.37 | [Artifacts](../../build/uat/demo16_proxy/result.json) |
+| uat_demo17_direct | PASS | 3.13 | [Artifacts](../../build/uat/demo17_direct/result.json) |
+| uat_demo17_proxy | PASS | 3.18 | [Artifacts](../../build/uat/demo17_proxy/result.json) |
+| uat_demo18_direct | PASS | 3.08 | [Artifacts](../../build/uat/demo18_direct/result.json) |
+| uat_demo18_proxy | PASS | 6.25 | [Artifacts](../../build/uat/demo18_proxy/result.json) |
+| uat_demo19_direct | PASS | 19.88 | [Artifacts](../../build/uat/demo19_direct/result.json) |
+| uat_demo19_proxy | PASS | 19.94 | [Artifacts](../../build/uat/demo19_proxy/result.json) |
+| uat_demo20_direct | PASS | 3.31 | [Artifacts](../../build/uat/demo20_direct/result.json) |
+| uat_demo20_proxy | PASS | 3.21 | [Artifacts](../../build/uat/demo20_proxy/result.json) |
+| uat_demo21_direct | PASS | 4.01 | [Artifacts](../../build/uat/demo21_direct/result.json) |
+| uat_demo21_proxy | PASS | 4.01 | [Artifacts](../../build/uat/demo21_proxy/result.json) |
+| uat_demo22_direct | PASS | 3.15 | [Artifacts](../../build/uat/demo22_direct/result.json) |
+| uat_demo22_proxy | PASS | 3.25 | [Artifacts](../../build/uat/demo22_proxy/result.json) |
+| uat_demo23_direct | PASS | 3.11 | [Artifacts](../../build/uat/demo23_direct/result.json) |
+| uat_demo23_proxy | PASS | 3.24 | [Artifacts](../../build/uat/demo23_proxy/result.json) |
+| uat_demo24_direct | PASS | 4.02 | [Artifacts](../../build/uat/demo24_direct/result.json) |
+| uat_demo24_proxy | PASS | 3.98 | [Artifacts](../../build/uat/demo24_proxy/result.json) |
+| uat_demo25_direct | PASS | 4.33 | [Artifacts](../../build/uat/demo25_direct/result.json) |
+| uat_demo25_proxy | PASS | 4.39 | [Artifacts](../../build/uat/demo25_proxy/result.json) |
+| uat_demo26_direct | PASS | 3.97 | [Artifacts](../../build/uat/demo26_direct/result.json) |
+| uat_demo26_proxy | PASS | 4.11 | [Artifacts](../../build/uat/demo26_proxy/result.json) |
+| uat_demo27_direct | PASS | 2.40 | [Artifacts](../../build/uat/demo27_direct/result.json) |
+| uat_demo27_proxy | PASS | 2.41 | [Artifacts](../../build/uat/demo27_proxy/result.json) |
+| uat_demo28_direct | PASS | 3.18 | [Artifacts](../../build/uat/demo28_direct/result.json) |
+| uat_demo28_proxy | PASS | 3.20 | [Artifacts](../../build/uat/demo28_proxy/result.json) |
+| uat_demo29_direct | PASS | 3.20 | [Artifacts](../../build/uat/demo29_direct/result.json) |
+| uat_demo29_proxy | PASS | 3.17 | [Artifacts](../../build/uat/demo29_proxy/result.json) |
+| uat_demo30_direct | PASS | 3.13 | [Artifacts](../../build/uat/demo30_direct/result.json) |
+| uat_demo30_proxy | PASS | 3.11 | [Artifacts](../../build/uat/demo30_proxy/result.json) |
+| uat_demo31_direct | PASS | 15.37 | [Artifacts](../../build/uat/demo31_direct/result.json) |
+| uat_demo31_proxy | PASS | 15.41 | [Artifacts](../../build/uat/demo31_proxy/result.json) |
+| uat_demo32_direct | PASS | 3.60 | [Artifacts](../../build/uat/demo32_direct/result.json) |
+| uat_demo32_proxy | PASS | 3.72 | [Artifacts](../../build/uat/demo32_proxy/result.json) |
+| uat_demo33_direct | PASS | 4.39 | [Artifacts](../../build/uat/demo33_direct/result.json) |
+| uat_demo33_proxy | PASS | 4.29 | [Artifacts](../../build/uat/demo33_proxy/result.json) |
+| uat_demo34_direct | PASS | 3.57 | [Artifacts](../../build/uat/demo34_direct/result.json) |
+| uat_demo34_proxy | PASS | 3.69 | [Artifacts](../../build/uat/demo34_proxy/result.json) |
+| uat_file_drop_direct | PASS | 20.05 | [Artifacts](../../build/uat/file_drop_direct/result.json) |
+| uat_file_drop_proxy | PASS | 20.22 | [Artifacts](../../build/uat/file_drop_proxy/result.json) |
+| uat_trash_direct | PASS | 22.10 | [Artifacts](../../build/uat/trash_direct/result.json) |
+| uat_trash_proxy | PASS | 22.23 | [Artifacts](../../build/uat/trash_proxy/result.json) |
+| uat_calc_direct | PASS | 6.28 | [Artifacts](../../build/uat/calc_direct/result.json) |
+| uat_calc_proxy | PASS | 6.17 | [Artifacts](../../build/uat/calc_proxy/result.json) |
+| uat_gemread_direct | PASS | 10.46 | [Artifacts](../../build/uat/gemread_direct/result.json) |
+| uat_gemread_proxy | PASS | 10.57 | [Artifacts](../../build/uat/gemread_proxy/result.json) |
+| uat_gemread_pdf_proxy | PASS | 8.21 | [Artifacts](../../build/uat/gemread_pdf_proxy/result.json) |
+| uat_gemread_epub_proxy | PASS | 4.76 | [Artifacts](../../build/uat/gemread_epub_proxy/result.json) |
+| uat_gemscape_proxy | PASS | 46.30 | [Artifacts](../../build/uat/gemscape_proxy/result.json) |
+| uat_desktop_direct | PASS | 17.31 | [Artifacts](../../build/uat/desktop_direct/result.json) |
+| uat_desktop_proxy | PASS | 17.29 | [Artifacts](../../build/uat/desktop_proxy/result.json) |
 
 ## Proposed actions
 

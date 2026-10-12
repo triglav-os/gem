@@ -71,7 +71,11 @@ VOID v_opnvwk(WORD work_in[11], VDI_HANDLE *handle, WORD work_out[57])
             return;
         }
         (void)gem_hid_init();
-        gem_os_sleep_ms(20u);
+        /* The Rasta viewer may resize or replace its framebuffer after the
+         * subscription datagram.  Give that local reconfiguration time to
+         * finish before remapping; presenting through a mapping while its
+         * backing file is truncated can otherwise raise SIGBUS at startup. */
+        gem_os_sleep_ms(100u);
         (void)gem_raster_resync();
         gem_os_sleep_ms(20u);
         (void)gem_raster_resync();

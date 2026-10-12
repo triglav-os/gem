@@ -119,12 +119,17 @@ void draw_terminal(term_state_t *state, const GRECT *dirty)
 {
     GRECT box;
     WORD previous_font;
+    WORD text_attributes[10] = {0};
 
     sync_layout(state);
     update_window_controls(state);
 
     wind_update(BEG_UPDATE);
-    previous_font = vst_font(vdi_handle, ATARI);
+    previous_font = ATARI;
+    if (vqt_attributes(vdi_handle, text_attributes) != 0) {
+        previous_font = text_attributes[0];
+    }
+    (void)vst_font(vdi_handle, ATARI);
     wind_get(state->handle, WF_FIRSTXYWH, &box.g_x, &box.g_y, &box.g_w,
              &box.g_h);
     while (box.g_w > 0 && box.g_h > 0) {

@@ -132,8 +132,8 @@ int gem_os_pty_spawn_shell(gem_os_pty_t *pty, const char *shell_path,
             (void)close(slave_fd);
         }
 
-        if (cwd != NULL && cwd[0] != '\0') {
-            (void)chdir(cwd);
+        if (cwd != NULL && cwd[0] != '\0' && chdir(cwd) != 0) {
+            _exit(127);
         }
         (void)snprintf(lines_text, sizeof(lines_text), "%u", (unsigned)rows);
         (void)snprintf(columns_text, sizeof(columns_text), "%u",

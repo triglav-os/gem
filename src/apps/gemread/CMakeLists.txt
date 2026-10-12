@@ -11,17 +11,20 @@ file(MAKE_DIRECTORY ${GEMREAD_MUPDF_SOURCE}/include)
 
 # MuPDF is a build dependency, not a repository dependency. ExternalProject
 # keeps its archive, extracted source and objects under build/deps, so a second
-# build reuses the download while no vendor files enter Git.
+# build reuses the download while no vendor files enter Git. MuPDF 1.26.10
+# explicitly discards one ftruncate result; disable that warning only for the
+# upstream build rather than changing its extracted source.
 ExternalProject_Add(gemread_mupdf
     URL ${GEMREAD_MUPDF_URL}
     URL_HASH SHA256=1653f35bd8fbd970f05523efdc7f86e41e9728e2564a3295296e03cf59a51437
     DOWNLOAD_DIR ${GEMREAD_MUPDF_DOWNLOAD}
     SOURCE_DIR ${GEMREAD_MUPDF_SOURCE}
     CONFIGURE_COMMAND ""
-    BUILD_COMMAND ${CMAKE_MAKE_PROGRAM} -C <SOURCE_DIR>
+    BUILD_COMMAND ${CMAKE_COMMAND} -E env --unset=MAKEFLAGS --unset=MFLAGS
+        --unset=GNUMAKEFLAGS ${CMAKE_MAKE_PROGRAM} -C <SOURCE_DIR>
         build=release HAVE_X11=no HAVE_GLUT=no HAVE_CURL=no
         HAVE_LEPTONICA=no HAVE_TESSERACT=no HAVE_JS=no
-        HAVE_OBJCOPY=no libs libmupdf-threads
+        HAVE_OBJCOPY=no XCFLAGS=-Wno-unused-result libs libmupdf-threads
     INSTALL_COMMAND ""
     BUILD_BYPRODUCTS
         ${GEMREAD_MUPDF_BUILD}/libmupdf.a

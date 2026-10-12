@@ -26,6 +26,10 @@ The emulated process uses the standard contiguous TOS layout: its text begins
 at `basepage + 0x100`, followed by data and BSS. `Mshrink` validates that block
 and establishes the first address available to `Malloc`, so startup libraries
 and self-extractors see the memory topology expected on an Atari ST.
+Launched `.PRG`, `.APP`, `.GTP`, `.TOS` and `.TTP` programs receive a stable
+synthetic parent basepage, while `.ACC` guests retain a null parent. Historical
+runtimes can therefore select their application or accessory startup path in
+the same way they do under TOS.
 GEMDOS `Super` changes the emulated supervisor state and returns a stable
 supervisor-stack token; it does not grant host privileges.
 Optional 14-byte DRI/GST symbols are decoded when present. Other linker-private
@@ -34,20 +38,27 @@ they do not prevent the following relocation stream from being applied.
 
 Stout presents a monochrome 640x400 Atari screen at the top of guest RAM.
 XBIOS `Physbase`, `Logbase`, `Getrez` and `Setscreen` expose that screen,
-`Iorec` and `Kbdvbase` return stable guest-memory records, and `Supexec`
-temporarily enters validated guest callbacks. `Vsync` yields for one hosted
-display interval, and BIOS `Kbshift` reports the hosted modifier state (zero
-until the input backend exposes modifier queries). The VDI bridge translates
-MFDB headers and big-endian bitmap words for raster copies, and accepts the
-classic cursor and input-vector calls used by TEMPUS. The AES bridge converts 68k
-object trees, strings and text records into hosted objects for menus and
-dialogs. It also loads big-endian Atari `.RSC` files, relocates their object,
-text, icon, bitmap, string and tree references into guest memory, initializes
-the AES global resource pointers, and follows resource links added dynamically
-by an application. The standard keyboard, button, mouse, message and timer
-event calls are forwarded to the hosted AES. Guest callback vectors are
-retained only as compatibility state; host input is delivered through AES
-events rather than by calling 68k functions from the host VDI.
+`Setpalette` and `Setcolor` retain the guest palette, `Iorec`, `Kbdvbase` and
+`Keytbl` return stable guest-memory records, and `Supexec` temporarily enters
+validated guest callbacks. `Setprt` retains the classic printer configuration,
+`Blitmode` reports that no hardware blitter is installed,
+`Vsync` yields for one hosted display interval, and BIOS `Kbshift` reports the
+hosted modifier state (zero until the input backend exposes modifier queries).
+BIOS `Setexc` supports vector inquiry and replacement, and the direct trap #2
+`vq_gdos` probe reports that no GDOS extension is installed. The VDI bridge
+translates MFDB headers and big-endian bitmap words for raster copies, and
+accepts the classic cursor, text-attribute and input-vector calls used by
+existing applications. The AES bridge converts 68k object trees, strings and
+text records into hosted objects for menus and dialogs. It also loads
+big-endian Atari `.RSC` files, relocates their object, text, icon, bitmap,
+string and tree references into guest memory, initializes the AES global
+resource pointers, and fixes packed coordinates for embedded resource objects.
+The standard keyboard, button, mouse, message and timer event calls are
+forwarded to the hosted AES. `appl_find`, `objc_change` and `shel_find` cover
+the application lookup, clipped state redraw and guest-drive resource lookup
+used by QIndex and GEMBench. Guest callback vectors are retained only as
+compatibility state; host input is delivered through AES events rather than by
+calling 68k functions from the host VDI.
 
 The root build produces `bin/apps/stout`; the native package installs the same
 program as `bin/gemix/bin/stout`. With a matching gemd and display session
@@ -84,6 +95,15 @@ passes its XBIOS screen and keyboard setup, installs its 131-object menu,
 draws its startup form and reaches the AES event loop. This does not imply
 complete Atari hardware emulation; direct guest framebuffer writes and guest
 VDI callback execution remain outside the hosted bridge.
+
+QIndex 1.6 is checked at its native 320x368 high-resolution resource size.
+Its form is centered below the 19-pixel Atari high-resolution menu strip;
+guest `IBM` and 6x6 `SMALL` TEDINFOs use classic border, justification and
+whole-character fitting rules. Its custom form remains modal to QIndex without
+blocking other gemd clients, participates in shared window z-order, and is
+reconstructed from its live tree when a covering window exposes it.
+GEMBench 4.03 is run from the mounted Delta image and reaches its event loop
+without unsupported AES/XBIOS reports or the former illegal-opcode exit.
 
 Set `STOUT_TRACE=1` to trace dispatch. Interactive execution is unlimited by
 default and yields between CPU slices. Set `STOUT_MAX_CYCLES` to a positive

@@ -18,7 +18,10 @@ enum {
     vdi_font_id_system = 1,
     vdi_font_id_small_internal = 2,
     vdi_font_id_ibm = 3,
-    vdi_font_id_small = 5
+    vdi_font_id_small = 5,
+    /* Private selectors used by Stout's translated Atari TEDINFOs. */
+    vdi_font_id_ibm_compat = -3,
+    vdi_font_id_small_compat = -5
 };
 
 typedef struct vdi_font {
@@ -49,5 +52,7 @@ typedef struct vdi_font {
 uint16_t vdi_font_read_le16(const uint8_t *bytes);
 /* The font selected for text output, or NULL before any font loads. */
 vdi_font_t *vdi_current_font(void);
+/* Non-zero while Stout's compact compatibility selector is active. */
+int vdi_small_font_metrics_active(void);
 
 #endif
