@@ -13,9 +13,9 @@ make
 make tests
 ```
 
-`make` configures GCC Debug with the Rasta backend and builds libraries,
+`make` configures GCC RelWithDebInfo with the Rasta backend and builds libraries,
 applications and both variants of every UAT demo. `make tests` runs the full
-suite and writes [the latest report](../tests/LATEST.md). Use `make unit`,
+suite using the built Rasta viewer and writes [the latest report](../tests/LATEST.md). Use `make unit`,
 `make integration` or `make uat` to select a suite. The default viewer is `bin/tools/rasta`; set `RASTA_BIN` only for an explicit
 viewer override; `UAT_SDL_DRIVER=x11` or `wayland` makes its windows
 visible instead of using the default dummy driver.
@@ -72,9 +72,15 @@ Gemread uses the same overlay path for color document pages and thumbnails.
 ## VS Code: one F5 session
 
 Select **GEM — Desktop and Terminal** and press F5. This is the only launch
-configuration. It builds the project in GCC Debug/Rasta mode, starts Rasta,
+configuration. Its build task uses `wischner/gcc-x86_64-linux-sdl:1.3.0`
+through Docker in GCC RelWithDebInfo/Rasta mode, starts Rasta,
 then launches gemd under GDB. Once gemd is listening, the supervisor starts the
 desktop and waits for its first rendered scene before launching the other apps.
+Docker must be available to your VS Code user. F5 build intermediates live in
+`build/container-sdl/`; executables and resources go into `bin/`. The source
+is mounted at its host path so host GDB resolves source locations directly.
+The viewer, supervisor and debugger run on the host, which needs Python 3,
+GDB, SDL2 runtime libraries and the VS Code C/C++ debug extension.
 The F5 Rasta viewer and GEM desktop use a 1920×1080 BGRA32 framebuffer at
 scale 1. Rasta hides the Linux/SDL pointer over its surface so only GEM's
 software cursor is visible.
@@ -127,7 +133,7 @@ These session checks complement the individual
 
 For direct framebuffer and evdev operation, follow the
 [Gemix Linux guide](GEMIX_LINUX.md). To return to hosted development after a
-native Release build, run `make`, which restores GCC Debug and Rasta.
+native Release build, run `make`, which restores GCC RelWithDebInfo and Rasta.
 
 ## Independent dependencies and Docker
 
@@ -135,7 +141,10 @@ native Release build, run `make`, which restores GCC Debug and Rasta.
 `5f1e1511e918e8b4dfa6f8b7a51272f66133ea0e` and verifies its archive with
 SHA-256 `c017b7e0884d8e94bf16a6ce549c62f2fbf2013aeaf3bf14ef1fb0cc4bc04e78`.
 Downloads, extracted sources and CMake intermediates remain under root `build/`.
-The viewer is installed into `bin/tools/rasta`. A fresh build needs GitHub
+The viewer is installed into `bin/tools/rasta`. Use `make rasta` to prepare
+just the viewer and its core test executable. Every build checks these outputs
+incrementally and restores a missing viewer without downloading again.
+A fresh build needs GitHub
 access; subsequent unchanged builds reuse the verified download. Updating the
 revision requires updating the hash and rerunning the UAT suite.
 
@@ -162,7 +171,24 @@ container toolchain instead, run `make container`, or
 `tools/scripts/container.sh all`. The pinned Ubuntu 24.04 base and package list
 are in `tools/container/Dockerfile`. Only Docker is required when invoking the
 script directly. It runs as your UID with dropped capabilities and writes to
-`build/container/`, including an isolated `runtime/`. Test reports still go to
+`build/container/`, including an isolated `runtime/`. To use the SDL toolchain
+image directly without building the Ubuntu image:
+
+```sh
+export GEM_CONTAINER_IMAGE=wischner/gcc-x86_64-linux-sdl:1.3.0
+export GEM_CONTAINER_BUILD_DIR="$PWD/build/container-sdl"
+export GEM_CONTAINER_OUTPUT_ROOT="$PWD/bin"
+tools/scripts/container.sh all
+tools/scripts/container.sh tests
+```
+
+These are the same paths and image used by F5. The image is reused locally;
+Docker pulls it if absent. `tools/container/Dockerfile.sdl` adds the NSS, ATK
+and Xdamage libraries needed by the CEF browser to this base image; the
+resulting `gem-build:sdl` layer is cached too.
+Keep separate build directories for different
+toolchains. The bind mount preserves absolute host paths for debugging.
+Test reports still go to
 `docs/tests/`. Package updates are not frozen, so this is a reproducible build
 procedure rather than a claim of byte-identical binaries.
 

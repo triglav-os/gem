@@ -12,6 +12,9 @@ ExternalProject_Add(rasta_viewer
     BINARY_DIR "${CMAKE_BINARY_DIR}/deps/rasta-build"
     CMAKE_ARGS -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=gcc
         -DCMAKE_CXX_COMPILER=g++
+    # Recheck outputs incrementally, including after bin/ has been removed.
+    # Download/configure stamps still preserve the cached upstream snapshot.
+    BUILD_ALWAYS TRUE
     BUILD_COMMAND ${CMAKE_COMMAND} -E env --unset=MAKEFLAGS --unset=MFLAGS
         --unset=GNUMAKEFLAGS ${CMAKE_COMMAND} --build <BINARY_DIR>
         --target rasta test_rasta --parallel 4

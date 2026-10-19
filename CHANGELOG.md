@@ -6,6 +6,14 @@ Unreleased.
 
 ## Unreleased
 
+- F5 now builds with the `wischner/gcc-x86_64-linux-sdl:1.3.0` Docker
+  toolchain, keeping executables in `bin/` for the host debugger. The container
+  helper accepts image, build-directory and output-directory overrides.
+
+- Added `make rasta` to prepare the cached Rasta viewer separately. Normal
+  builds now recheck its outputs incrementally and restore missing binaries
+  before running tests, without repeating the download.
+
 _Updated 2026-09-25._
 
 - Clean GCC builds now complete without project, test or downloaded-dependency

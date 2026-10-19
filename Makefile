@@ -2,11 +2,14 @@
 BUILD_DIR ?= $(CURDIR)/build
 JOBS ?= 4
 BUILD_TYPE ?= RelWithDebInfo
-.PHONY: all configure cef mupdf tests unit integration uat sdk clean
+.PHONY: all configure rasta cef mupdf tests unit integration uat sdk clean
 configure:
 	cmake -S . -B $(BUILD_DIR) -DCMAKE_C_COMPILER=gcc -DCMAKE_BUILD_TYPE=$(BUILD_TYPE) -DGEM_PLATFORM=rasta -DBUILD_TESTING=ON $(CMAKE_FLAGS)
 all: configure
 	cmake --build $(BUILD_DIR) --parallel $(JOBS)
+rasta: configure
+	cmake --build $(BUILD_DIR) --target rasta_viewer --parallel $(JOBS)
+
 mupdf: configure
 	cmake --build $(BUILD_DIR) --target gemread_mupdf --parallel $(JOBS)
 
