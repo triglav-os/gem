@@ -147,7 +147,8 @@ add_custom_target(gemix_package
     COMMAND ${CMAKE_COMMAND} -E copy
         ${PROJECT_SOURCE_DIR}/include/gem/vdi.h ${GEMIX_INCLUDE}/gem/
     COMMAND ${CMAKE_COMMAND} -E copy
-        ${PROJECT_SOURCE_DIR}/include/gem/portab.h ${GEMIX_INCLUDE}/gem/
+        ${PROJECT_SOURCE_DIR}/include/gem/portab.h
+        ${PROJECT_SOURCE_DIR}/include/gem/input.h ${GEMIX_INCLUDE}/gem/
     COMMAND ${CMAKE_COMMAND} -E copy
         ${PROJECT_SOURCE_DIR}/include/gem/os.h ${GEMIX_INCLUDE}/gem/
     COMMAND ${CMAKE_COMMAND} -E copy

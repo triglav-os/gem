@@ -191,3 +191,22 @@ During cooperative alert/file-selector servicing, transport deadlines use a
 clock reading taken after socket I/O, since receiving a new frame updates
 its start timestamp. Comparing a pre-I/O reading with that timestamp can
 underflow and incorrectly disconnect an active application.
+
+## Optional hosted physical keyboard events
+
+`<gem/input.h>` defines the opt-in `GEM_MU_KEY` flag for the existing
+`evnt_multi` signature and RPC layout. Request it instead of `MU_KEYBD` before
+receiving input. `pkr` contains the USB usage in the high byte and translated
+ASCII in the low byte. `pbr` is `GEM_KEY_PRESS` for a press, zero for a release,
+or `GEM_KEY_RESET` to cancel all held input after focus loss or queue overflow.
+The bounded per-application queue holds 64 events (including modifiers and
+releases). It is discarded on reset; do not interpret reset as a synthetic release.
+
+Opted-in applications route keyboard menu accelerators after their focused
+control; AES pointer menus are unchanged. A subsequent `MU_KEYBD` request
+restores standard keyboard routing. Timer-only calls retain the selection.
+Standard applications retain the same signatures, key-down-only behavior,
+button-click results and automatic AES shortcuts. No RPC structure or version
+changes. Both libgem and gemd must come from the extended SDK; older SDKs do
+not promise this optional flag. Rasta supplies real USB positions/releases;
+this does not qualify every host keyboard layout or viewer focus-loss path.

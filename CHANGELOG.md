@@ -6,6 +6,14 @@ Unreleased.
 
 ## Unreleased
 
+- Initialize the pie-slice scratch coordinates explicitly, removing GCC
+  optimized-build diagnostics without suppressing warnings or changing VDI APIs.
+
+- Added an opt-in hosted physical-key extension in `<gem/input.h>` for
+  emulators: real press/release packets and focus/overflow reset, with
+  client-owned keyboard shortcut routing. Standard AES APIs and MU_KEYBD
+  application behavior remain unchanged; use matching libgem/gemd builds.
+
 - F5 now builds with the `wischner/gcc-x86_64-linux-sdl:1.3.0` Docker
   toolchain, keeping executables in `bin/` for the host debugger. The container
   helper accepts image, build-directory and output-directory overrides.

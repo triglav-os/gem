@@ -214,3 +214,14 @@ The viewer runs with `--inverse off --bpp 32` to display the GEM mono surface as
 on white paper. PBM checkpoints inspect the shared bits before display decoding;
 `test_rasta_polarity` separately verifies the viewer's RGB mapping and retention
 of inverse mode after subscriber reconfiguration.
+
+### Opt-in held keyboard input
+
+Use an extended-SDK consumer to hold and release a letter and modifier,
+transfer focus, and exercise a menu shortcut after typing in an editor.
+No key may remain held after reset; editor clipboard shortcuts take priority
+when the consumer owns accelerator routing. Repeat with a standard MU_KEYBD
+application: it must retain key-down events and AES menu shortcuts. The
+`test_gemd_host` regression checks standard key-down compatibility alongside
+physical releases and queue-overflow reset. Native's GEM menu/input tests
+exercise the consuming adapter and focused editor route.

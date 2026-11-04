@@ -18,7 +18,8 @@
 
 enum {
     AES_MAX_APPS = 16,
-    AES_APP_INPUT_QUEUE_SIZE = 16,
+    /* Physical input includes modifiers and releases as well as text. */
+    AES_APP_INPUT_QUEUE_SIZE = 64,
     /*
      * Shared across every app and message type (WM_REDRAW, WM_TOPPED,
      * WM_MOVED/SIZED, MN_SELECTED, ...) with no per-app reservation --
@@ -75,6 +76,8 @@ typedef struct aes_app {
     gem_hid_event_t input_events[AES_APP_INPUT_QUEUE_SIZE];
     WORD input_event_head;
     WORD input_event_count;
+    WORD physical_key_reset;
+    WORD physical_key_events;
 } aes_app_t;
 
 typedef struct aes_system_item {

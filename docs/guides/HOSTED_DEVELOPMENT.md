@@ -225,3 +225,11 @@ back to PBM for comparison. Runtime geometry reconfiguration retains both
 `test_rasta_polarity` checks parsing, reconfiguration and the actual decoder's
 RGB output. An explicit `RASTA_BIN` override must support these options too.
 Restart an existing F5 session to use the corrected viewer.
+
+### Physical keyboard consumers
+
+Build and install headers, libgem and gemd together when using the optional
+`gem/input.h` extension. An application must explicitly request `GEM_MU_KEY`;
+existing applications need no changes. See [the transport contract](../architecture/API_TRANSPORT.md#optional-hosted-physical-keyboard-events).
+The CPC consumer can layer these artifacts over its pinned SDK image without
+replacing the published image, keyed by the local source contents.

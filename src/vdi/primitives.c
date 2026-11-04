@@ -260,7 +260,7 @@ VOID v_arc(WORD handle, WORD x, WORD y, WORD radius, WORD begang, WORD endang)
 VOID v_pieslice(WORD handle, WORD x, WORD y, WORD radius, WORD begang,
                 WORD endang)
 {
-    WORD points[VDI_POLYGON_MAX_POINTS * 2];
+    WORD points[VDI_POLYGON_MAX_POINTS * 2] = {0};
     WORD count;
 
     if (!vdi_valid_handle(handle) || radius < 0) {

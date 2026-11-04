@@ -7,6 +7,7 @@
  */
 #define _POSIX_C_SOURCE 200809L
 #include "../../../src/aes/aes_internal.h"
+#include <gem/input.h>
 #include "../../../src/aes/fsel_private.h"
 #include "gem/gemctl.h"
 #include "platform/raster.h"
@@ -283,6 +284,51 @@ static void text_editor_hid_collisions(void)
            GEMCTL_TEXT_EDIT_ACCEPT);
 }
 
+static void physical_keyboard_extension(void)
+{
+    WORD key = 0, state = 0;
+    gem_hid_event_t event = {0};
+    aes_reset_state();
+    aes_state.initialized = 1;
+    WORD app = appl_init();
+    aes_state.input_focus_app_id = app;
+    aes_external_input = 1;
+    event.type = GEM_HID_KEY;
+    event.key = (4u << 8) | 'a';
+    event.flags = 1;
+    aes_dispatch_hid_event(&event);
+    event.flags = 0;
+    aes_dispatch_hid_event(&event);
+    for (int pressed = 1; pressed >= 0; --pressed) {
+        assert(evnt_multi(GEM_MU_KEY | MU_TIMER, 0, 0, 0,
+                          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL,
+                          0, 0, NULL, NULL, NULL, NULL, &key, &state) ==
+               GEM_MU_KEY);
+        assert(key == (WORD)((4u << 8) | 'a') && state == pressed);
+    }
+    /* Standard clients still receive only the original key-down packet. */
+    event.flags = 1;
+    aes_dispatch_hid_event(&event);
+    event.flags = 0;
+    aes_dispatch_hid_event(&event);
+    assert(evnt_multi(MU_KEYBD | MU_TIMER, 0, 0, 0,
+                      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL,
+                      0, 0, NULL, NULL, NULL, NULL, &key, &state) == MU_KEYBD);
+    assert(key == (WORD)((4u << 8) | 'a'));
+    assert(evnt_multi(MU_KEYBD | MU_TIMER, 0, 0, 0,
+                      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL,
+                      0, 0, NULL, NULL, NULL, NULL, &key, &state) == MU_TIMER);
+    for (int i = 0; i <= AES_APP_INPUT_QUEUE_SIZE; ++i)
+        aes_dispatch_hid_event(&event);
+    assert(evnt_multi(GEM_MU_KEY | MU_TIMER, 0, 0, 0,
+                      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL,
+                      0, 0, NULL, NULL, NULL, NULL, &key, &state) == GEM_MU_KEY);
+    assert(state == GEM_KEY_RESET);
+    assert(aes_find_app_by_id(app)->input_event_count == 0);
+    aes_external_input = 0;
+    assert(appl_exit());
+}
+
 int main(void)
 {
     framebuffer_paths();
@@ -291,6 +337,7 @@ int main(void)
     selector_patterns();
     selector_hidden_entries();
     text_editor_hid_collisions();
+    physical_keyboard_extension();
     puts("hostile framebuffer paths, viewer replacement and app-id rollover "
          "passed");
     return 0;

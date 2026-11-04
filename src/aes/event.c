@@ -8,6 +8,7 @@
  */
 
 #include "aes_internal.h"
+#include <gem/input.h>
 #include "system_menu.h"
 #include "window_track.h"
 
@@ -85,6 +86,14 @@ static WORD aes_input_event_owner(const gem_hid_event_t *evt)
     return (window != NULL) ? window->owner : 0;
 }
 
+static void aes_set_input_owner(WORD owner)
+{
+    aes_app_t *previous = aes_find_app_by_id(aes_state.input_focus_app_id);
+    if (previous != NULL && previous->id != owner)
+        previous->physical_key_reset = 1;
+    aes_state.input_focus_app_id = owner;
+}
+
 static void aes_activate_input_target(const gem_hid_event_t *evt)
 {
     aes_window_t *window;
@@ -97,7 +106,7 @@ static void aes_activate_input_target(const gem_hid_event_t *evt)
     if (aes_event_hits_modal_form(evt) != 0) {
         aes_window_t *top = aes_find_top_window();
 
-        aes_state.input_focus_app_id = aes_state.modal_form_owner_app_id;
+        aes_set_input_owner(aes_state.modal_form_owner_app_id);
         if (top != NULL && top->z_order > aes_state.modal_form_z) {
             GRECT dirty = aes_state.modal_form_rect;
 
@@ -114,14 +123,14 @@ static void aes_activate_input_target(const gem_hid_event_t *evt)
          * the current top window, but route the next key events to Desktop so
          * icon actions such as Delete work after another window was moved. */
         if (aes_state.desktop_owner_app_id != 0) {
-            aes_state.input_focus_app_id = aes_state.desktop_owner_app_id;
+            aes_set_input_owner(aes_state.desktop_owner_app_id);
         }
         return;
     }
 
     window = aes_find_window(handle);
     if (window != NULL) {
-        aes_state.input_focus_app_id = window->owner;
+        aes_set_input_owner(window->owner);
         aes_menu_switch_to_app(window->owner);
     }
 }
@@ -144,8 +153,11 @@ static void aes_queue_input_event(WORD app_id, const gem_hid_event_t *evt)
     aes_app_t *app = aes_find_app_by_id(app_id);
     WORD tail;
 
-    if (app == NULL || evt == NULL ||
-        app->input_event_count >= AES_APP_INPUT_QUEUE_SIZE) {
+    if (app == NULL || evt == NULL) {
+        return;
+    }
+    if (app->input_event_count >= AES_APP_INPUT_QUEUE_SIZE) {
+        app->physical_key_reset = 1;
         return;
     }
 
@@ -179,15 +191,17 @@ void aes_dispatch_hid_event(const gem_hid_event_t *evt)
     }
 
     if (evt->type == GEM_HID_KEY) {
+        aes_app_t *target = aes_find_app_by_id(aes_input_event_owner(evt));
+        int physical = target != NULL && target->physical_key_events != 0;
         aes_store_key_state(evt);
-        if (aes_system_delete_hook != NULL &&
+        if (!physical && aes_system_delete_hook != NULL &&
             ((evt->key & 0xff) == 127 || ((evt->key >> 8) & 0xff) == 0x4c ||
              ((evt->key >> 8) & 0xff) == 0x53 ||
              ((evt->key >> 8) & 0xff) == 0x7f) &&
             aes_system_delete_hook() != 0) {
             return;
         }
-        if (aes_state.menu_visible != 0 && aes_state.menu_tree != NULL &&
+        if (!physical && aes_state.menu_visible != 0 && aes_state.menu_tree != NULL &&
             aes_menu_key_event(aes_state.menu_tree, evt, mepbuff) != 0) {
             aes_post_menu_selection(mepbuff);
             return;
@@ -354,6 +368,12 @@ WORD evnt_multi(UWORD flags, UWORD bclk, UWORD bmsk, UWORD bst, UWORD m1flags,
 
     (void)bclk;
 
+    /* Opted-in clients route shortcuts after their focused control. Standard
+     * MU_KEYBD callers keep AES accelerator dispatch unchanged. */
+    aes_app_t *input_app = aes_find_app_by_id(aes_state.current_app_id);
+    if (input_app != NULL && (flags & (GEM_MU_KEY | MU_KEYBD)) != 0u)
+        input_app->physical_key_events = (flags & GEM_MU_KEY) != 0u;
+
     FOREVER
     {
         gem_hid_event_t evt;
@@ -369,6 +389,18 @@ WORD evnt_multi(UWORD flags, UWORD bclk, UWORD bmsk, UWORD bst, UWORD m1flags,
             aes_dequeue_message(mepbuff) != 0) {
             graf_mkstate(pmx, pmy, pmb, pks);
             return MU_MESAG;
+        }
+
+        aes_app_t *app = aes_find_app_by_id(aes_state.current_app_id);
+        if ((flags & GEM_MU_KEY) != 0u && app != NULL &&
+            app->physical_key_reset != 0) {
+            app->physical_key_reset = 0;
+            app->input_event_head = 0;
+            app->input_event_count = 0;
+            graf_mkstate(pmx, pmy, pmb, pks);
+            if (pkr != NULL) *pkr = 0;
+            if (pbr != NULL) *pbr = GEM_KEY_RESET;
+            return GEM_MU_KEY;
         }
 
         int queued = aes_dequeue_input_event(aes_state.current_app_id, &evt);
@@ -392,6 +424,7 @@ WORD evnt_multi(UWORD flags, UWORD bclk, UWORD bmsk, UWORD bst, UWORD m1flags,
                 aes_store_key_state(&evt);
             }
             if (!queued && aes_state.modal_form_owner_app_id == 0 &&
+                (flags & GEM_MU_KEY) == 0u &&
                 (flags & MU_MESAG) != 0u && mepbuff != NULL &&
                 aes_state.menu_visible != 0 && aes_state.menu_tree != NULL &&
                 aes_menu_key_event(aes_state.menu_tree, &evt, mepbuff) != 0) {
@@ -460,6 +493,14 @@ WORD evnt_multi(UWORD flags, UWORD bclk, UWORD bmsk, UWORD bst, UWORD m1flags,
                     return MU_M2;
                 }
                 continue;
+            }
+
+            if ((flags & GEM_MU_KEY) != 0u && evt.type == GEM_HID_KEY) {
+                graf_mkstate(pmx, pmy, pmb, pks);
+                if (pkr != NULL) *pkr = (WORD)evt.key;
+                if (pbr != NULL) *pbr = (WORD)(evt.flags & GEM_KEY_PRESS);
+                if (pks != NULL) *pks = (WORD)evt.mod;
+                return GEM_MU_KEY;
             }
 
             if ((flags & MU_KEYBD) != 0u && evt.type == GEM_HID_KEY &&
