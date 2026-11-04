@@ -447,7 +447,7 @@ WORD aes_wind_set_text(WORD handle, WORD field, const char *text)
     strncpy(target, text, size - 1u);
     target[size - 1u] = '\0';
     if (window->open != 0) {
-        aes_draw_window_frame(window);
+        aes_redraw_window_text(window);
     }
     return 1;
 }

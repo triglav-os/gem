@@ -6,6 +6,10 @@ Unreleased.
 
 ## Unreleased
 
+- Background window name/info changes repaint only visible text chrome.
+  A disassembly title updating behind another window can no longer draw its
+  scrollbar through the foreground window. Standard AES APIs are unchanged.
+
 - Initialize the pie-slice scratch coordinates explicitly, removing GCC
   optimized-build diagnostics without suppressing warnings or changing VDI APIs.
 

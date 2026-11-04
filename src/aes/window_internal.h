@@ -50,6 +50,8 @@ int aes_window_hleft_rect(const aes_window_t *window, GRECT *rect);
 int aes_window_hright_rect(const aes_window_t *window, GRECT *rect);
 /* Flush a window frame to the display even inside an update. */
 void aes_present_window_frame(const aes_window_t *window);
+/* Repaint visible title/information chrome without damaging covered windows. */
+void aes_redraw_window_text(const aes_window_t *window);
 /* Fill an inclusive rectangle with a VDI color index. */
 void aes_fill_rect(WORD x0, WORD y0, WORD x1, WORD y1, WORD color);
 /* Draw selected one-pixel edges of an inclusive rectangle. */

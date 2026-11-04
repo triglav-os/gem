@@ -36,6 +36,26 @@ void aes_present_window_frame(const aes_window_t *window)
     }
 }
 
+void aes_redraw_window_text(const aes_window_t *window)
+{
+    GRECT damage;
+    GRECT visible[64];
+    WORD count;
+    WORD piece;
+
+    if (window == NULL || window->open == 0 || aes_state.vdi_ready == 0) {
+        return;
+    }
+    damage = window->outer;
+    damage.g_h = (WORD)(window->work.g_y - window->outer.g_y);
+    /* Clip before scheduling damage: repainting a covering client's work
+     * area would erase it until that client handles WM_REDRAW. */
+    count = aes_clip_visible_rects(window, &damage, visible, 64);
+    for (piece = 0; piece < count; ++piece) {
+        aes_redraw_region(&visible[piece]);
+    }
+}
+
 static void aes_desktop_rect_local(GRECT *rect)
 {
     WORD menu_height;

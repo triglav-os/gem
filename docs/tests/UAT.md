@@ -225,3 +225,10 @@ application: it must retain key-down events and AES menu shortcuts. The
 `test_gemd_host` regression checks standard key-down compatibility alongside
 physical releases and queue-overflow reset. Native's GEM menu/input tests
 exercise the consuming adapter and focused editor route.
+
+### Background window text updates
+
+`test_gemd_host` covers fully and partially obscured windows. Updating the
+background name and info must preserve every foreground work-area pixel;
+closing the foreground window reveals the latest stored title. This exercises
+standard `wind_set_str` calls without requiring the hosted input extension.

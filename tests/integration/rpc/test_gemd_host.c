@@ -329,6 +329,65 @@ static void physical_keyboard_extension(void)
     assert(appl_exit());
 }
 
+/* A background title update must not paint its scrollbar over the top window. */
+static void background_window_title(void)
+{
+    char directory[] = "/tmp/gem-title-test.XXXXXXXX";
+    char path[128];
+    WORD back, front, handle, x, y, w, h, pel, color;
+    WORD fill[4];
+
+    assert(mkdtemp(directory));
+    snprintf(path, sizeof(path), "%s/framebuffer", directory);
+    assert(setenv("GEM_RASTA_FRAMEBUFFER", path, 1) == 0);
+    assert(appl_init() > 0);
+    handle = graf_handle(NULL, NULL, NULL, NULL);
+    assert(handle > 0);
+    back = wind_create(NAME | MOVER | VSLIDE | HSLIDE, 0, 0, 640, 400);
+    front = wind_create(NAME | MOVER, 0, 0, 640, 400);
+    assert(back > 0 && front > 0);
+    assert(wind_open(back, 100, 100, 240, 200));
+    assert(wind_open(front, 40, 40, 340, 280));
+    for (int partial = 0; partial < 2; ++partial) {
+        if (partial != 0) {
+            assert(wind_set(front, WF_WXYWH, 180, 140, 180, 150));
+        }
+        assert(wind_get(front, WF_CXYWH, &x, &y, &w, &h));
+        fill[0] = x;
+        fill[1] = y;
+        fill[2] = (WORD)(x + w - 1);
+        fill[3] = (WORD)(y + h - 1);
+        vs_clip(handle, 0, fill);
+        vsf_interior(handle, 1);
+        vsf_color(handle, 1);
+        vswr_mode(handle, MD_REPLACE);
+        v_bar(handle, fill);
+        WORD *before = malloc((size_t)w * (size_t)h * sizeof(*before));
+        assert(before != NULL);
+        for (WORD row = 0; row < h; ++row) {
+            for (WORD col = 0; col < w; ++col) {
+                assert(v_get_pixel(handle, x + col, y + row, &pel, &color));
+                before[(size_t)row * (size_t)w + (size_t)col] = pel;
+            }
+        }
+        assert(wind_set_str(back, WF_NAME, partial ? "PC 1234" : "PC 5678"));
+        assert(wind_set_str(back, WF_INFO, partial ? "Running" : "Paused"));
+        for (WORD row = y; row < y + h; ++row) {
+            for (WORD col = x; col < x + w; ++col) {
+                assert(v_get_pixel(handle, col, row, &pel, &color));
+                assert(pel == before[(size_t)(row - y) * (size_t)w +
+                                     (size_t)(col - x)]);
+            }
+        }
+        free(before);
+    }
+    assert(wind_close(front) && wind_delete(front));
+    assert(strcmp(aes_find_window(back)->name, "PC 1234") == 0);
+    assert(wind_close(back) && wind_delete(back));
+    assert(appl_exit());
+    assert(unlink(path) == 0 && rmdir(directory) == 0);
+}
+
 int main(void)
 {
     framebuffer_paths();
@@ -338,6 +397,7 @@ int main(void)
     selector_hidden_entries();
     text_editor_hid_collisions();
     physical_keyboard_extension();
+    background_window_title();
     puts("hostile framebuffer paths, viewer replacement and app-id rollover "
          "passed");
     return 0;
