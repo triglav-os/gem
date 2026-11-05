@@ -6,6 +6,11 @@ Unreleased.
 
 ## Unreleased
 
+- Resizable windows without frame scroll controls use a thin right/bottom
+  frame instead of empty scrollbar strips. Drag the L-shaped bottom-right
+  grip to resize; client clicks stay inside the application. Windows with
+  frame scroll controls retain their existing chrome and geometry.
+
 - Background window name/info changes repaint only visible text chrome.
   A disassembly title updating behind another window can no longer draw its
   scrollbar through the foreground window. Standard AES APIs are unchanged.

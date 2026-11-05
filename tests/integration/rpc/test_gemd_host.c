@@ -6,7 +6,7 @@
  * Copyright (C) 2026 tomaz stih
  */
 #define _POSIX_C_SOURCE 200809L
-#include "../../../src/aes/aes_internal.h"
+#include "../../../src/aes/window_internal.h"
 #include <gem/input.h>
 #include "../../../src/aes/fsel_private.h"
 #include "gem/gemctl.h"
@@ -388,8 +388,70 @@ static void background_window_title(void)
     assert(unlink(path) == 0 && rmdir(directory) == 0);
 }
 
+/* SIZER alone keeps a thin frame and never steals a client-area click. */
+static void compact_window_geometry(void)
+{
+    aes_window_t window = {0};
+    GRECT outer = {40, 50, 320, 240};
+    GRECT work;
+    GRECT round_trip;
+    const UWORD base = NAME | CLOSER | FULLER | MOVER | SIZER;
+    const UWORD scroll[] = {0, VSLIDE, HSLIDE, VSLIDE | HSLIDE,
+                            UPARROW, DNARROW, LFARROW, RTARROW};
+
+    for (size_t i = 0; i < sizeof(scroll) / sizeof(scroll[0]); ++i) {
+        window.kind = (UWORD)(base | scroll[i]);
+        window.open = 1;
+        window.outer = outer;
+        aes_compute_work(&window);
+        work = window.work;
+        assert(wind_calc(WC_WORK, window.kind, outer.g_x, outer.g_y,
+                         outer.g_w, outer.g_h, &round_trip.g_x,
+                         &round_trip.g_y, &round_trip.g_w, &round_trip.g_h));
+        assert(memcmp(&work, &round_trip, sizeof(work)) == 0);
+        assert(wind_calc(WC_BORDER, window.kind, work.g_x, work.g_y,
+                         work.g_w, work.g_h, &round_trip.g_x,
+                         &round_trip.g_y, &round_trip.g_w, &round_trip.g_h));
+        assert(memcmp(&outer, &round_trip, sizeof(outer)) == 0);
+        if (scroll[i] == 0) {
+            assert(outer.g_x + outer.g_w - work.g_x - work.g_w == 4);
+            assert(outer.g_y + outer.g_h - work.g_y - work.g_h == 4);
+            for (WORD y = (WORD)(outer.g_y + outer.g_h - 12);
+                 y < outer.g_y + outer.g_h; ++y) {
+                for (WORD x = (WORD)(outer.g_x + outer.g_w - 12);
+                     x < outer.g_x + outer.g_w; ++x) {
+                    WORD part = aes_window_hit_part(&window, x, y);
+                    assert((part == AES_WINDOW_PART_SIZER) ==
+                           !aes_point_in_rect(x, y, &work));
+                }
+            }
+        } else {
+            assert(aes_window_right_border(&window) ==
+                   aes_window_scroll_span(&window));
+            assert(aes_window_bottom_border(&window) ==
+                   aes_window_scroll_span(&window));
+        }
+    }
+    window.kind = base;
+    for (WORD side = 1; side < 24; ++side) {
+        GRECT grip;
+        window.outer.g_w = side;
+        window.outer.g_h = side;
+        if (aes_window_sizer_rect(&window, &grip)) {
+            assert(grip.g_x >= window.outer.g_x &&
+                   grip.g_y >= window.outer.g_y);
+            assert(grip.g_w <= side && grip.g_h <= side);
+        }
+    }
+    window.outer = outer;
+    window.kind = NAME | CLOSER | MOVER;
+    aes_compute_work(&window);
+    assert(aes_window_hit_part(&window, 359, 289) != AES_WINDOW_PART_SIZER);
+}
+
 int main(void)
 {
+    compact_window_geometry();
     framebuffer_paths();
     application_ids();
     custom_form_input_scope();

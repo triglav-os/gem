@@ -101,3 +101,15 @@ and TOS tails, missing-program failure and no parent launch-variable leakage.
 inverse-mode regression. It verifies black ink/white paper in decoded RGB,
 option parsing and preservation across subscriber reconfiguration. Full-session
 checks also require F5 to launch the viewer with `--inverse off --bpp 32`.
+
+
+`test_gemd_host` also checks scrollbar-free `SIZER` geometry: work/border
+round trips, compact frame widths, corner hit testing outside the client,
+and unchanged frame geometry when any scroll-control flag is present.
+
+The compact-frame change updates the reviewed references for demos 20, 21,
+22, 23, 25 and 26: client origins and interactions are unchanged, while empty
+right/bottom scrollbar strips become thin resize borders. The complete rerun
+is 96/101, retaining the five previously recorded demo34, Gemread and Gemscape
+failures. The geometry check also covers compact grips on tiny windows under
+ASan/UBSan. See the generated latest report for full-suite evidence.

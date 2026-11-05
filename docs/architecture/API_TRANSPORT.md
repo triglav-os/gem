@@ -210,3 +210,20 @@ button-click results and automatic AES shortcuts. No RPC structure or version
 changes. Both libgem and gemd must come from the extended SDK; older SDKs do
 not promise this optional flag. Rasta supplies real USB positions/releases;
 this does not qualify every host keyboard layout or viewer focus-loss path.
+
+
+## Scrollbar-free resizable windows
+
+`wind_create(NAME | CLOSER | FULLER | MOVER | SIZER, ...)` creates an
+ordinary overlapping, resizable window without frame scrollbars. When none
+of `UPARROW`, `DNARROW`, `VSLIDE`, `LFARROW`, `RTARROW` or `HSLIDE` is set,
+AES reserves a four-pixel right/bottom resize frame instead of full scrollbar
+strips. Its L-shaped grip is confined to the frame at the bottom-right
+corner: the client rectangle remains rectangular and receives every click
+inside it. Sizing still uses the standard `WM_SIZED` message. Applications
+must use `wind_calc` or the work rectangle rather than fixed border sizes.
+Windows that request scroll controls keep the existing scrollbar geometry.
+
+This is a hosted AES geometry policy, with unchanged public flags and wire
+layout. Both direct and gemd clients receive it. Native needs no application
+special case or window-scrollbar synchronization for its child controls.

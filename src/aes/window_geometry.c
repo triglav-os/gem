@@ -29,6 +29,13 @@ int aes_window_has_hscroll(const aes_window_t *window)
            (window->kind & (LFARROW | RTARROW | HSLIDE)) != 0u;
 }
 
+int aes_window_has_compact_sizer(const aes_window_t *window)
+{
+    return window != NULL && (window->kind & SIZER) != 0u &&
+           aes_window_has_vscroll(window) == 0 &&
+           aes_window_has_hscroll(window) == 0;
+}
+
 WORD aes_window_scroll_span(const aes_window_t *window)
 {
     WORD span;
@@ -55,6 +62,9 @@ WORD aes_window_scroll_button_side(const aes_window_t *window)
 
 WORD aes_window_right_border(const aes_window_t *window)
 {
+    if (aes_window_has_compact_sizer(window) != 0) {
+        return 4;
+    }
     if (window != NULL &&
         ((window->kind & SIZER) != 0u || aes_window_has_vscroll(window) != 0)) {
         return aes_window_scroll_span(window);
@@ -64,6 +74,9 @@ WORD aes_window_right_border(const aes_window_t *window)
 
 WORD aes_window_bottom_border(const aes_window_t *window)
 {
+    if (aes_window_has_compact_sizer(window) != 0) {
+        return 4;
+    }
     if (window != NULL &&
         ((window->kind & SIZER) != 0u || aes_window_has_hscroll(window) != 0)) {
         return aes_window_scroll_span(window);
@@ -153,6 +166,21 @@ int aes_window_sizer_rect(const aes_window_t *window, GRECT *rect)
 
     if (window == NULL || rect == NULL || (window->kind & SIZER) == 0u) {
         return 0;
+    }
+
+    /* The compact grip occupies only the frame, not this whole square.
+     * Hit testing excludes the client rectangle below. */
+    if (aes_window_has_compact_sizer(window) != 0) {
+        size = aes_min_word(aes_window_scroll_span(window),
+                            aes_min_word(window->outer.g_w, window->outer.g_h));
+        if (size < 3) {
+            return 0;
+        }
+        aes_set_rect(rect,
+                     (WORD)(window->outer.g_x + window->outer.g_w - size),
+                     (WORD)(window->outer.g_y + window->outer.g_h - size),
+                     size, size);
+        return 1;
     }
 
     right_border = aes_window_right_border(window);
@@ -471,7 +499,9 @@ WORD aes_window_hit_part(const aes_window_t *window, WORD x, WORD y)
         return AES_WINDOW_PART_FULLER;
     }
     if (aes_window_sizer_rect(window, &rect) != 0 &&
-        aes_point_in_rect(x, y, &rect)) {
+        aes_point_in_rect(x, y, &rect) &&
+        (aes_window_has_compact_sizer(window) == 0 ||
+         !aes_point_in_rect(x, y, &window->work))) {
         return AES_WINDOW_PART_SIZER;
     }
     if (aes_window_vup_rect(window, &rect) != 0 &&

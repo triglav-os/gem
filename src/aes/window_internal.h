@@ -22,6 +22,8 @@ WORD aes_window_left_border(const aes_window_t *window);
 int aes_window_has_vscroll(const aes_window_t *window);
 /* Nonzero when the kind carries any horizontal scroll part. */
 int aes_window_has_hscroll(const aes_window_t *window);
+/* Nonzero for a resizable window without any frame scroll controls. */
+int aes_window_has_compact_sizer(const aes_window_t *window);
 /* Thickness of a scroll bar strip, never below 12. */
 WORD aes_window_scroll_span(const aes_window_t *window);
 /* Side length of a scroll arrow button. */
@@ -38,7 +40,8 @@ int aes_window_closer_rect(const aes_window_t *window, GRECT *rect);
 int aes_window_fuller_rect(const aes_window_t *window, GRECT *rect);
 /* Rectangle of the draggable title area; 0 when absent. */
 int aes_window_title_rect(const aes_window_t *window, GRECT *rect);
-/* Rectangle of the size box; 0 when the kind lacks it. */
+/* Bounds of the size grip; compact grips exclude the client within them.
+ * Returns 0 when the kind lacks SIZER. */
 int aes_window_sizer_rect(const aes_window_t *window, GRECT *rect);
 /* Rectangle of the up arrow; 0 when absent. */
 int aes_window_vup_rect(const aes_window_t *window, GRECT *rect);
