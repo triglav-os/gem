@@ -288,6 +288,8 @@ int main(int argc, char **argv)
     if (appl_init() < 0 || !ted_document_init(&s.doc))
         return 1;
     s.vdi = graf_handle(&cw, &ch, &bw, &bh);
+    s.char_h = ch;
+    s.box_h = bh;
     s.cw = 8;
     s.ch = 16;
     vst_font(s.vdi, ATARI);
@@ -364,12 +366,15 @@ int main(int argc, char **argv)
             redraw = 1;
         }
         if ((event & MU_BUTTON) && wind_find(mx, my) == s.window) {
-            if (my < s.body.g_y) {
-                int action = (mx - s.work.g_x) / 80;
-                if (action >= 0 && action < 4)
-                    ted_action(&s, act_new + action);
+            if (my >= s.chrome.toolbar.g_y && my < s.body.g_y) {
+                WORD action = ted_toolbar_action(&s, mx, my);
+                if (action) {
+                    ted_action(&s, action);
+                    ted_follow(&s);
+                }
                 redraw = 1;
-            } else if (my < s.body.g_y + s.body.g_h) {
+            } else if (my >= s.body.g_y && my < s.body.g_y + s.body.g_h &&
+                       mx >= s.body.g_x && mx < s.body.g_x + s.body.g_w) {
                 s.doc.cursor = ted_offset(
                     &s, s.top + (my - s.body.g_y) / s.ch,
                     s.left + (mx > s.body.g_x + 4 ? (mx - s.body.g_x - 4) / s.cw
@@ -393,6 +398,13 @@ int main(int argc, char **argv)
                     redraw = 1;
                 }
             }
+        }
+        WORD hover = ted_toolbar_action(&s, mx, my);
+        if (hover && wind_find(mx, my) != s.window)
+            hover = 0;
+        if (hover != s.hover_action) {
+            s.hover_action = hover;
+            redraw = 1;
         }
         if (redraw && s.running)
             ted_draw(&s);

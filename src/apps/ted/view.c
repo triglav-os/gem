@@ -12,11 +12,8 @@ void ted_layout(ted_state_t *s)
 {
     wind_get(s->window, WF_WORKXYWH, &s->work.g_x, &s->work.g_y, &s->work.g_w,
              &s->work.g_h);
-    s->body = s->work;
-    s->body.g_y += 28;
-    s->body.g_h -= 50;
-    if (s->body.g_h < 1)
-        s->body.g_h = 1;
+    gemctl_chrome_layout(&s->work, s->char_h, s->box_h, &s->chrome);
+    s->body = s->chrome.content;
 }
 size_t ted_column(ted_state_t *s, size_t start, size_t end)
 {
@@ -101,22 +98,13 @@ void ted_draw(ted_state_t *s)
         vsf_color(s->vdi, BLACK);
         v_bar(s->vdi, xy);
         vst_color(s->vdi, WHITE);
-        GRECT toolbar = s->work;
-        toolbar.g_h = 28;
-        gemctl_toolbar_draw(s->vdi, &toolbar);
-        const char *labels[] = {"New", "Open", "Save", "Save As"};
-        for (int i = 0; i < 4; ++i) {
-            v_gtext(s->vdi, s->work.g_x + 8 + i * 80, s->work.g_y + 19,
-                    (const BYTE *)labels[i]);
-            gemctl_toolbar_separator(s->vdi, s->work.g_x + (i + 1) * 80 - 1,
-                                     s->work.g_y, s->work.g_y + 27);
-        }
-        GRECT band = {s->work.g_x, s->work.g_y + s->work.g_h - 22, s->work.g_w,
-                      22};
-        gemctl_status_draw(s->vdi, &band, status);
+        ted_toolbar_draw(s);
+        const GRECT *band = &s->chrome.status;
+        const char *hint = ted_toolbar_hint(s->hover_action);
+        gemctl_status_draw(s->vdi, band, hint ? hint : status);
         WORD bodyclip[4] = {
             xy[0], xy[1] > s->body.g_y ? xy[1] : s->body.g_y, xy[2],
-            xy[3] < band.g_y - 1 ? xy[3] : (WORD)(band.g_y - 1)};
+            xy[3] < band->g_y - 1 ? xy[3] : (WORD)(band->g_y - 1)};
         if (bodyclip[1] <= bodyclip[3]) {
             vs_clip(s->vdi, 1, bodyclip);
             size_t pos = ted_document_line(&s->doc, s->top), col = 0;

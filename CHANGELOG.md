@@ -6,6 +6,10 @@ Unreleased.
 
 ## Unreleased
 
+- Ted replaces its in-window text buttons with 16×16 command icons and the
+  shared Gemscape/Gemread toolbar and status-bar layout. Drawing and hit targets
+  follow resizing; disabled actions are dimmed and icon hints use the status bar.
+
 - File Manager context menus retain all four borders. Naming prompts, alerts,
   browser/reader settings and website dialogs use titled movable windows,
   parent-relative placement and standard window borders. Classic untitled forms

@@ -300,6 +300,8 @@ frames must preserve every dialog pixel, excluding the mouse pointer.
 
 `uat_ted_proxy` edits a real `.text` file, exercises multiline input, selection,
 copy/paste, cut, undo, atomic save, Save As, New/Open and cancellation of an
-unsaved close.
+unsaved close. It also checks toolbar icon bounds, shared toolbar/status heights,
+every icon action, disabled Paste, hover hints and hit targets after a narrow
+resize.
 `test_ted_document` covers UTF-8 character boundaries, selection replacement,
 NUL rejection, the 1 MiB limit and unchanged data after a rejected edit.
