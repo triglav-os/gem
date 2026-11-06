@@ -54,6 +54,7 @@ int gemscape_script_dialog(int kind, const char *origin, const char *message,
                            char *text, size_t capacity);
 /* Opens or raises the non-blocking tabbed preferences window. */
 void gemscape_settings_open(gemscape_settings_dialog_t *dialog, WORD vdi,
+                            WORD parent,
                             const gemscape_preferences_t *preferences);
 /* Closes the settings window and discards unapplied edits. */
 void gemscape_settings_close(gemscape_settings_dialog_t *dialog);

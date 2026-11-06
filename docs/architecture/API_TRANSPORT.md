@@ -100,7 +100,11 @@ declared rectangle, while clicks and keyboard focus outside it continue to
 follow the target application. While that form waits, gemd services ordinary
 requests from other sessions and marks each in-flight request so a bounded
 `evnt_multi` poll cannot recursively dispatch itself. Standard alerts and file
-selectors remain the one shared, globally input-modal panel. The custom form
+selectors remain shared, globally input-modal panels. They now use movable
+titled windows centered over the current application's top window, or the
+desktop when there is no parent. `form_center()` uses the same parent selection.
+Application prompts and settings use the shared `libgemctl` dialog helpers;
+these own their event loops and clip drawing to visible work rectangles. The custom form
 is a z-ordered redraw layer: gemd keeps its decoded tree alive for the blocking
 `form_do`, clips both it and ordinary window drawing against higher layers, and
 repaints its visible fragments when covering windows move or close.

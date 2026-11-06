@@ -128,7 +128,7 @@ def main():
                 state = json.loads(subprocess.check_output(
                     ['docker', 'exec', name, 'cat', directory + '/state.json'], text=True))
                 if breakpoint_hit and state.get('phase') == 'applications-ready':
-                    assert state['started_apps'] == ['desktop', 'terminal'], state
+                    assert state['started_apps'] == ['desktop'], state
                     if ready_since is None:
                         ready_since = time.monotonic()
                     elif time.monotonic() - ready_since >= 10:
@@ -142,7 +142,7 @@ def main():
                  str(Path(directory).parent)], text=True).splitlines()
             assert permissions == ['700', '700'], permissions
             logs = evidence/'state/gem/sessions'/hashlib.sha256(str(ROOT).encode()).hexdigest()[:16]
-            assert (logs/'terminal.log').is_file(), 'Runtime logs did not reach XDG state storage'
+            assert (logs/'desktop.log').is_file(), 'Runtime logs did not reach XDG state storage'
             request('disconnect', {'terminateDebuggee': True})
             process.wait(timeout=10)
         finally:

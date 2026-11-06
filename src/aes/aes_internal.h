@@ -360,4 +360,7 @@ int aes_try_resolve_path(const char *filename, char *resolved,
 int aes_save_region_pixels(const GRECT *rect, uint8_t **pixels_out);
 void aes_restore_region_pixels(const GRECT *rect, uint8_t *pixels);
 
+/* Resolve the foremost current-application parent, or the desktop. */
+void aes_dialog_parent_rect(GRECT *area);
+
 #endif

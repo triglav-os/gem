@@ -9,6 +9,7 @@
 
 #include "aes_internal.h"
 #include "alert_icons.h"
+#include "window_track.h"
 
 #include "platform/os.h"
 
@@ -26,6 +27,8 @@ enum {
 };
 
 typedef struct aes_alert {
+    WORD window;
+    GRECT cover;
     WORD icon;
     WORD default_button;
     WORD line_count;
@@ -216,7 +219,7 @@ static void aes_alert_compute_layout(aes_alert_t *alert)
         content_h = icon_h;
     }
 
-    aes_desktop_rect(&desktop);
+    aes_dialog_parent_rect(&desktop);
     alert->outer.g_w = (WORD)(content_w + 32);
     alert->outer.g_h = (WORD)(content_h + button_h + 40);
     alert->outer.g_x =
@@ -255,8 +258,8 @@ static void aes_alert_draw_frame(const GRECT *rect)
     vsf_color(aes_state.vdi_handle, BLACK);
     vr_recfl(aes_state.vdi_handle, fill);
 
-    /* Classic untitled dialog enclosure: black/white/black/black. */
-    for (WORD inset = 0; inset < 4; ++inset) {
+    /* Classic 11010 enclosure, from the outside inward. */
+    for (WORD inset = 0; inset < 5; ++inset) {
         WORD left = (WORD)(fill[0] + inset);
         WORD top = (WORD)(fill[1] + inset);
         WORD right = (WORD)(fill[2] - inset);
@@ -273,7 +276,8 @@ static void aes_alert_draw_frame(const GRECT *rect)
         border[7] = bottom;
         border[8] = left;
         border[9] = top;
-        vsl_color(aes_state.vdi_handle, inset == 1 ? BLACK : WHITE);
+        vsl_color(aes_state.vdi_handle,
+                  inset == 2 || inset == 4 ? BLACK : WHITE);
         v_pline(aes_state.vdi_handle, 5, border);
     }
 }
@@ -519,7 +523,8 @@ static WORD aes_run_alert(aes_alert_t *alert)
 
     vdi_begin_update();
     v_hide_c(aes_state.vdi_handle);
-    (void)aes_save_region_pixels(&alert->outer, &saved_pixels);
+    if (alert->window <= 0)
+        (void)aes_save_region_pixels(&alert->outer, &saved_pixels);
     v_show_c(aes_state.vdi_handle, 0);
     vdi_end_update();
     aes_draw_alert(alert);
@@ -550,7 +555,8 @@ static WORD aes_run_alert(aes_alert_t *alert)
             if (ch >= '1' && ch < '1' + alert->button_count) {
                 wind_update(BEG_UPDATE);
                 v_hide_c(aes_state.vdi_handle);
-                aes_restore_region_pixels(&alert->outer, saved_pixels);
+                if (saved_pixels)
+                    aes_restore_region_pixels(&alert->outer, saved_pixels);
                 v_show_c(aes_state.vdi_handle, 0);
                 wind_update(END_UPDATE);
                 if (saved_pixels != NULL) {
@@ -565,13 +571,44 @@ static WORD aes_run_alert(aes_alert_t *alert)
         if (evt.type == GEM_HID_MOUSE_BUTTON &&
             evt.button == GEM_HID_BUTTON_LEFT &&
             (evt.flags & GEM_HID_BUTTON_LEFT) != 0u) {
+            aes_window_t *window = aes_find_window(alert->window);
+            if (window && evt.y >= window->outer.g_y &&
+                evt.y < window->work.g_y && evt.x >= window->outer.g_x &&
+                evt.x < window->outer.g_x + window->outer.g_w) {
+                if (evt.x < window->outer.g_x + aes_chrome_height())
+                    break;
+                WORD mx = evt.x, my = evt.y, buttons = 1, modifiers = 0;
+                aes_track_t track = {.window = window,
+                                     .first_evt = &evt,
+                                     .flags = 0,
+                                     .pmx = &mx,
+                                     .pmy = &my,
+                                     .pmb = &buttons,
+                                     .pks = &modifiers,
+                                     .start_x = evt.x,
+                                     .start_y = evt.y};
+                aes_begin_interaction_lock();
+                aes_track_move(&track);
+                WORD dx = window->work.g_x - alert->outer.g_x;
+                WORD dy = window->work.g_y - alert->outer.g_y;
+                alert->outer = window->work;
+                alert->cover = window->outer;
+                for (WORD j = 0; j < alert->button_count; ++j) {
+                    alert->button_rects[j].g_x += dx;
+                    alert->button_rects[j].g_y += dy;
+                }
+                aes_notify_window_topology_changed();
+                aes_draw_alert(alert);
+                continue;
+            }
             for (i = 0; i < alert->button_count; ++i) {
                 if (aes_point_in_rect((WORD)evt.x, (WORD)evt.y,
                                       &alert->button_rects[i]) != 0) {
                     aes_alert_wait_button_release();
                     wind_update(BEG_UPDATE);
                     v_hide_c(aes_state.vdi_handle);
-                    aes_restore_region_pixels(&alert->outer, saved_pixels);
+                    if (saved_pixels)
+                        aes_restore_region_pixels(&alert->outer, saved_pixels);
                     v_show_c(aes_state.vdi_handle, 0);
                     wind_update(END_UPDATE);
                     if (saved_pixels != NULL) {
@@ -585,7 +622,8 @@ static WORD aes_run_alert(aes_alert_t *alert)
 
     wind_update(BEG_UPDATE);
     v_hide_c(aes_state.vdi_handle);
-    aes_restore_region_pixels(&alert->outer, saved_pixels);
+    if (saved_pixels)
+        aes_restore_region_pixels(&alert->outer, saved_pixels);
     v_show_c(aes_state.vdi_handle, 0);
     wind_update(END_UPDATE);
     if (saved_pixels != NULL) {
@@ -604,9 +642,48 @@ WORD form_alert(WORD defbtn, char *str)
         return (defbtn > 0) ? defbtn : 1;
     }
     aes_alert_compute_layout(&alert);
-    aes_modal_cover = &alert.outer;
+    GRECT border;
+    wind_calc(WC_BORDER, NAME | MOVER | CLOSER, alert.outer.g_x,
+              alert.outer.g_y, alert.outer.g_w, alert.outer.g_h, &border.g_x,
+              &border.g_y, &border.g_w, &border.g_h);
+    GRECT parent, screen;
+    aes_dialog_parent_rect(&parent);
+    aes_desktop_rect(&screen);
+    WORD x = parent.g_x + (parent.g_w - border.g_w) / 2;
+    WORD y = parent.g_y + (parent.g_h - border.g_h) / 2;
+    if (x + border.g_w > screen.g_x + screen.g_w)
+        x = screen.g_x + screen.g_w - border.g_w;
+    if (y + border.g_h > screen.g_y + screen.g_h)
+        y = screen.g_y + screen.g_h - border.g_h;
+    if (x < screen.g_x)
+        x = screen.g_x;
+    if (y < screen.g_y)
+        y = screen.g_y;
+    WORD dx = x - border.g_x, dy = y - border.g_y;
+    border.g_x = x;
+    border.g_y = y;
+    alert.outer.g_x += dx;
+    alert.outer.g_y += dy;
+    for (WORD i = 0; i < alert.button_count; ++i) {
+        alert.button_rects[i].g_x += dx;
+        alert.button_rects[i].g_y += dy;
+    }
+    alert.window = wind_create(NAME | MOVER | CLOSER, border.g_x, border.g_y,
+                               border.g_w, border.g_h);
+    if (alert.window > 0) {
+        wind_set_str(alert.window, WF_NAME, "Message");
+        wind_open(alert.window, border.g_x, border.g_y, border.g_w, border.g_h);
+    }
+    alert.cover = alert.window > 0 ? border : alert.outer;
+    aes_modal_cover = alert.window > 0 ? previous_cover : &alert.cover;
+    aes_notify_window_topology_changed();
     result = aes_run_alert(&alert);
     aes_modal_cover = previous_cover;
+    if (alert.window > 0) {
+        wind_close(alert.window);
+        wind_delete(alert.window);
+    }
+    aes_notify_window_topology_changed();
     if (aes_wait_hook)
         aes_redraw_region(&alert.outer);
     return result;

@@ -42,7 +42,7 @@ cache = dict(re.findall(r'^([A-Za-z0-9_]+):[^=\n]+=(.*)$',
 libdir, bindir, datadir = (cache['CMAKE_INSTALL_' + name] for name in ('LIBDIR', 'BINDIR', 'DATADIR'))
 datadir = datadir or cache['CMAKE_INSTALL_DATAROOTDIR']
 assert not Path(libdir).is_absolute() and not Path(bindir).is_absolute()
-programs = {'gemd', 'desktop', 'terminal', 'calc', 'clock', 'stout', 'gemread', 'gemscape', 'rasta'}
+programs = {'gemd', 'desktop', 'terminal', 'calc', 'clock', 'stout', 'gemread', 'gemscape', 'rasta', 'ted'}
 libraries = {'lib' + name + '.so' for name in ('gem', 'aes', 'vdi', 'platform_linux', 'rasta', 'fat12', 'msa', 'prg')}
 if cache['GEM_PLATFORM'] == 'linux':
     programs.remove('rasta')
@@ -80,7 +80,7 @@ if args.no_gui:
     print('PASS native runtime contents, stripped ELF dependencies and resource allowlists')
     sys.exit(0)
 os.environ['RASTA_BIN'] = str(relocated/bindir/'rasta')
-for app in ('gemscape', 'gemread', 'clock', 'desktop', 'terminal', 'calc'):
+for app in ('gemscape', 'gemread', 'clock', 'desktop', 'terminal', 'calc', 'ted'):
     scenario = SimpleNamespace(demo='installed_' + app, capture=True, mode='proxy',
         binary=str(relocated/bindir/app), gemd=str(relocated/bindir/'gemd'),
         artifacts=str(stage), resources=str(relocated/datadir/'gem'))

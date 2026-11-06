@@ -18,6 +18,9 @@ permissions. `test_runtime_paths` checks Docker mounts and non-overwriting
 settings/profile migration, including shared XDG bases. `test_install_layout`
 checks exact contents, strips/dependency closure, removes stale files and
 launches relocated installed applications without checkout resource overrides.
+`uat_ted_proxy` edits and saves real text; the document unit test checks bounded
+replacement and undo. Dialog cases verify centered, movable windows and the
+classic enclosure, including browser settings over animation.
 `test_sdk_layout` exports a clean SDK and builds independent samples after
 relocation; see [Linux paths](../guides/LINUX_PATHS.md).
 CTest still runs independent tests in parallel inside each invocation; select
@@ -92,7 +95,7 @@ python3 -B tests/integration/session/debug_adapter.py \
 ```
 
 It reads the checked-in launch/tasks configuration, hits and continues a
-breakpoint at `main`, keeps Desktop and Terminal ready for ten seconds, then
+breakpoint at `main`, keeps Desktop ready for ten seconds, then
 checks private runtime permissions, persistent XDG logs and that the post-debug
 Make task removes the test container. Its evidence lives
 in `build/f5-adapter/`. This check is separate from CTest because the IDE adapter

@@ -3,7 +3,7 @@
 `samples/` is a separate CMake project containing the independent examples. It
 uses public GEM headers and compiled GEM libraries; it does not compile core
 sources or include private core headers. The root build also includes this
-project so `make` still builds everything. Desktop, Terminal, Clock,
+project so `make` still builds everything. Desktop, Terminal, Ted, Clock,
 Calculator, Gemscape, Gemread and Stout are bundled applications under
 `src/apps/`, not samples.
 
@@ -167,3 +167,5 @@ new download. Different build directories have separate caches.
 There is no Git submodule or nested repository under `lib/musashi/`. Normal
 `git add .` stages only the recipe and patch, and clones obtain source on their
 first root build. Do not copy a Git checkout into the source tree.
+
+Ted is a bundled application, documented in [the editor guide](TED.md).

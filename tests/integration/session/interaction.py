@@ -239,23 +239,24 @@ class Interaction:
         self.receive(size)
         self.session.pause(7)
         opened = self.snapshot('system_alert_open')
-        # The alert's right side is over exposed background, not animation.
+        alert = self.rpc(33, struct.pack('=hh', 0, 10))[1]
+        alert_handle = struct.unpack('=4h', alert)[0]
+        assert alert_handle not in windows, 'Shutdown did not create a modal window'
+        alert_rect = self.rect(alert_handle)
         def alert_edge(frame):
             pitch = (self.width + 7) // 8
-            column = (self.width // 2 + 128) // 8
-            top = self.height // 2 - 44
+            column = (alert_rect[0] + 4) // 8
+            top = alert_rect[1]
             return bytes(frame[row * pitch + column]
-                         for row in range(top, top + 90))
+                         for row in range(top, top + alert_rect[3]))
         assert alert_edge(opened) != alert_edge(before), 'Shutdown alert did not appear'
         for handle, rect in windows.items():
             assert self.rect(handle) == rect, 'Shutdown alert removed or moved a sample window'
-        assert self.rpc(36, struct.pack('=hh', 10, 82))[0] == target, 'System menu closed the underlying window'
         assert self.rect(target) == original
-        for kind in (3, 10, 11):
-            self.event(kind, self.width // 2 + 53, self.height // 2 + 26)
+        self.key(41)  # Cancel the titled parent-centered alert.
         self.session.pause(.4)
         closed = self.snapshot('system_alert_closed')
-        assert alert_edge(closed) == alert_edge(before), 'Shutdown alert did not close'
+        assert self.rpc(33, struct.pack('=hh', alert_handle, 4))[0] == 0, 'Shutdown alert did not close'
         for handle, rect in windows.items():
             assert self.rect(handle) == rect, 'Dismissing Shutdown removed a window'
         assert self.rpc(36, struct.pack('=hh', 10, 82))[0] == target, 'Dismissing Shutdown closed the underlying window'
@@ -284,8 +285,8 @@ class Interaction:
         assert self.rpc(1)[0] > 0  # APPL_INIT: independent responsive client.
         self.system_alert()
         # Applications start in a deterministic order. Terminal, Gemscape,
-        # Gemread, Maestro and Stout report handles 3 through 7 respectively.
-        stout = 7
+        # Gemread, Ted, Maestro and Stout report handles 3 through 8 respectively.
+        stout = 8
         assert self.rect(stout)[2] > 0
         for index in range(3):
             self.drag(stout, 100, 80, f'stout_drag_{index + 1}')
@@ -307,9 +308,10 @@ class Interaction:
         assert stout_process.returncode == 0, 'Stout failed while closing'
         # Move Maestro's title off the windows checked next. Stout's final
         # position exposes it before the guest closes normally.
-        maestro = 6
+        maestro = 7
         assert self.rect(maestro)[2] > 0
         self.drag(maestro, 1000, 0, 'maestro_drag')
+        self.drag(6, 1000, 250, 'ted_drag')
         gemread = 5
         assert self.rect(gemread)[2] > 0
         self.drag(gemread, 0, 120, 'gemread_drag')

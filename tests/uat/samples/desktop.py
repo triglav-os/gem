@@ -52,6 +52,7 @@ def check(session):
     folders = [(x, y) for x, y in positions if matches(initial, 'folder', x, y)]
     assert len(folders) == 2, 'Workspace and File Manager icons are missing'
     assert matches(initial, 'prg', 36, 170), 'Gemscape launcher icon is missing'
+    assert matches(initial, 'prg', 36, 236), 'Terminal launcher icon is missing'
     assert matches(initial, 'trash', 576, 332), 'Trash icon missing'
     x, y = folders[0]
     session.click(x + 16, y + 16)
@@ -159,6 +160,20 @@ def check(session):
     double_click(session, 52, 186)  # Gemscape launcher through AES shell.
     session.wait(lambda: (session.path/'browser-launched').exists(),
                  'Gemscape launcher to execute its resolved program')
+    double_click(session, 52, 252)
+    session.wait(lambda: (session.path/'terminal-launched').exists(),
+                 'Terminal desktop launcher')
+    double_click(session, 52, 54)
+    double_click(session, 300, 108)  # uat_child directory.
+    session.click(260, 70)  # Return to Name sorting after the earlier Size check.
+    session.frame('association_files')
+    # Names sort before a_small.txt and are safe host files, not executables.
+    double_click(session, 300, 108)
+    session.wait(lambda: (session.path/'pdf-launched').exists(), 'PDF association')
+    assert (session.path/'pdf-launched').read_text() == str(session.path/'uat_child/0 book.PDF')
+    double_click(session, 300, 126)
+    session.wait(lambda: (session.path/'text-launched').exists(), 'Ted association')
+    assert (session.path/'text-launched').read_text() == str(session.path/'uat_child/1 note.text')
     print('PASS desktop file manager shows four list columns, icons, navigation and close')
 
 
@@ -185,6 +200,8 @@ def main():
         '[desktop]\nshow_trash = true\nshow_hidden = false\n\n'
         '[locations]\n' + str(session.path) + ' = Workspace\n')
     (session.path/'uat_child').mkdir(exist_ok=True)
+    (session.path/'uat_child/0 book.PDF').unlink(missing_ok=True)
+    (session.path/'uat_child/1 note.text').unlink(missing_ok=True)
     (session.path/'uat_child'/'marker.txt').write_text('Desktop UAT fixture\n')
     (session.path/'uat_child'/'a_small.txt').write_text('x')
     (session.path/'uat_child'/'z_large.txt').write_bytes(b'x' * 2048)
@@ -194,6 +211,15 @@ def main():
     launcher_probe = session.path/'gemscape'
     launcher_probe.write_text('#!/bin/sh\nprintf ready > browser-launched\n')
     launcher_probe.chmod(0o700)
+    (session.path/'terminal-launched').unlink(missing_ok=True)
+    terminal = session.path/'terminal'
+    terminal.write_text('#!/bin/sh\nprintf ready > terminal-launched\ntouch \"uat_child/0 book.PDF\" \"uat_child/1 note.text\"\n')
+    terminal.chmod(0o700)
+    for program, marker in (('gemread', 'pdf-launched'), ('ted', 'text-launched')):
+        (session.path/marker).unlink(missing_ok=True)
+        probe = session.path/program
+        probe.write_text('#!/bin/sh\nprintf %s "$1" > '+marker+'\n')
+        probe.chmod(0o700)
     result = {'passed': False}
     try:
         try:

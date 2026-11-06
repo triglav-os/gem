@@ -44,7 +44,7 @@ resources together under the root build directory. `CMAKE_FLAGS` passes extra
 CMake configuration options through the wrapper. Keep overridden build and
 output paths inside the checkout, which is mounted at the same path in Docker.
 
-Bundled applications live in `src/apps/`: Desktop, Terminal, Clock, Calculator,
+Bundled applications live in `src/apps/`: Desktop, Terminal, Ted, Clock, Calculator,
 Gemscape, Gemread and Stout build into `bin/apps/`. Independent examples live in `samples/src/`
 and build into `bin/samples/`; the display server remains in `bin/core/`.
 Automated demo scenarios remain in `tests/uat/`.
@@ -60,7 +60,7 @@ make run
 make stop   # from another terminal, to stop this checkout's session
 ```
 
-The launcher starts Rasta, gemd, Desktop and Terminal in the same container.
+The launcher starts Rasta, gemd and Desktop in the same container.
 It forwards the current X11 display/socket and Xauthority file, or the current
 Wayland socket. Run it from your graphical login; no host SDL2, CEF or GDB
 installation is needed. F5 also needs the VS Code C/C++ extension.
@@ -95,7 +95,7 @@ its off-screen CEF view; it does not require X, Wayland or GPU access. See the
 
 ## VS Code: one F5 session
 
-Select **GEM — Desktop and Terminal** and press F5. This is the only launch
+Select **GEM — Desktop** and press F5. This is the only launch
 configuration. Its prelaunch task runs `make run DEBUG=1`, which builds with
 the same Wischner Docker defaults as the command line in GCC
 RelWithDebInfo/Rasta mode and prepares Rasta for GDB to launch gemd.
@@ -122,12 +122,11 @@ The F5 Rasta viewer and GEM desktop use a 1920×1080 BGRA32 framebuffer at
 scale 1. Rasta hides the Linux/SDL pointer over its surface so only GEM's
 software cursor is visible.
 The supervisor waits for a complete post-Desktop RPC round trip before it
-starts Terminal; the larger initial redraw therefore cannot consume Terminal's
-connection timeout and tear down the session.
+reports readiness or launches additional applications in the full test session.
 
-The interactive session initially runs only Desktop and Terminal as libgem
-clients on one display. The full integration check explicitly launches every
-bundled application plus Maestro; those applications are not part of normal
+The interactive session initially runs only Desktop as a libgem client on one
+display. Terminal starts from its desktop icon. The full integration check
+explicitly launches every bundled application plus Maestro; those applications are not part of normal
 F5 startup. The direct `*_hosted` alternatives and numbered UAT demos are
 separate test configurations.
 
@@ -151,15 +150,15 @@ startup, interaction and cleanup check independent of your interactive session:
 
 ```sh
 SDL_VIDEODRIVER=dummy python3 -B tools/scripts/sample_session.py check \
-    --apps desktop,terminal \
+    --apps desktop \
     --directory "$PWD/build/sample_session_check"
 ```
 
-That command checks only the initial Desktop and Terminal session. The
+That command checks only the initial Desktop session. The
 `test_sample_session` CTest entry deliberately omits `--apps`, launches all
 bundled and sample applications as part of the full suite, and verifies
-startup order. It then injects Rasta mouse events to drag Maestro three times,
-move Gemread, move Gemscape with its CEF overlay, move Terminal and close
+startup order. It then injects Rasta mouse events to drag Stout three times,
+move Ted, move Gemread, move Gemscape with its CEF overlay, move Terminal and close
 Terminal. An independent RPC client checks actual window coordinates and
 server responsiveness; framebuffer captures verify redraws and overlay
 occlusion. It measures terminal key-to-framebuffer latency and types a shell

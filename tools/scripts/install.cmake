@@ -1,5 +1,5 @@
 # Runtime-only GNUInstallDirs installation. Development files belong in gem_sdk.
-set(gem_install_programs gemd desktop terminal calc_gemd clock_gemd stout gemread gemscape)
+set(gem_install_programs gemd desktop terminal calc_gemd clock_gemd stout gemread gemscape ted)
 set(gem_install_libraries gem aes vdi platform_linux fat12 msa prg)
 if(GEM_PLATFORM STREQUAL "rasta")
     list(APPEND gem_install_libraries rasta)

@@ -87,4 +87,22 @@ void gemctl_toolbar_bitmap(VDI_HANDLE handle, const BITBLK *bitmap,
 void gemctl_toolbar_zoom_icon(VDI_HANDLE handle, const GRECT *slot,
                               int zoom_in);
 
+/* Open a titled dialog centered over parent (0: desktop), clamped to screen.
+ * Width/height are the work size. Return a window handle, or 0 on failure;
+ * the caller closes/deletes it. On success, fill work with its content area. */
+WORD gemctl_dialog_open(WORD parent, const char *title, WORD width, WORD height,
+                        GRECT *work);
+/* Apply dialog move/top messages and refresh work; return -1 for
+ * close/termination. */
+int gemctl_dialog_message(WORD handle, const WORD *message, GRECT *work);
+/* Draw the classic 11010 enclosure inside the current VDI clip. */
+void gemctl_dialog_frame(VDI_HANDLE vdi, const GRECT *work);
+/* Draw visible dialog regions, optionally including one single-line editor. */
+void gemctl_dialog_draw(WORD handle, VDI_HANDLE vdi, OBJECT *tree,
+                        gemctl_text_edit_t *edit, WORD edit_object);
+/* Edit a bounded string in a parent-centered modal window; Cancel preserves it.
+ */
+int gemctl_prompt(WORD parent, VDI_HANDLE vdi, const char *title,
+                  const char *label, char *text, size_t capacity);
+
 #endif

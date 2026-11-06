@@ -29,7 +29,7 @@ static size_t g_framebuffer_size;
 static int g_framebuffer_fd = -1;
 
 enum { linux_overlay_max = 8, linux_overlay_limit = 8 * 1024 * 1024 };
-enum { linux_overlay_occlusion_max = 16 };
+enum { linux_overlay_occlusion_max = 18 };
 typedef struct linux_overlay {
     uint32_t id;
     int x;
@@ -65,8 +65,7 @@ static int overlay_occluded(const linux_overlay_t *overlay, int x, int y)
 {
     for (unsigned i = 0; i < overlay->occlusion_count; ++i) {
         const int *r = overlay->occlusion[i];
-        if (x >= r[0] && y >= r[1] && x < r[0] + r[2] &&
-            y < r[1] + r[3])
+        if (x >= r[0] && y >= r[1] && x < r[0] + r[2] && y < r[1] + r[3])
             return 1;
     }
     return 0;
@@ -84,13 +83,13 @@ static int overlay_color(int x, int y, uint8_t *red, uint8_t *green,
         const uint8_t *pixel;
         unsigned alpha;
 
-        if (overlay->pixels == NULL || overlay->visible == 0 || ox < 0 || oy < 0 ||
-            ox >= overlay->width || oy >= overlay->height)
+        if (overlay->pixels == NULL || overlay->visible == 0 || ox < 0 ||
+            oy < 0 || ox >= overlay->width || oy >= overlay->height)
             continue;
         if (overlay_occluded(overlay, x, y) != 0)
             continue;
-        pixel = overlay->pixels +
-                ((size_t)oy * overlay->width + (size_t)ox) * 4u;
+        pixel =
+            overlay->pixels + ((size_t)oy * overlay->width + (size_t)ox) * 4u;
         alpha = pixel[3];
         if (alpha == 0u)
             continue;
@@ -100,14 +99,12 @@ static int overlay_color(int x, int y, uint8_t *red, uint8_t *green,
             *red = pixel[2];
             return 1;
         }
-        *blue = (uint8_t)((pixel[0] * alpha + *blue * (255u - alpha) +
-                           127u) /
+        *blue = (uint8_t)((pixel[0] * alpha + *blue * (255u - alpha) + 127u) /
                           255u);
-        *green = (uint8_t)((pixel[1] * alpha + *green * (255u - alpha) +
-                            127u) /
+        *green = (uint8_t)((pixel[1] * alpha + *green * (255u - alpha) + 127u) /
                            255u);
-        *red = (uint8_t)((pixel[2] * alpha + *red * (255u - alpha) + 127u) /
-                         255u);
+        *red =
+            (uint8_t)((pixel[2] * alpha + *red * (255u - alpha) + 127u) / 255u);
         return 1;
     }
     return 0;
@@ -443,34 +440,34 @@ void gem_raster_present_rect(int x, int y, int width, int height)
                 (size_t)row_y * g_surface.pitch + (size_t)col_x / 8u;
             uint8_t mask = (uint8_t)(0x80u >> ((unsigned int)col_x & 7u));
             int bit_set = (source[source_offset] & mask) != 0u;
-                uint8_t intensity = shadow_bit_to_intensity(bit_set);
-                uint8_t red = intensity;
-                uint8_t green = intensity;
-                uint8_t blue = intensity;
-                (void)overlay_color(col_x, row_y, &red, &green, &blue);
-                if (g_cursor_visible != 0 && col_x >= g_cursor_x &&
-                    col_x < g_cursor_x + 16 && row_y >= g_cursor_y &&
-                    row_y < g_cursor_y + 16 &&
-                    (g_cursor_mask[row_y - g_cursor_y] &
-                     (uint16_t)(0x8000u >> (col_x - g_cursor_x))) != 0u)
-                    red = green = blue = intensity;
-                uint32_t pixel;
+            uint8_t intensity = shadow_bit_to_intensity(bit_set);
+            uint8_t red = intensity;
+            uint8_t green = intensity;
+            uint8_t blue = intensity;
+            (void)overlay_color(col_x, row_y, &red, &green, &blue);
+            if (g_cursor_visible != 0 && col_x >= g_cursor_x &&
+                col_x < g_cursor_x + 16 && row_y >= g_cursor_y &&
+                row_y < g_cursor_y + 16 &&
+                (g_cursor_mask[row_y - g_cursor_y] &
+                 (uint16_t)(0x8000u >> (col_x - g_cursor_x))) != 0u)
+                red = green = blue = intensity;
+            uint32_t pixel;
 
-                if (g_var.bits_per_pixel == 8u) {
-                    pixel = ((unsigned)red * 77u +
-                             (unsigned)green * 150u +
-                             (unsigned)blue * 29u + 128u) / 256u;
-                } else {
-                    pixel = scale_channel(red, g_var.red.length)
-                                << g_var.red.offset;
-                    pixel |= scale_channel(green, g_var.green.length)
-                             << g_var.green.offset;
-                    pixel |= scale_channel(blue, g_var.blue.length)
-                             << g_var.blue.offset;
-                    if (g_var.transp.length != 0u)
-                        pixel |= scale_channel(255u, g_var.transp.length)
-                                 << g_var.transp.offset;
-                }
+            if (g_var.bits_per_pixel == 8u) {
+                pixel = ((unsigned)red * 77u + (unsigned)green * 150u +
+                         (unsigned)blue * 29u + 128u) /
+                        256u;
+            } else {
+                pixel = scale_channel(red, g_var.red.length)
+                        << g_var.red.offset;
+                pixel |= scale_channel(green, g_var.green.length)
+                         << g_var.green.offset;
+                pixel |= scale_channel(blue, g_var.blue.length)
+                         << g_var.blue.offset;
+                if (g_var.transp.length != 0u)
+                    pixel |= scale_channel(255u, g_var.transp.length)
+                             << g_var.transp.offset;
+            }
 
             write_native_pixel(row + (size_t)col_x * bytes_per_pixel, pixel,
                                bytes_per_pixel);

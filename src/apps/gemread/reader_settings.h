@@ -20,5 +20,6 @@ void gemread_preferences_load(gemread_preferences_t *preferences);
 int gemread_preferences_save(const gemread_preferences_t *preferences);
 /* Show a tabbed settings form; change preferences only after a successful Save.
  */
-int gemread_settings_dialog(gemread_preferences_t *preferences);
+int gemread_settings_dialog(gemread_preferences_t *preferences, WORD parent,
+                            WORD vdi);
 #endif

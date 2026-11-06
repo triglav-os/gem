@@ -31,17 +31,17 @@ SESSION = Path(os.environ.get('GEM_SESSION_DIRECTORY', ROOT/'build/f5'))
 LOGS = Path(os.environ.get('GEM_SESSION_LOG_DIRECTORY', SESSION))
 STATE = SESSION / 'state.json'
 BUNDLED_APPS = (
-    'desktop', 'calc', 'clock', 'terminal', 'gemscape', 'gemread', 'stout'
+    'desktop', 'calc', 'clock', 'terminal', 'gemscape', 'gemread', 'ted', 'stout'
 )
 SOURCE_BUNDLED_APPS = {
     'desktop', 'calculator', 'clock', 'terminal', 'gemscape', 'gemread',
-    'stout'
+    'stout', 'ted'
 }
 SAMPLE_APPS = ('maestro',)
 # Keep Stout last in the interaction run so its guest window is exposed for
 # the repeated drag regression, independently of where the executable lives.
 ALL_APPS = BUNDLED_APPS[:-1] + SAMPLE_APPS + ('stout',)
-INITIAL_APPS = ('desktop', 'terminal')
+INITIAL_APPS = ('desktop',)
 F5_WIDTH = 1920
 F5_HEIGHT = 1080
 
@@ -395,7 +395,7 @@ def main():
         while time.monotonic() < deadline and proc.poll() is None:
             state = read_state()
             if state.get('manager', {}).get('pid') == proc.pid and state.get('phase') == 'viewer-ready':
-                print('Rasta ready. F5 will start gemd, Desktop and Terminal. '
+                print('Rasta ready. F5 will start gemd, Desktop. '
                       f'Logs: {LOGS}')
                 return
             time.sleep(.05)

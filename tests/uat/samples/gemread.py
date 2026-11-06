@@ -20,6 +20,7 @@ import zipfile
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from run import Session
+from dialog_checks import check_dialog
 
 
 def crop(frame, x, y, w, h):
@@ -148,6 +149,7 @@ def check_empty(session, selector_document):
     assert sum(page) < 64, 'Gemread empty document viewport is not white'
     assert sum(crop(initial, 22, 53, 45, 20)) > 3, \
         'Gemread zoom toolbar icons are missing'
+    assert sum(crop(initial, 580, 54, 16, 18)) > 15, 'Gemread menu icon is missing'
     assert sum(crop(initial, 22, 370, 300, 18)) > 10, \
         'Gemread status bar is missing'
 
@@ -208,19 +210,21 @@ def check_settings(session):
     opened = session.frame('gemread_settings_display')
     assert crop(opened, 80, 72, 480, 256) != crop(before, 80, 72, 480, 256), \
         'Gemread settings button did not open its dialog'
-    session.click(200, 135)  # Fit Width draft.
-    session.click(480, 303)  # Cancel.
+    x, y = (field(session, field(session, 0, 10)[0], 5)[:2]
+            if session.args.mode == 'proxy' else (80, 94))
+    session.click(x + 120, y + 63)  # Fit Width draft.
+    session.click(x + 400, y + 231)  # Cancel.
     cancelled = session.frame('gemread_settings_cancelled')
     assert crop(cancelled, 150, 80, 430, 250) == crop(before, 150, 80, 430, 250), \
         'Cancel changed the document display'
     session.click(590, 63)
-    session.click(200, 135)  # Fit Width.
-    session.click(200, 167)  # Hide thumbnails.
-    session.click(500, 230)  # Default zoom +25.
-    session.click(430, 97)  # Files tab.
+    session.click(x + 120, y + 63)  # Fit Width.
+    session.click(x + 120, y + 95)  # Hide thumbnails.
+    session.click(x + 420, y + 158)  # Default zoom +25.
+    session.click(x + 350, y + 25)  # Files tab.
     session.frame('gemread_settings_files')
-    session.click(200, 135)  # Disable remembering folders.
-    session.click(365, 303)  # Save.
+    session.click(x + 120, y + 63)  # Disable remembering folders.
+    session.click(x + 285, y + 231)  # Save.
     saved = session.frame('gemread_settings_saved')
     assert crop(saved, 22, 75, 575, 270) != crop(before, 22, 75, 575, 270), \
         'Saved display settings did not rerender the PDF'
@@ -292,6 +296,15 @@ def check_document(session, document_kind, color_fixture=False):
             work[2] - 120, work[3] - 40)
         assert third_color == 2 and third != second, \
             'Thumbnail rail did not advance to and open page 3'
+
+    if color_fixture:
+        control_key(session, 10)  # Ctrl+G.
+        check_dialog(session)
+        session.key(30)  # Page 1 replaces the selected page number.
+        session.key(40)
+        color, _ = dominant_color(raw_frame(session), work[0] + 120,
+                                  work[1] + 20, work[2] - 120, work[3] - 40)
+        assert color == 0, 'Go to Page did not navigate to page 1'
 
     # Zoom in through the shared toolbar, then exercise native scrollbars.
     session.click(work[0] + 30, work[1] + 10)

@@ -1,5 +1,5 @@
 /*
- * Implements a modeless, tabbed native GEM browser settings dialog. Browser
+ * Implements a tabbed native GEM browser settings dialog. Browser
  * pumping continues in the application event loop while this window is open.
  *
  * SPDX-License-Identifier: GPL-2.0-or-later
@@ -17,8 +17,8 @@ int gemscape_script_dialog(int kind, const char *origin, const char *message,
     char title[64], lines[2][64], prompt[256];
     OBJECT tree[7] = {{0}};
     TEDINFO edit = {0};
-    WORD x, y, width, height, result, outer_x, outer_y, outer_w, outer_h,
-        window;
+    WORD result, window, parent = 0, unused = 0;
+    GRECT work;
     snprintf(title, sizeof(title), "%.62s", origin);
     snprintf(lines[0], sizeof(lines[0]), "%.62s", message);
     snprintf(lines[1], sizeof(lines[1]), "%.62s",
@@ -67,37 +67,29 @@ int gemscape_script_dialog(int kind, const char *origin, const char *message,
     tree[6].ob_spec = (LONG)(intptr_t) "Cancel";
     tree[6].ob_flags |= LASTOB | (kind == 0 ? HIDETREE : 0);
     tree[6].ob_next = 0;
-    form_center(tree, &x, &y, &width, &height);
-    tree[0].ob_x = x;
-    tree[0].ob_y = y;
-    /* A real GEM window also occludes the browser's BGRA presenter layer.
-     * A bare form_dial rectangle clips VDI but does not cover that layer. */
-    wind_calc(WC_BORDER, 0, x, y, width, height, &outer_x, &outer_y, &outer_w,
-              &outer_h);
-    window = wind_create(0, outer_x, outer_y, outer_w, outer_h);
+    wind_get(0, WF_TOP, &parent, &unused, &unused, &unused);
+    window = gemctl_dialog_open(parent, "Website Message", 520, 158, &work);
     if (window <= 0)
         return 0;
-    wind_open(window, outer_x, outer_y, outer_w, outer_h);
-    form_dial(FMD_START, 0, 0, 0, 0, x, y, width, height);
-    objc_draw(tree, 0, MAX_DEPTH, x, y, width, height);
     {
         gemctl_text_edit_t editor;
         WORD cw, ch, bw, bh, vdi = graf_handle(&cw, &ch, &bw, &bh);
-        GRECT clip = {x, y, width, height};
-        GRECT field = {(WORD)(x + tree[4].ob_x), (WORD)(y + tree[4].ob_y),
-                       tree[4].ob_width, tree[4].ob_height};
+
         gemctl_text_edit_init(&editor, prompt, sizeof(prompt));
         if (kind == 2)
             gemctl_text_edit_focus(&editor, 1);
         result = 6;
         for (;;) {
-            WORD mx, my, buttons, modifiers, key, clicks;
-            if (kind == 2)
-                gemctl_text_edit_draw(&editor, vdi, &field, &clip);
-            WORD flags = evnt_multi(MU_BUTTON | MU_KEYBD, 1, 1, 1, 0, 0, 0, 0,
-                                    0, 0, 0, 0, 0, 0, NULL, 0, 0, &mx, &my,
-                                    &buttons, &modifiers, &key, &clicks);
-            if (flags == 0)
+            WORD mx, my, buttons, modifiers, key, clicks, msg[8];
+            gemctl_dialog_draw(window, vdi, tree, kind == 2 ? &editor : NULL,
+                               4);
+            GRECT field = {work.g_x + tree[4].ob_x, work.g_y + tree[4].ob_y,
+                           tree[4].ob_width, tree[4].ob_height};
+            WORD flags = evnt_multi(MU_BUTTON | MU_KEYBD | MU_MESAG, 1, 1, 1, 0,
+                                    0, 0, 0, 0, 0, 0, 0, 0, 0, msg, 0, 0, &mx,
+                                    &my, &buttons, &modifiers, &key, &clicks);
+            if (flags == 0 || ((flags & MU_MESAG) &&
+                               gemctl_dialog_message(window, msg, &work) < 0))
                 break;
             if (flags & MU_KEYBD) {
                 if ((key & 255) == 27)
@@ -124,7 +116,6 @@ int gemscape_script_dialog(int kind, const char *origin, const char *message,
         WORD no_clip[4] = {0};
         vs_clip(vdi, 0, no_clip);
     }
-    form_dial(FMD_FINISH, 0, 0, 0, 0, x, y, width, height);
     wind_close(window);
     wind_delete(window);
     if (result == 5 && text != NULL && capacity > 0)
@@ -257,10 +248,10 @@ static void settings_tree(gemscape_settings_dialog_t *dialog, OBJECT *tree,
 }
 
 void gemscape_settings_open(gemscape_settings_dialog_t *dialog, WORD vdi,
+                            WORD parent,
                             const gemscape_preferences_t *preferences)
 {
-    GRECT desktop;
-    WORD x, y, width, height;
+    GRECT work;
     if (dialog->handle > 0) {
         wind_set(dialog->handle, WF_TOP, 0, 0, 0, 0);
         return;
@@ -270,17 +261,10 @@ void gemscape_settings_open(gemscape_settings_dialog_t *dialog, WORD vdi,
     dialog->draft = *preferences;
     gemctl_text_edit_init(&dialog->home_edit, dialog->draft.homepage,
                           sizeof(dialog->draft.homepage));
-    wind_get(0, WF_CXYWH, &desktop.g_x, &desktop.g_y, &desktop.g_w,
-             &desktop.g_h);
-    wind_calc(WC_BORDER, NAME | CLOSER | MOVER, 0, 0, settings_width,
-              settings_height, &x, &y, &width, &height);
-    x = (WORD)(desktop.g_x + (desktop.g_w - width) / 2);
-    y = (WORD)(desktop.g_y + (desktop.g_h - height) / 2);
-    dialog->handle = wind_create(NAME | CLOSER | MOVER, x, y, width, height);
+    dialog->handle = gemctl_dialog_open(parent, "Gemscape Settings",
+                                        settings_width, settings_height, &work);
     if (dialog->handle <= 0)
         return;
-    wind_set_str(dialog->handle, WF_NAME, "Gemscape Settings");
-    wind_open(dialog->handle, x, y, width, height);
     gemscape_settings_draw(dialog);
 }
 
@@ -297,29 +281,11 @@ void gemscape_settings_draw(gemscape_settings_dialog_t *dialog)
 {
     OBJECT tree[settings_count];
     char labels[settings_count][128] = {{0}};
-    GRECT clip;
     if (dialog->handle <= 0)
         return;
     settings_tree(dialog, tree, labels);
-    wind_update(BEG_UPDATE);
-    wind_get(dialog->handle, WF_FIRSTXYWH, &clip.g_x, &clip.g_y, &clip.g_w,
-             &clip.g_h);
-    while (clip.g_w > 0 && clip.g_h > 0) {
-        objc_draw(tree, 0, MAX_DEPTH, clip.g_x, clip.g_y, clip.g_w, clip.g_h);
-        if (dialog->tab == 0) {
-            GRECT field = {(WORD)(tree[0].ob_x + tree[5].ob_x + 1),
-                           (WORD)(tree[0].ob_y + tree[5].ob_y + 1),
-                           (WORD)(tree[5].ob_width - 2),
-                           (WORD)(tree[5].ob_height - 2)};
-            gemctl_text_edit_draw(&dialog->home_edit, dialog->vdi, &field,
-                                  &clip);
-            WORD no_clip[4] = {0};
-            vs_clip(dialog->vdi, 0, no_clip);
-        }
-        wind_get(dialog->handle, WF_NEXTXYWH, &clip.g_x, &clip.g_y, &clip.g_w,
-                 &clip.g_h);
-    }
-    wind_update(END_UPDATE);
+    gemctl_dialog_draw(dialog->handle, dialog->vdi, tree,
+                       dialog->tab == 0 ? &dialog->home_edit : NULL, 5);
 }
 
 void gemscape_settings_message(gemscape_settings_dialog_t *dialog,

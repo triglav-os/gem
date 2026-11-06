@@ -295,3 +295,17 @@ Verification includes an unchanged offline rebuild with blocked HTTP proxies
 and unchanged archive/source timestamps, standalone SDK builds, Docker builds
 and the complete acceptance suite. Latest per-test outcomes remain in
 [LATEST.md](LATEST.md); migration logs are in `build/audit/musashi/`.
+
+## Titled modal dialogs and bounded text editing
+
+The modal RPC regression now inspects the live alert work rectangle and checks
+all four `11010` enclosure edges while a separate client remains responsive.
+Alerts are real movable windows; parent placement and title dragging are also
+covered by the File Manager and Gemread acceptance cases. Browser acceptance
+keeps a canvas repainting beneath moved settings and compares the dialog pixels.
+
+Ted rejects files containing NUL or exceeding 1 MiB, preserves existing data on
+rejected edits and uses the existing atomic-write platform helper for saves.
+Its model tests cover capacity, UTF-8 movement and undo; UI tests verify file
+contents and cancellation of an unsaved close. These checks do not add a new
+analyzer claim or change the previously recorded remaining diagnostics.

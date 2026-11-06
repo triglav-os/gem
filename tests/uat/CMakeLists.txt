@@ -200,3 +200,10 @@ foreach(mode direct proxy)
             --resources ${GEM_RESOURCES_DIR})
     set_tests_properties(uat_desktop_${mode} PROPERTIES ENVIRONMENT "RASTA_BIN=${GEM_TOOLS_DIR}/rasta" LABELS "uat;${mode}" TIMEOUT 30)
 endforeach()
+
+add_test(NAME uat_ted_proxy
+    COMMAND ${Python3_EXECUTABLE} -B ${CMAKE_CURRENT_SOURCE_DIR}/samples/ted.py
+        --binary $<TARGET_FILE:ted> --gemd $<TARGET_FILE:gemd>
+        --artifacts ${CMAKE_BINARY_DIR}/uat --resources ${GEM_RESOURCES_DIR})
+set_tests_properties(uat_ted_proxy PROPERTIES
+    ENVIRONMENT "RASTA_BIN=${GEM_TOOLS_DIR}/rasta" LABELS "uat;proxy" TIMEOUT 60)

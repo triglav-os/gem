@@ -31,8 +31,8 @@ enum {
     rasta_bits_per_pixel = 32,
     rasta_bytes_per_pixel = rasta_bits_per_pixel / 8,
     rasta_overlay_max = 8,
-    rasta_overlay_limit = 8 * 1024 * 1024
-    ,rasta_overlay_occlusion_max = 16
+    rasta_overlay_limit = 8 * 1024 * 1024,
+    rasta_overlay_occlusion_max = 18
 };
 
 typedef struct rasta_overlay {
@@ -70,8 +70,7 @@ static int overlay_occluded(const rasta_overlay_t *overlay, int x, int y)
 {
     for (unsigned i = 0; i < overlay->occlusion_count; ++i) {
         const int *r = overlay->occlusion[i];
-        if (x >= r[0] && y >= r[1] && x < r[0] + r[2] &&
-            y < r[1] + r[3])
+        if (x >= r[0] && y >= r[1] && x < r[0] + r[2] && y < r[1] + r[3])
             return 1;
     }
     return 0;
@@ -392,11 +391,11 @@ static void publish_rect(int x, int y, int width, int height)
     if (right <= x || bottom <= y)
         return;
     for (row = y; row < bottom; ++row) {
-        const uint8_t *source = (const uint8_t *)g_surface.pixels +
-                                (size_t)row * g_surface.pitch;
-        destination = g_present_pixels +
-                      ((size_t)row * g_surface.width + (size_t)x) *
-                          rasta_bytes_per_pixel;
+        const uint8_t *source =
+            (const uint8_t *)g_surface.pixels + (size_t)row * g_surface.pitch;
+        destination =
+            g_present_pixels +
+            ((size_t)row * g_surface.width + (size_t)x) * rasta_bytes_per_pixel;
         source_offset = (size_t)x / 8u;
         for (int column = x; column < right; ++column) {
             uint8_t value = (source[source_offset] &
@@ -416,14 +415,13 @@ static void publish_rect(int x, int y, int width, int height)
                 int oy = row - overlay->y;
 
                 if (overlay->pixels == NULL || overlay->visible == 0 ||
-                    overlay_occluded(overlay, column, row) != 0 ||
-                    ox < 0 || oy < 0 ||
-                    ox >= overlay->width || oy >= overlay->height)
+                    overlay_occluded(overlay, column, row) != 0 || ox < 0 ||
+                    oy < 0 || ox >= overlay->width || oy >= overlay->height)
                     continue;
-                blend_overlay_pixel(destination,
-                                    overlay->pixels +
-                                        ((size_t)oy * overlay->width +
-                                         (size_t)ox) * 4u);
+                blend_overlay_pixel(
+                    destination,
+                    overlay->pixels +
+                        ((size_t)oy * overlay->width + (size_t)ox) * 4u);
             }
             if (g_cursor_visible != 0 && column >= g_cursor_x &&
                 column < g_cursor_x + 16 && row >= g_cursor_y &&
@@ -492,8 +490,7 @@ int gem_raster_overlay_create(uint32_t id, int x, int y, uint16_t width,
     }
     if (overlay == NULL)
         return 0;
-    if (old_width == 0u &&
-        (overlay->x != x || overlay->y != y)) {
+    if (old_width == 0u && (overlay->x != x || overlay->y != y)) {
         old_x = overlay->x;
         old_y = overlay->y;
         old_width = overlay->width;
@@ -553,11 +550,8 @@ void gem_raster_overlay_set_visible(uint32_t id, int visible)
 
     if (overlay == NULL || overlay->visible == (visible != 0))
         return;
-    if (overlay->visible != 0)
-        publish_rect(overlay->x, overlay->y, overlay->width, overlay->height);
     overlay->visible = (visible != 0);
-    if (overlay->visible != 0)
-        publish_rect(overlay->x, overlay->y, overlay->width, overlay->height);
+    publish_rect(overlay->x, overlay->y, overlay->width, overlay->height);
 }
 
 void gem_raster_overlay_set_occlusion(uint32_t id, const int *rects,

@@ -1,6 +1,6 @@
 /*
  * Resolves Desktop file associations and launches their program through the
- * AES shell. Atari executable families have built-in Stout associations;
+ * AES shell. Built-in associations cover Stout programs, Gemread and Ted;
  * ordered desktop.cfg association sections override those defaults.
  *
  * SPDX-License-Identifier: GPL-2.0-or-later
@@ -26,8 +26,7 @@ static int desktop_pattern_match(const char *pattern, size_t pattern_length,
     size_t retry = 0u;
 
     while (name[name_index] != '\0') {
-        if (pattern_index < pattern_length &&
-            pattern[pattern_index] == '*') {
+        if (pattern_index < pattern_length && pattern[pattern_index] == '*') {
             star = pattern_index++;
             retry = name_index;
         } else if (pattern_index < pattern_length &&
@@ -43,8 +42,7 @@ static int desktop_pattern_match(const char *pattern, size_t pattern_length,
             return 0;
         }
     }
-    while (pattern_index < pattern_length &&
-           pattern[pattern_index] == '*')
+    while (pattern_index < pattern_length && pattern[pattern_index] == '*')
         ++pattern_index;
     return pattern_index == pattern_length;
 }
@@ -53,7 +51,8 @@ static int desktop_patterns_match(const char *patterns, const char *name)
 {
     const char *cursor = patterns;
 
-    if (patterns == NULL || name == NULL) return 0;
+    if (patterns == NULL || name == NULL)
+        return 0;
     while (*cursor != '\0') {
         const char *start;
         const char *end;
@@ -62,9 +61,11 @@ static int desktop_patterns_match(const char *patterns, const char *name)
                *cursor == ';')
             ++cursor;
         start = cursor;
-        while (*cursor != '\0' && *cursor != ',' && *cursor != ';') ++cursor;
+        while (*cursor != '\0' && *cursor != ',' && *cursor != ';')
+            ++cursor;
         end = cursor;
-        while (end > start && isspace((unsigned char)end[-1])) --end;
+        while (end > start && isspace((unsigned char)end[-1]))
+            --end;
         if (end > start &&
             desktop_pattern_match(start, (size_t)(end - start), name))
             return 1;
@@ -83,7 +84,8 @@ static int desktop_program_is_stout(const char *program)
 {
     const char *leaf;
 
-    if (program == NULL) return 0;
+    if (program == NULL)
+        return 0;
     leaf = strrchr(program, '/');
     leaf = leaf != NULL ? leaf + 1u : program;
     return strcasecmp(leaf, "stout") == 0;
@@ -103,25 +105,35 @@ static const char *desktop_associated_program(const char *name)
         kind = gemconf_get(&g_desktop.config, section, "kind", NULL);
         patterns = gemconf_get(&g_desktop.config, section, "patterns", NULL);
         program = gemconf_get(&g_desktop.config, section, "executable", NULL);
-        if (kind == NULL && patterns == NULL && program == NULL) continue;
+        if (kind == NULL && patterns == NULL && program == NULL)
+            continue;
         if (kind == NULL || strcasecmp(kind, "directory") == 0 ||
             program == NULL || program[0] == '\0' ||
             !desktop_patterns_match(patterns, name))
             continue;
         return program;
     }
+    if (desktop_patterns_match(
+            "*.pdf;*.xps;*.oxps;*.epub;*.mobi;*.fb2;*.cbz;*.cbt", name))
+        return "gemread";
+    if (desktop_patterns_match("*.text;*.txt;*.md;*.csv;*.log", name))
+        return "ted";
     return desktop_builtin_stout_pattern(name) ? "stout" : NULL;
 }
 
 static int desktop_resolve_program(const char *program, char *resolved,
                                    size_t resolved_size)
 {
-    if (desktop_program_is_stout(program)) {
-        if (gem_os_find_executable("stout", resolved, resolved_size) != 0 ||
-            gem_os_find_file("bin/apps/stout", resolved, resolved_size) != 0)
-            return 1;
-    }
-    if (strlen(program) >= resolved_size) return 0;
+    char relative[GEM_OS_PATH_MAX];
+    if (gem_os_find_executable(program, resolved, resolved_size))
+        return 1;
+    if (!strchr(program, '/') &&
+        snprintf(relative, sizeof(relative), "bin/apps/%s", program) <
+            (int)sizeof(relative) &&
+        gem_os_find_file(relative, resolved, resolved_size))
+        return 1;
+    if (strlen(program) >= resolved_size)
+        return 0;
     memcpy(resolved, program, strlen(program) + 1u);
     return 1;
 }
@@ -146,14 +158,16 @@ static int desktop_launch_tail(const desktop_browser_window_t *browser,
 
         if (strncmp(relative, browser->disk_root, root_length) == 0) {
             relative += root_length;
-            while (*relative == '/') ++relative;
+            while (*relative == '/')
+                ++relative;
         }
         length = snprintf(text, sizeof(text), "\"A:/%s\" \"%s\"", relative,
                           browser->disk_root);
     } else {
         length = snprintf(text, sizeof(text), "\"%s\"", entry->path);
     }
-    if (length <= 0 || (size_t)length >= sizeof(text)) return 0;
+    if (length <= 0 || (size_t)length >= sizeof(text))
+        return 0;
     tail[0] = (char)length;
     memcpy(tail + 1u, text, (size_t)length + 1u);
     return 1;
@@ -181,7 +195,8 @@ int desktop_browser_launch_entry(const desktop_browser_window_t *browser,
     char tail[128];
     int okay;
 
-    if (status == NULL || status_size == 0u) return 0;
+    if (status == NULL || status_size == 0u)
+        return 0;
     if (program == NULL && entry->is_executable != 0 &&
         browser->backend == DESKTOP_BROWSER_FILES)
         program = entry->path;

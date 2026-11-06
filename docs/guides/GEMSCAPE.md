@@ -113,3 +113,8 @@ The hosted CEF process still uses its existing `no_sandbox` configuration.
 Docker mounts the development checkout writable and is not a security boundary
 for hostile web content; see [security and safety](../architecture/SECURITY.md).
 The separate `gemscape_hosted` sample provides the GEM frame without CEF.
+
+Settings and website messages are titled, movable modal windows. They initially
+center on their parent (clamped to the display when necessary) and use the
+classic double enclosure. Page animation continues behind settings; the overlay
+excludes the dialog and its shadow during repainting and after movement.

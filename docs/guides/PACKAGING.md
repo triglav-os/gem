@@ -18,7 +18,7 @@ GEM does not guess which user files it can remove.
 
 ## Runtime contract
 
-The runtime contains gemd, Desktop/File Manager/Trash, Terminal, Calculator,
+The runtime contains gemd, Desktop/File Manager/Trash, Terminal, Calculator, Ted,
 Clock, Stout, Gemread and Gemscape. Hosted packages additionally contain Rasta
 and librasta; native framebuffer packages omit both. Libraries contain only
 the shared dependencies of these programs. Static archives, public headers,

@@ -15,6 +15,7 @@ import shutil
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from run import Session
 from file_drop import double_click
+from dialog_checks import check_dialog, pixel
 
 
 def shortcut(session, scan, shift=False):
@@ -38,9 +39,12 @@ def popup(session, row, x=300, y=108, capture=None):
     session.event(3, x, y)
     session.event(30, x, y)
     session.event(31, x, y)
+    px, py = min(x, 404), min(y, 116)
     if capture:
-        session.frame(capture)
-    px, py = min(x, 404), min(y, 120)
+        for index in range(3):
+            frame = session.frame(capture + (f'_{index}' if index else ''))
+            assert all(pixel(frame, px+i, py) for i in range(236)), 'Popup top border missing'
+            assert all(pixel(frame, px, py+i) for i in range(284)), 'Popup left border missing'
     session.click(px + 80, py + row * 20 + 10)
 
 
@@ -53,12 +57,14 @@ def check(session, work, data):
     double_click(session, 52, 54)
     session.click(300, 108)  # First file, using only normal left-click selection.
     session.key(76)
-    session.click(274, 224)
+    check_dialog(session)
+    session.key(30)  # Explicit first confirmation button.
     assert not (work/'initial.txt').exists(), 'Delete acted on the desktop location instead of the file'
     popup(session, 3, 500, 240)  # Empty this test's Trash before the batch checks.
-    session.click(274, 224)
+    session.key(30)  # Explicit first confirmation button.
     # Right-click blank space and create a folder, then exercise all templates.
     popup(session, 8, 500, 240, 'folder_context')
+    check_dialog(session)
     name(session, 'target')
     assert (work/'target').is_dir(), 'Context menu New Folder failed'
     for row, filename in ((9, 'note.txt'), (10, 'note.md'), (11, 'page.html'), (12, 'table.csv')):
@@ -108,7 +114,7 @@ def check(session, work, data):
     session.key(40)  # Default Cancel must leave both files intact.
     assert len(list((work/'target').iterdir())) == 2
     session.key(76)
-    session.click(274, 224)
+    session.key(30)  # Explicit first confirmation button.
     assert not list((work/'target').iterdir()), 'Multi-selection Delete failed'
     assert (work/'target').is_dir(), 'Select All included the parent'
     double_click(session, 592, 348)

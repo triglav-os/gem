@@ -99,13 +99,13 @@ def check(session, fixture, folder, open_folder, blocked_folder, xdg):
     workspace.chmod(0o555)
     try:
         drag(session, 272, 164, 592, 348)
-        session.click(274, 224)  # Confirm the move; rename must fail.
+        session.key(30)  # Confirm the move; rename must fail.
         workspace.chmod(workspace_mode)
         failed = session.frame('folder_drop_failed')
         assert blocked_folder.exists(), 'Failed move unexpectedly removed source'
         assert crop(failed, 150, 150, 340, 100) != \
             crop(icons, 150, 150, 340, 100), 'Move failure alert did not open'
-        session.click(320, 224)  # Dismiss Cannot move.
+        session.key(40)  # Dismiss Cannot move.
     finally:
         workspace.chmod(workspace_mode)
 
@@ -129,7 +129,7 @@ def check(session, fixture, folder, open_folder, blocked_folder, xdg):
     pending = session.frame('folder_drop_pending')
     assert crop(pending, 568, 368, 64, 24) != \
         crop(before, 568, 368, 64, 24), 'Trash title was not inverted'
-    session.click(274, 224)
+    session.key(30)
     folder_payload = xdg / 'Trash' / 'files' / folder.name
     folder_info = xdg / 'Trash' / 'info' / (folder.name + '.trashinfo')
     assert not folder.exists(), 'Confirmed folder drop left the source in place'
@@ -150,7 +150,7 @@ def check(session, fixture, folder, open_folder, blocked_folder, xdg):
 
     workspace_before_move = session.frame('workspace_before_file_move')
     drag(session, 300, 126, 592, 348)
-    session.click(274, 224)  # Trash, the non-default left button.
+    session.key(30)  # Trash, the non-default left button.
     moved_workspace = session.frame('file_drop_result')
     payload = xdg / 'Trash' / 'files' / fixture.name
     info = xdg / 'Trash' / 'info' / (fixture.name + '.trashinfo')
@@ -187,7 +187,7 @@ def check(session, fixture, folder, open_folder, blocked_folder, xdg):
         'Default Cancel emptied Trash'
 
     choose_file_item(session, 92)
-    session.click(274, 224)  # Empty, the non-default left button.
+    session.key(30)  # Empty, the non-default left button.
     assert not folder_payload.exists() and not folder_info.exists(), \
         'Confirmed Empty failed'
     session.frame('trash_emptied')

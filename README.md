@@ -42,17 +42,19 @@ for build options and display setup.
 
 ## Run with Rasta
 
-Start Rasta, gemd, Desktop and Terminal together in Docker:
+Start Rasta, gemd and Desktop in Docker:
 
 ```sh
 make run
 ```
 
-Alternatively, press F5 with **GEM — Desktop and Terminal** in VS Code to
-start those two applications together under the Docker debugger. Use `make stop`
+Alternatively, press F5 with **GEM — Desktop** in VS Code to
+start Desktop under the Docker debugger. Open Terminal, Files or Gemscape
+from their desktop icons. Use `make stop`
 to remove this checkout's interactive container. See the
 [hosted development guide](docs/guides/HOSTED_DEVELOPMENT.md) for setup and the
 [samples guide](docs/guides/SAMPLES.md) for SDK builds.
+[Ted](docs/guides/TED.md) edits plain-text files; Gemread opens PDF documents.
 
 ## Run on a Linux framebuffer
 

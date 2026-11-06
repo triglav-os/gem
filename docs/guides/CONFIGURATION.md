@@ -148,7 +148,13 @@ are matched case-insensitively in section order; multiple patterns may be
 separated by commas or semicolons. A matching data file such as `.TXT` is
 passed to its registered executable through `shel_write()`. `.PRG`, `.TOS`,
 `.TTP`, `.APP`, `.GTP` and `.ACC` have a built-in `stout` fallback when no
-configured association overrides them. Mounted-image launches pass an `A:/`
+configured association overrides them. Host `.pdf`, `.xps`, `.oxps`, `.epub`,
+`.mobi`, `.fb2`, `.cbz` and `.cbt` files default to Gemread; `.text`, `.txt`,
+`.md`, `.csv` and `.log` default to Ted. These defaults work without creating
+a config file. An explicit matching association takes precedence. No separate
+`desktop.inf` is required: the existing `shel_get()`/`shel_put()` compatibility
+translation remains available to classic Desktop clients.
+Mounted-image Stout launches pass an `A:/`
 guest path and the source image as separate quoted tail arguments, while host
 files pass their full quoted path. The association is therefore the same for
 normal and mounted File Manager windows and retains the normal AES application
@@ -189,7 +195,8 @@ the first load, and every initialized object must eventually be cleared.
 ## Gemread document viewer
 
 Gemread has File/Open, Close Document, Settings and Quit commands, plus a View
-menu for zoom, Fit Page/Fit Width, thumbnails and previous/next page. Ctrl+O
+menu for zoom, Fit Page/Fit Width, thumbnails, previous/next page and Go to Page.
+Click the toolbar page counter or press Ctrl+G to enter a page number. Ctrl+O
 opens the chooser, Ctrl+W closes the document, and Ctrl+Q quits. The toolbar's
 three-line button opens the same tabbed settings dialog as File/Settings.
 

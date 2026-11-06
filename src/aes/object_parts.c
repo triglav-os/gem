@@ -126,8 +126,8 @@ void aes_draw_ted_object(const OBJECT *tree, WORD object, const OBJECT *obj,
                    text != NULL ? text : "");
     classic_ted = ted->te_font == -3 || ted->te_font == -5;
     inset = classic_ted != 0 && ted->te_thickness > 0 ? ted->te_thickness : 0;
-    text_left = classic_ted != 0 ? (WORD)(rect[0] + inset)
-                                 : (WORD)(rect[0] + 2);
+    text_left =
+        classic_ted != 0 ? (WORD)(rect[0] + inset) : (WORD)(rect[0] + 2);
     text_top = (WORD)(rect[1] + inset);
     text_right = (WORD)(rect[2] - inset);
     text_bottom = (WORD)(rect[3] - inset);
@@ -166,8 +166,7 @@ void aes_draw_ted_object(const OBJECT *tree, WORD object, const OBJECT *obj,
         text_y =
             (WORD)(text_top +
                    ((text_bottom - text_top + 1 - vdi_font_text_height()) > 0
-                        ? (text_bottom - text_top +
-                           (classic_ted != 0 ? 2 : 1) -
+                        ? (text_bottom - text_top + (classic_ted != 0 ? 2 : 1) -
                            vdi_font_text_height()) /
                               2
                         : 0) +
@@ -231,8 +230,7 @@ void aes_draw_ted_object(const OBJECT *tree, WORD object, const OBJECT *obj,
         text_y =
             (WORD)(text_top +
                    ((text_bottom - text_top + 1 - vdi_font_text_height()) > 0
-                        ? (text_bottom - text_top +
-                           (classic_ted != 0 ? 2 : 1) -
+                        ? (text_bottom - text_top + (classic_ted != 0 ? 2 : 1) -
                            vdi_font_text_height()) /
                               2
                         : 0) +
@@ -246,8 +244,7 @@ void aes_draw_ted_object(const OBJECT *tree, WORD object, const OBJECT *obj,
         text_y =
             (WORD)(text_top +
                    ((text_bottom - text_top + 1 - vdi_font_text_height()) > 0
-                        ? (text_bottom - text_top +
-                           (classic_ted != 0 ? 2 : 1) -
+                        ? (text_bottom - text_top + (classic_ted != 0 ? 2 : 1) -
                            vdi_font_text_height()) /
                               2
                         : 0) +
@@ -291,7 +288,7 @@ void aes_draw_dialog_frame(const WORD rect[4])
 
     for (inset = 0; inset < 5; ++inset) {
         WORD color =
-            (inset == 0 || inset >= 3) ? aes_dark_color() : aes_light_color();
+            (inset == 2 || inset == 4) ? aes_light_color() : aes_dark_color();
 
         left = (WORD)(rect[0] + inset);
         top = (WORD)(rect[1] + inset);

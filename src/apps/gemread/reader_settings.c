@@ -7,6 +7,7 @@
  */
 #include "reader_settings.h"
 #include <gem/gemconf.h>
+#include <gem/gemctl.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -129,30 +130,28 @@ static void settings_tree(OBJECT tree[12], char labels[12][96],
     tree[11].ob_next = 0;
 }
 
-int gemread_settings_dialog(gemread_preferences_t *preferences)
+int gemread_settings_dialog(gemread_preferences_t *preferences, WORD parent,
+                            WORD vdi)
 {
     gemread_preferences_t draft = *preferences;
     OBJECT tree[12];
     char labels[12][96] = {{0}};
-    WORD x, y, w, h, ox, oy, ow, oh, handle;
+    GRECT work;
+    WORD handle;
     int tab = 0, saved = 0;
     settings_tree(tree, labels, &draft, tab, 0, 0);
-    form_center(tree, &x, &y, &w, &h);
-    wind_calc(WC_BORDER, NAME, x, y, w, h, &ox, &oy, &ow, &oh);
-    handle = wind_create(NAME, ox, oy, ow, oh);
+    handle = gemctl_dialog_open(parent, "Gemread Settings", 480, 256, &work);
     if (handle <= 0)
         return 0;
-    wind_set_str(handle, WF_NAME, "Gemread Settings");
-    wind_open(handle, ox, oy, ow, oh);
-    form_dial(FMD_START, 0, 0, 0, 0, x, y, w, h);
     for (;;) {
         WORD mx, my, buttons, modifiers, key, clicks, msg[8], hit = NIL;
-        settings_tree(tree, labels, &draft, tab, x, y);
-        objc_draw(tree, 0, MAX_DEPTH, x, y, w, h);
+        settings_tree(tree, labels, &draft, tab, work.g_x, work.g_y);
+        gemctl_dialog_draw(handle, vdi, tree, NULL, 0);
         WORD event = evnt_multi(MU_BUTTON | MU_KEYBD | MU_MESAG, 1, 1, 1, 0, 0,
                                 0, 0, 0, 0, 0, 0, 0, 0, msg, 0, 0, &mx, &my,
                                 &buttons, &modifiers, &key, &clicks);
-        if (!event || ((event & MU_MESAG) && msg[0] == AP_TERM))
+        if (!event || ((event & MU_MESAG) &&
+                       gemctl_dialog_message(handle, msg, &work) < 0))
             break;
         if (event & MU_KEYBD) {
             if ((key & 255) == 27)
@@ -197,7 +196,6 @@ int gemread_settings_dialog(gemread_preferences_t *preferences)
                 draft.folder[0] = '\0';
         }
     }
-    form_dial(FMD_FINISH, 0, 0, 0, 0, x, y, w, h);
     wind_close(handle);
     wind_delete(handle);
     return saved;

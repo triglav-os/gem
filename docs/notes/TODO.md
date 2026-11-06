@@ -6,10 +6,12 @@ behavior is implemented. See the [audit](../tests/SECURITY_AUDIT.md) and
 
 - Add coverage-guided fuzzing for RSC relocation, RPC tree decoding, FAT12/MSA
   and PRG relocation. Keep minimized failures as regression fixtures.
-- Render file/program icons in Desktop and apply ordered
-  `[association.NNN]` rules: registered data patterns launch their executable,
-  while recognized GEM/TOS program files launch directly. The configuration
-  and DESKTOP.INF `#G/#F/#P/#D` translation already preserve these rules.
+- Replace the temporary Files, Gemscape and Terminal desktop launcher artwork
+  with reviewed icons. Ordered file associations and default PDF/Ted launches
+  now have direct/proxy acceptance coverage.
+- Extend Ted with a shared system clipboard, Unicode font/input support and
+  multi-level undo if required; the current small editor keeps its clipboard
+  local, preserves UTF-8 bytes and supports one undo/redo snapshot.
 - Reduce the remaining Clang analyzer diagnostics to small reproductions.
   Track bitmap ownership explicitly if integer-valued GEM pointer fields keep
   confusing analysis; preserve the public BITBLK representation.

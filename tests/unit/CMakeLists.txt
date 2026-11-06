@@ -15,3 +15,5 @@ set_tests_properties(test_report PROPERTIES LABELS unit)
 add_subdirectory(security)
 
 add_subdirectory(paths)
+
+add_subdirectory(ted)

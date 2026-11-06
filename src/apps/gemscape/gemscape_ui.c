@@ -749,9 +749,9 @@ static void gemscape_pointer(gemscape_state_t *state, WORD x, WORD y,
              &work.g_h);
     gemscape_layout(state, &work, &bar, &content, &status);
     gemscape_address_rect(&bar, &field);
-    int content_hit = owner == state->handle && x >= content.g_x &&
-                      x < content.g_x + content.g_w && y >= content.g_y &&
-                      y < content.g_y + content.g_h;
+    int content_hit = state->settings.handle <= 0 && owner == state->handle &&
+                      x >= content.g_x && x < content.g_x + content.g_w &&
+                      y >= content.g_y && y < content.g_y + content.g_h;
     if (pressed & 1) {
         uint32_t now = gem_os_ticks_ms();
         if (now - state->last_click_tick < 400 &&
@@ -767,6 +767,9 @@ static void gemscape_pointer(gemscape_state_t *state, WORD x, WORD y,
             gemscape_settings_action(
                 state, gemscape_settings_click(&state->settings, x, y,
                                                &state->preferences));
+        } else if (state->settings.handle > 0) {
+            wind_set(state->settings.handle, WF_TOP, 0, 0, 0, 0);
+            return;
         } else if (owner == state->handle && y >= bar.g_y &&
                    y < bar.g_y + bar.g_h) {
             state->browser_focused = 0;
@@ -776,7 +779,7 @@ static void gemscape_pointer(gemscape_state_t *state, WORD x, WORD y,
             if (x >= bar.g_x + bar.g_w - bar.g_h) {
                 gemctl_text_edit_blur(&state->address_edit);
                 gemscape_settings_open(&state->settings, state->vdi_handle,
-                                       &state->preferences);
+                                       state->handle, &state->preferences);
             } else if (x < field.g_x) {
                 int slot = (x - bar.g_x) / bar.g_h;
                 gemctl_text_edit_blur(&state->address_edit);
@@ -1059,7 +1062,9 @@ int gemscape_main(int argc, char **argv)
                 gemscape_toggle_full(&state);
                 gemscape_resize_browser(&state);
             } else if (msg[0] == WM_TOPPED) {
-                (void)wind_set(state.handle, WF_TOP, 0, 0, 0, 0);
+                (void)wind_set(state.settings.handle > 0 ? state.settings.handle
+                                                         : state.handle,
+                               WF_TOP, 0, 0, 0, 0);
             } else if (msg[0] == WM_ARROWED || msg[0] == WM_VSLID ||
                        msg[0] == WM_HSLID) {
 #if defined(GEMSCAPE_CEF) && GEMSCAPE_CEF

@@ -172,6 +172,10 @@ specific direct checkpoints after reviewing an intended UI change:
 python3 -B tests/uat/record.py 21 26
 ```
 
+The November 2026 dialog review updates demos 24, 27 and 33 for the `11010`
+enclosure, demo 32 for titled parent-centered alerts, and demo 34 for the
+file chooser enclosure.
+
 Inspect the PBMs in `tests/data/uat/` and compare them with the demo's source and
 catalog requirements before retaining them. Run `make tests` afterwards: proxy
 checkpoints must match the same direct references. `--capture` on `run.py`
@@ -282,3 +286,19 @@ a relocated export, including the FAT12/MSA CLI and pkg-config metadata. These
 are integration checks, not additional numbered demo UAT cases. Native package
 contents/dependencies can be checked with `install_layout.py --no-gui`; physical
 framebuffer/input acceptance still requires hardware.
+
+## Dialog, document and editor regressions
+
+File-command scenarios assert the context menu's top/left enclosure, the `11010`
+modal frame, parent-relative placement, title dragging and successful submission
+from the moved prompt. Desktop cases check the Terminal shortcut and quoted,
+case-insensitive PDF/Ted file associations. Gemread verifies the visible menu
+icon and Ctrl+G page navigation through a movable prompt. The browser control
+fixture paints an alternating canvas while settings move; repeated captured
+frames must preserve every dialog pixel, excluding the mouse pointer.
+
+`uat_ted_proxy` edits a real `.text` file, exercises multiline input, selection,
+copy/paste, cut, undo, atomic save, Save As, New/Open and cancellation of an
+unsaved close.
+`test_ted_document` covers UTF-8 character boundaries, selection replacement,
+NUL rejection, the 1 MiB limit and unchanged data after a rejected edit.

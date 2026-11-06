@@ -30,7 +30,7 @@ void gemd_overlay_window_top_changed(void)
     for (size_t i = 0; i < gemd_overlay_max; ++i) {
         gemd_overlay_t *overlay = &g_overlays[i];
         aes_window_t *target;
-        int occlusion[16][4];
+        int occlusion[18][4];
         unsigned count = 0;
 
         if (overlay->id == 0u || overlay->window == 0)
@@ -49,8 +49,8 @@ void gemd_overlay_window_top_changed(void)
                 continue;
             intersection.g_x = cover->outer.g_x;
             intersection.g_y = cover->outer.g_y;
-            intersection.g_w = cover->outer.g_w;
-            intersection.g_h = cover->outer.g_h;
+            intersection.g_w = cover->outer.g_w + 1;
+            intersection.g_h = cover->outer.g_h + 1;
             if (intersection.g_x < target->work.g_x) {
                 intersection.g_w -= target->work.g_x - intersection.g_x;
                 intersection.g_x = target->work.g_x;
@@ -73,6 +73,18 @@ void gemd_overlay_window_top_changed(void)
                 occlusion[count][2] = intersection.g_w;
                 occlusion[count][3] = intersection.g_h;
                 ++count;
+            }
+        }
+        const GRECT *modal[2] = {aes_modal_cover,
+                                 aes_state.modal_form_z > target->z_order
+                                     ? &aes_state.modal_form_rect
+                                     : NULL};
+        for (int m = 0; m < 2 && count < 18; ++m) {
+            if (modal[m] && modal[m]->g_w > 0 && modal[m]->g_h > 0) {
+                occlusion[count][0] = modal[m]->g_x;
+                occlusion[count][1] = modal[m]->g_y;
+                occlusion[count][2] = modal[m]->g_w;
+                occlusion[count++][3] = modal[m]->g_h;
             }
         }
         gem_raster_overlay_set_visible(overlay->id, 1);

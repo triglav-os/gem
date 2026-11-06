@@ -6,6 +6,21 @@ Unreleased.
 
 ## Unreleased
 
+- File Manager context menus retain all four borders. Naming prompts, alerts,
+  browser/reader settings and website dialogs use titled movable windows,
+  parent-relative placement and the classic `11010` enclosure.
+- Animated browser overlays respect dialog coverage and window shadows;
+  moving settings preserves its contents while the page continues repainting.
+- PDF and supported document extensions default to Gemread; `.text`, `.txt`,
+  Markdown, CSV and log files default to the new lightweight Ted editor.
+  Explicit Desktop associations continue to override these defaults.
+- Desktop starts without a Terminal window. Its Terminal icon launches the
+  shell on demand; F5 continues to use `make run` and `make stop`.
+- Gemread's three-line menu icon is visible. Its page counter, View menu and
+  Ctrl+G open a validated Go to Page dialog.
+- Ted provides New/Open/Save/Save As, mouse/keyboard selection, Cut/Copy/Paste,
+  single-step Undo/Redo, scrolling, atomic saves and unsaved-change confirmation.
+
 - Runtime packages now contain only their applications, shared dependencies,
   used resources and notices. SDK files, unused Clock artwork, sample disks and
   extracted assets are excluded. Native packages omit the hosted viewer/backend.

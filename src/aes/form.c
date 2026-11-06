@@ -308,39 +308,46 @@ WORD form_dial(WORD flag, WORD x1, WORD y1, WORD w1, WORD h1, WORD x2, WORD y2,
         aes_redraw_region(&dirty);
     }
 
+    aes_notify_window_topology_changed();
     return 1;
+}
+
+void aes_dialog_parent_rect(GRECT *area)
+{
+    aes_desktop_rect(area);
+    const aes_window_t *parent = NULL;
+    for (size_t i = 0; i < AES_MAX_WINDOWS; ++i) {
+        const aes_window_t *w = &aes_state.windows[i];
+        if (w->used && w->open && w->owner == aes_state.current_app_id &&
+            (!parent || w->z_order > parent->z_order))
+            parent = w;
+    }
+    if (parent)
+        *area = parent->outer;
 }
 
 WORD form_center(OBJECT *tree, WORD *cx, WORD *cy, WORD *cw, WORD *ch)
 {
-    WORD width = 200;
-    WORD height = 100;
-
-    if (tree != NULL) {
-        width = tree[ROOT].ob_width;
-        height = tree[ROOT].ob_height;
-    }
-    if (aes_ensure_vdi() != 0) {
-        if (cx != NULL) {
-            *cx = (WORD)((aes_state.work_out[0] + 1 - width) / 2);
-        }
-        if (cy != NULL) {
-            *cy = (WORD)((aes_state.work_out[1] + 1 - height) / 2);
-        }
-    } else {
-        if (cx != NULL) {
-            *cx = 0;
-        }
-        if (cy != NULL) {
-            *cy = 0;
-        }
-    }
-    if (cw != NULL) {
+    GRECT area, screen;
+    WORD width = tree ? tree[ROOT].ob_width : 200;
+    WORD height = tree ? tree[ROOT].ob_height : 100;
+    aes_ensure_vdi();
+    aes_dialog_parent_rect(&area);
+    aes_desktop_rect(&screen);
+    WORD x = area.g_x + (area.g_w - width) / 2;
+    WORD y = area.g_y + (area.g_h - height) / 2;
+    x = aes_max_word(screen.g_x,
+                     aes_min_word(x, screen.g_x + screen.g_w - width));
+    y = aes_max_word(screen.g_y,
+                     aes_min_word(y, screen.g_y + screen.g_h - height));
+    if (cx)
+        *cx = x;
+    if (cy)
+        *cy = y;
+    if (cw)
         *cw = width;
-    }
-    if (ch != NULL) {
+    if (ch)
         *ch = height;
-    }
     return 1;
 }
 

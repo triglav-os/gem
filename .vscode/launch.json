@@ -2,7 +2,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "GEM \u2014 Desktop and Terminal",
+            "name": "GEM \u2014 Desktop",
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/bin/core/gemd",

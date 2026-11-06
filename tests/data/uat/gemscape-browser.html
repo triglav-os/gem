@@ -45,6 +45,18 @@
   dialog.onclick = () => report('confirm', confirm('Continue browser test?'));
   document.getElementById('prompt').onclick = () => report('prompt', prompt('Enter browser test text:', 'default'));
   addEventListener('scroll', () => report('scroll', JSON.stringify({x:scrollX,y:scrollY,w:innerWidth,h:innerHeight,total:document.documentElement.scrollHeight})));
+  if (location.search === '?animate') {
+    const canvas = document.createElement('canvas');
+    canvas.width = 1200; canvas.height = 900;
+    canvas.style = 'position:fixed;left:0;top:0;pointer-events:none';
+    document.body.append(canvas);
+    const context = canvas.getContext('2d');
+    let tick = 0;
+    setInterval(() => {
+      context.fillStyle = ++tick % 2 ? '#ff0000' : '#00ff00';
+      context.fillRect(0, 0, 1200, 900);
+    }, 40);
+  }
   report('loaded', location.pathname + location.search);
   read();
   fetch('/cacheable').then(r=>r.text()).then(v=>report('cache',v));

@@ -164,14 +164,17 @@ void desktop_open_selected_icon(void)
     }
     if (selected->is_trash != 0) {
         desktop_open_trash();
-    } else if (selected->launcher == 2) {
+    } else if (selected->launcher >= 2) {
+        const char *app = selected->launcher == 2 ? "gemscape" : "terminal";
+        char relative[64];
+        snprintf(relative, sizeof(relative), "bin/apps/%s", app);
         char program[GEM_OS_PATH_MAX], tail[2] = {0};
-        if ((gem_os_find_executable("gemscape", program, sizeof(program)) ||
-             gem_os_find_file("bin/apps/gemscape", program, sizeof(program))) &&
+        if ((gem_os_find_executable(app, program, sizeof(program)) ||
+             gem_os_find_file(relative, program, sizeof(program))) &&
             shel_write(1, 1, 0, program, tail))
-            desktop_set_status("Gemscape launched.");
+            desktop_set_status("Application launched.");
         else
-            form_alert(1, "[1][ Unable to launch Gemscape. ][ OK ]");
+            form_alert(1, "[1][ Unable to launch application. ][ OK ]");
     } else {
         desktop_open_disk_path(selected->path, selected->label);
     }
@@ -504,13 +507,15 @@ void desktop_install_trash_icon(void)
 
 void desktop_install_launchers(void)
 {
-    for (int launcher = 1; launcher <= 2; ++launcher) {
+    for (int launcher = 1; launcher <= 3; ++launcher) {
         if (g_desktop.icon_count >= DESKTOP_MAX_ICONS)
             return;
         desktop_icon_entry_t *entry = &g_desktop.icons[g_desktop.icon_count];
         memset(entry, 0, sizeof(*entry));
         snprintf(entry->label, sizeof(entry->label), "%s",
-                 launcher == 1 ? "Files" : "Gemscape");
+                 launcher == 1   ? "Files"
+                 : launcher == 2 ? "Gemscape"
+                                 : "Terminal");
         if (launcher == 1 && !gem_os_getcwd(entry->path, sizeof(entry->path)))
             strcpy(entry->path, "/");
         entry->asset = launcher == 1 ? &desktop_folder_icon_asset

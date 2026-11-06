@@ -391,7 +391,7 @@ static int frame_pixel(const unsigned char *pixels, int x, int y)
     return pixels[((size_t)y * frame_width + x) * frame_pixel_bytes] == 0u;
 }
 
-static void alert_frame(const unsigned char *before)
+static void alert_frame(const unsigned char *before, int healthy)
 {
     static unsigned char after[frame_bytes];
     int left = frame_width, top = frame_height, right = -1, bottom = -1;
@@ -411,8 +411,20 @@ static void alert_frame(const unsigned char *before)
         }
     }
     assert(right - left > 40 && bottom - top > 40);
-    for (int inset = 0; inset < 4; ++inset) {
-        int ink = inset != 1;
+    gem_rpc_wind_get_req_t get = {0, WF_TOP};
+    gem_rpc_wind_get_rsp_t reply;
+    send_request(healthy, GEM_RPC_WIND_GET, &get, sizeof(get));
+    assert(receive_reply(healthy, &reply, sizeof(reply)) == 1 && reply.w1 > 0);
+    get.handle = reply.w1;
+    get.field = WF_CXYWH;
+    send_request(healthy, GEM_RPC_WIND_GET, &get, sizeof(get));
+    assert(receive_reply(healthy, &reply, sizeof(reply)) == 1);
+    left = reply.w1;
+    top = reply.w2;
+    right = left + reply.w3 - 1;
+    bottom = top + reply.w4 - 1;
+    for (int inset = 0; inset < 5; ++inset) {
+        int ink = inset != 2 && inset != 4;
         assert(frame_pixel(after, left + 20, top + inset) == ink);
         assert(frame_pixel(after, left + 20, bottom - inset) == ink);
         assert(frame_pixel(after, left + inset, top + 20) == ink);
@@ -432,7 +444,7 @@ static void modal_waits(int healthy)
     send_request(owner, GEM_RPC_FORM_ALERT, &alert, sizeof(alert));
     nanosleep(&pause, NULL);
     assert(call(healthy, GEM_RPC_GRAF_HANDLE, NULL, 0) > 0);
-    alert_frame(before);
+    alert_frame(before, healthy);
     input_send(1, 40, 0);
     input_send(2, 40, 0);
     assert(receive_reply(owner, NULL, 0) == 1);

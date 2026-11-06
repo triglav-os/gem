@@ -19,85 +19,20 @@ static WORD dialog_open(OBJECT *tree)
     if (handle <= 0)
         return 0;
     wind_open(handle, x, y, w, h);
-    form_dial(FMD_START, 0, 0, 0, 0, tree[0].ob_x, tree[0].ob_y,
-              tree[0].ob_width, tree[0].ob_height);
     return handle;
 }
 
 static void dialog_close(OBJECT *tree, WORD handle)
 {
-    form_dial(FMD_FINISH, 0, 0, 0, 0, tree[0].ob_x, tree[0].ob_y,
-              tree[0].ob_width, tree[0].ob_height);
+    (void)tree;
     wind_close(handle);
     wind_delete(handle);
 }
 
 int desktop_name_dialog(const char *title, char *text, size_t capacity)
 {
-    OBJECT tree[5];
-    gemctl_text_edit_t editor;
-    char draft[256];
-    WORD x, y, w, h, handle;
-    int accepted = 0;
-    snprintf(draft, sizeof(draft), "%s", text);
-    desktop_init_object(&tree[0], NIL, 1, 4, G_BOX, NONE, NORMAL, 0x00021170L,
-                        0, 0, 480, 132);
-    desktop_init_object(&tree[1], 2, NIL, NIL, G_STRING, NONE, NORMAL,
-                        (LONG)(intptr_t)title, 12, 12, 450, 20);
-    desktop_init_object(&tree[2], 3, NIL, NIL, G_BOX, NONE, NORMAL, 0x00011170L,
-                        12, 42, 456, 28);
-    desktop_init_object(&tree[3], 4, NIL, NIL, G_BUTTON, SELECTABLE | DEFAULT,
-                        NORMAL, (LONG)(intptr_t) "OK", 234, 92, 110, 26);
-    desktop_init_object(&tree[4], 0, NIL, NIL, G_BUTTON, SELECTABLE | LASTOB,
-                        NORMAL, (LONG)(intptr_t) "Cancel", 356, 92, 110, 26);
-    form_center(tree, &x, &y, &w, &h);
-    tree[0].ob_x = x;
-    tree[0].ob_y = y;
-    handle = dialog_open(tree);
-    if (!handle)
-        return 0;
-    GRECT clip = {x, y, w, h};
-    GRECT field = {(WORD)(x + 13), (WORD)(y + 43), 454, 26};
-    gemctl_text_edit_init(&editor, draft, sizeof(draft));
-    gemctl_text_edit_focus(&editor, 1);
-    for (;;) {
-        WORD mx, my, buttons, modifiers, key, clicks, msg[8];
-        objc_draw(tree, 0, MAX_DEPTH, x, y, w, h);
-        gemctl_text_edit_draw(&editor, g_desktop.vdi_handle, &field, &clip);
-        WORD event = evnt_multi(MU_BUTTON | MU_KEYBD | MU_MESAG, 1, 1, 1, 0, 0,
-                                0, 0, 0, 0, 0, 0, 0, 0, msg, 0, 0, &mx, &my,
-                                &buttons, &modifiers, &key, &clicks);
-        if (!event)
-            break;
-        if ((event & MU_MESAG) && msg[0] == AP_TERM)
-            break;
-        if (event & MU_KEYBD) {
-            if ((key & 255) == 27)
-                break;
-            if ((key & 255) == 13 || (key & 255) == 10) {
-                accepted = 1;
-                break;
-            }
-            gemctl_text_edit_key_mod(&editor, (uint16_t)key,
-                                     (uint16_t)modifiers);
-        }
-        if (event & MU_BUTTON) {
-            WORD hit = objc_find(tree, 0, MAX_DEPTH, mx, my);
-            if (hit == 3 || hit == 4) {
-                accepted = hit == 3;
-                break;
-            }
-            if (hit == 2)
-                gemctl_text_edit_click(&editor, g_desktop.vdi_handle, &field,
-                                       mx, modifiers & K_LSHIFT);
-        }
-    }
-    WORD no_clip[4] = {0};
-    vs_clip(g_desktop.vdi_handle, 0, no_clip);
-    dialog_close(tree, handle);
-    if (accepted)
-        snprintf(text, capacity, "%s", draft);
-    return accepted;
+    return gemctl_prompt(g_desktop.active_browser_handle, g_desktop.vdi_handle,
+                         title, "Name", text, capacity);
 }
 
 void desktop_file_popup(WORD handle, WORD x, WORD y)
@@ -141,12 +76,12 @@ void desktop_file_popup(WORD handle, WORD x, WORD y)
     desktop_update_desk_menu_labels();
     if (x + 236 > g_desktop.screen_width)
         x = g_desktop.screen_width - 236;
-    if (y + count * row_height > g_desktop.screen_height)
-        y = g_desktop.screen_height - count * row_height;
+    if (y + count * row_height + 4 > g_desktop.screen_height)
+        y = g_desktop.screen_height - count * row_height - 4;
     if (y < g_desktop.work.g_y)
         y = g_desktop.work.g_y;
     desktop_init_object(&tree[0], NIL, 1, count, G_BOX, NONE, NORMAL,
-                        0x00011170L, x, y, 236, count * row_height);
+                        0x00011170L, x, y, 236, count * row_height + 4);
     for (int i = 1; i <= count; ++i)
         desktop_init_object(
             &tree[i], i == count ? 0 : (WORD)(i + 1), NIL, NIL, G_STRING,
@@ -154,15 +89,36 @@ void desktop_file_popup(WORD handle, WORD x, WORD y)
             desktop_file_command_enabled((WORD)(MENU_FILE_OPEN + i - 1))
                 ? NORMAL
                 : DISABLED,
-            (LONG)(intptr_t)labels[i - 1], 0, (WORD)((i - 1) * row_height), 236,
-            row_height);
+            (LONG)(intptr_t)labels[i - 1], 2, (WORD)(2 + (i - 1) * row_height),
+            232, row_height);
     window = dialog_open(tree);
     if (!window)
         return;
     for (;;) {
         WORD mx, my, buttons, modifiers, key, clicks, msg[8];
+        wind_update(BEG_UPDATE);
         objc_draw(tree, 0, MAX_DEPTH, x, y, tree[0].ob_width,
                   tree[0].ob_height);
+        WORD outline[10] = {x,
+                            y,
+                            (WORD)(x + 235),
+                            y,
+                            (WORD)(x + 235),
+                            (WORD)(y + count * row_height + 3),
+                            x,
+                            (WORD)(y + count * row_height + 3),
+                            x,
+                            y};
+        WORD clip[4] = {x, y, (WORD)(x + 235),
+                        (WORD)(y + count * row_height + 3)};
+        vs_clip(g_desktop.vdi_handle, 1, clip);
+        vswr_mode(g_desktop.vdi_handle, MD_REPLACE);
+        vsl_color(g_desktop.vdi_handle, WHITE);
+        vsl_type(g_desktop.vdi_handle, 1);
+        vsl_width(g_desktop.vdi_handle, 1);
+        v_pline(g_desktop.vdi_handle, 5, outline);
+        vs_clip(g_desktop.vdi_handle, 0, clip);
+        wind_update(END_UPDATE);
         WORD event = evnt_multi(MU_BUTTON | MU_KEYBD | MU_TIMER | MU_MESAG, 1,
                                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, msg, 30, 0,
                                 &mx, &my, &buttons, &modifiers, &key, &clicks);

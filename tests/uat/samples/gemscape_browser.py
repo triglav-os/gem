@@ -105,7 +105,7 @@ def clear_data(session, which):
     session.click(x + 240, y + 20)
     session.click(x + 80 + which * 164, y + 157)
     session.frame('clear_confirmation')
-    session.click(357, 226 if which != 1 else 218)
+    session.key(31)  # Explicit second confirmation button.
     session.pause(.6)
     session.key(41)  # Escape discards the unchanged settings draft.
 
@@ -129,7 +129,7 @@ def controls(session, base):
     session.click(335, 240)
     dialog_frame = session.frame('website_confirmation')
     assert sum(crop(dialog_frame, 72, 151, 460, 20)) > 350, 'Website dialog was hidden behind CEF pixels'
-    session.click(385, 255)
+    session.key(40)  # Accept the parent-centered website confirmation.
     event(session, 'confirm', 'true')
     mark = len(Site.events)
     session.click(335, 240)
@@ -240,6 +240,29 @@ def controls(session, base):
     event(session, 'grown', '1')
     session.wait(lambda: field(session, 1, 16)[0] < before, 'dynamic document height')
 
+    navigate(session, base + '/start?animate')
+    handle, x, y = settings(session)
+    parent = field(session, 1, 4)
+    outer = field(session, handle, 4)
+    assert abs(2*outer[0]+outer[2] - (2*parent[0]+parent[2])) <= 1
+    assert abs(2*outer[1]+outer[3] - (2*parent[1]+parent[3])) <= 1
+    before = session.frame('settings_animation_before')
+    expected = crop(before, x, y, 520, 250)
+    assert list(crop(before, x+50, y, 1, 5)) == [1, 1, 0, 1, 0], 'Dialog frame is not 11010'
+    sx, sy = outer[0]+100, outer[1]+10
+    session.event(3, sx, sy)
+    session.event(10, sx, sy)
+    session.event(3, sx-25, sy+28)
+    session.event(11, sx-25, sy+28)
+    session.wait(lambda: field(session, handle, 4)[:2] != outer[:2], 'settings drag')
+    x, y, _, _ = field(session, handle, 5)
+    session.event(3, 639, 399)  # Keep the GEM cursor outside the compared dialog.
+    for index in range(4):
+        session.pause(.16)
+        moved = session.frame(f'settings_animation_moved_{index}')
+        assert crop(moved, x, y, 520, 250) == expected, 'Animated page corrupted moved dialog'
+    session.key(41)
+    navigate(session, base + '/start')
     handle, x, y = settings(session)
     session.frame('settings_general')
     session.click(x + 420, y + 20)

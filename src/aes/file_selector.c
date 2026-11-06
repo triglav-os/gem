@@ -174,8 +174,8 @@ static WORD aes_fsel_control_at(const aes_fsel_state_t *state, WORD x, WORD y)
 {
     WORD control;
 
-    for (control = AES_FSEL_CONTROL_ACCEPT;
-         control <= AES_FSEL_CONTROL_UP; ++control) {
+    for (control = AES_FSEL_CONTROL_ACCEPT; control <= AES_FSEL_CONTROL_UP;
+         ++control) {
         GRECT rect;
 
         aes_fsel_control_rect(state, control, &rect);
@@ -301,6 +301,8 @@ static int aes_fsel_prepare(aes_fsel_state_t *state, char *pipath, char *pisel,
     wind_get(0, WF_CXYWH, &desk.g_x, &desk.g_y, &desk.g_w, &desk.g_h);
     width = desk.g_w > 620 ? 620 : (WORD)(desk.g_w - 20);
     height = desk.g_h > 390 ? 390 : (WORD)(desk.g_h - 20);
+    GRECT parent;
+    aes_dialog_parent_rect(&parent);
     state->handle =
         wind_create(NAME | CLOSER | MOVER | UPARROW | DNARROW | VSLIDE,
                     desk.g_x, desk.g_y, width, height);
@@ -319,8 +321,14 @@ static int aes_fsel_prepare(aes_fsel_state_t *state, char *pipath, char *pisel,
     aes_fsel_reload_entries(state);
 
     aes_fsel_snapshot(state);
-    wind_open(state->handle, (WORD)(desk.g_x + (desk.g_w - width) / 2),
-              (WORD)(desk.g_y + (desk.g_h - height) / 2), width, height);
+    wind_open(state->handle,
+              aes_max_word(desk.g_x,
+                           aes_min_word(parent.g_x + (parent.g_w - width) / 2,
+                                        desk.g_x + desk.g_w - width)),
+              aes_max_word(desk.g_y,
+                           aes_min_word(parent.g_y + (parent.g_h - height) / 2,
+                                        desk.g_y + desk.g_h - height)),
+              width, height);
     wind_set_str(state->handle, WF_NAME, state->title);
     aes_fsel_sync_work(state);
     aes_fsel_scroll_into_view(state);
@@ -358,8 +366,7 @@ static void aes_fsel_key(aes_fsel_state_t *state, WORD key)
                (ascii == 0 && (scancode == 42 || scancode == 14))) {
         size_t length;
 
-        if (state->mode != AES_FSEL_DIRECTORY &&
-            state->editing_name != 0) {
+        if (state->mode != AES_FSEL_DIRECTORY && state->editing_name != 0) {
             length = strlen(state->selection);
             if (length > 0u) {
                 state->selection[length - 1u] = '\0';
@@ -437,9 +444,10 @@ static void aes_fsel_message(aes_fsel_state_t *state, WORD msg[8])
             aes_fsel_draw(state, NULL);
             break;
         case WM_VSLID: {
-            WORD maximum = state->entry_count > state->visible_rows
-                               ? (WORD)(state->entry_count - state->visible_rows)
-                               : 0;
+            WORD maximum =
+                state->entry_count > state->visible_rows
+                    ? (WORD)(state->entry_count - state->visible_rows)
+                    : 0;
             state->top_index = (WORD)((long)maximum * msg[4] / 1000L);
             aes_fsel_draw(state, NULL);
             break;

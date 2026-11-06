@@ -26,6 +26,8 @@ update this index when documents move or new essential guidance is added.
   syntax, Desktop locations and the libgemconf API.
 - [Gemscape browser](docs/guides/GEMSCAPE.md): input, settings, profiles,
   cookies/cache, acceptance coverage and embedded-browser limits.
+- [Ted editor](docs/guides/TED.md): text editing, file safety, shortcuts and
+  current encoding/size limits.
 - [API transport](docs/architecture/API_TRANSPORT.md): libgem/gemd architecture,
   protocol, API coverage and compatibility limits.
 - [Security and safety](docs/architecture/SECURITY.md): trust boundaries,

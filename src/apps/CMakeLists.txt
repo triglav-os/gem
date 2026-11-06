@@ -6,6 +6,7 @@ add_subdirectory(calculator)
 add_subdirectory(gemscape)
 add_subdirectory(gemread)
 add_subdirectory(stout)
+add_subdirectory(ted)
 
 # Clock shares the artwork loader with the independent visual samples.
 foreach(target clock clock_gemd gemscape gemscape_hosted)

@@ -94,7 +94,7 @@ static void desktop_add_folder_icon(const char *path, const char *label)
 {
     desktop_icon_entry_t *entry;
 
-    if (g_desktop.icon_count >= DESKTOP_MAX_ICONS - 3 || path == NULL ||
+    if (g_desktop.icon_count >= DESKTOP_MAX_ICONS - 4 || path == NULL ||
         desktop_has_path(path, 1) != 0) {
         return;
     }
@@ -143,11 +143,10 @@ static void desktop_add_configured_locations(void)
     if (!gem_location_list(&locations)) {
         return;
     }
-    g_desktop.show_hidden =
-        (GEM_RPC_LOCATION_LIST_OPTIONS(locations) &
-         GEM_RPC_DESKTOP_SHOW_HIDDEN) != 0u;
+    g_desktop.show_hidden = (GEM_RPC_LOCATION_LIST_OPTIONS(locations) &
+                             GEM_RPC_DESKTOP_SHOW_HIDDEN) != 0u;
     for (i = 0;
-         i < locations.count && g_desktop.icon_count < DESKTOP_MAX_ICONS - 3;
+         i < locations.count && g_desktop.icon_count < DESKTOP_MAX_ICONS - 4;
          ++i) {
         gem_os_file_info_t info;
 
@@ -166,8 +165,8 @@ static void desktop_add_configured_locations(void)
         gemconf_get_bool(&g_desktop.config, "desktop", "show_hidden", 0) != 0;
     WORD maximum =
         gemconf_get_bool(&g_desktop.config, "desktop", "show_trash", 1)
-            ? (WORD)(DESKTOP_MAX_ICONS - 3)
-            : DESKTOP_MAX_ICONS - 3;
+            ? (WORD)(DESKTOP_MAX_ICONS - 4)
+            : DESKTOP_MAX_ICONS - 4;
 
     for (i = 0u;
          i < gemconf_count(&g_desktop.config) && g_desktop.icon_count < maximum;
@@ -206,9 +205,9 @@ void desktop_publish_location_selection(void)
         desktop_find_icon(g_desktop.selected_icon);
 
     (void)gem_location_select(selected != NULL && selected->is_folder != 0 &&
-                                       selected->is_trash == 0
-                                   ? selected->path
-                                   : "");
+                                      selected->is_trash == 0
+                                  ? selected->path
+                                  : "");
 #endif
 }
 
@@ -282,7 +281,8 @@ void desktop_choose_location(void)
         (void)fsel_options((UWORD)old_options, 1);
         if (name[0] != '\0') {
             char selected[GEM_OS_PATH_MAX];
-            if (snprintf(selected, sizeof(selected), "%s/%s", path, name) <= 0 ||
+            if (snprintf(selected, sizeof(selected), "%s/%s", path, name) <=
+                    0 ||
                 strlen(selected) >= sizeof(path)) {
                 return;
             }
