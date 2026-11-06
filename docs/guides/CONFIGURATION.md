@@ -7,8 +7,8 @@ component name without sharing a parser or schema.
 
 Gemscape's `gemscape.cfg` stores its home page, zoom, privacy and CEF preferences;
 see the [browser guide](GEMSCAPE.md) for the schema and restart behavior.
-Interactive Docker sessions persist XDG configuration under
-`build/user-data/config/` rather than the disposable container home.
+Interactive Docker sessions share the host user's XDG `gem` directories.
+See [Linux paths](LINUX_PATHS.md) for config/data/cache/state locations and migration.
 
 ## Standard locations
 
@@ -185,3 +185,36 @@ fallbacks. `gemconf_set()`, `gemconf_remove()` and `gemconf_save()` update the
 user component file. The entry enumeration functions support repeatable
 schemas such as Desktop's `[locations]` section. `gemconf_init()` must precede
 the first load, and every initialized object must eventually be cleared.
+
+## Gemread document viewer
+
+Gemread has File/Open, Close Document, Settings and Quit commands, plus a View
+menu for zoom, Fit Page/Fit Width, thumbnails and previous/next page. Ctrl+O
+opens the chooser, Ctrl+W closes the document, and Ctrl+Q quits. The toolbar's
+three-line button opens the same tabbed settings dialog as File/Settings.
+
+Display settings apply on Save and to newly opened documents. Cancel discards
+the draft. Fit Page is the default; zoom is a percentage of the chosen fit mode.
+The Files tab can remember the last opened folder or forget it. No document
+content, browsing history or thumbnail cache is saved. Rendering remains
+read-only; PDF editing, annotations, printing and password entry are not added.
+
+`gemread.cfg` uses the usual XDG component directory. Docker's interactive
+runtime shares `$XDG_CONFIG_HOME/gem/gemread.cfg` (normally
+`~/.config/gem/gemread.cfg`), alongside the other application settings:
+
+```ini
+[display]
+zoom = 100
+fit_width = false
+thumbnails = true
+antialias = true
+
+[files]
+remember_folder = true
+folder = /home/alex/Documents
+```
+
+Zoom is bounded to 50–400 percent; invalid values fall back to 100. Disabling
+folder memory clears its persisted path on Save. Settings writes preserve
+unrelated keys and use libgemconf's atomic replacement.

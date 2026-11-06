@@ -71,10 +71,13 @@ the keyboard and pointer devices under `/dev/input`:
 ```sh
 export GEM_RESOURCE_DIR="$PWD/bin/gemix/share/gem"
 ./bin/gemix/bin/gemd &
-while [ ! -S /tmp/gemd.sock ]; do sleep 0.02; done
+while [ ! -S "$XDG_RUNTIME_DIR/gem/gemd.sock" ]; do sleep 0.02; done
 ./bin/gemix/bin/desktop
 ```
 
-Copy the complete `bin/gemix` directory to install it elsewhere. See the
+Use `make package` to stage a standard Linux tree, or
+`make install PREFIX="$HOME/.local"` for a user installation.
+Runtime packages exclude development files; use `make sdk` for those.
+See [package contents](docs/guides/PACKAGING.md), [installation and XDG paths](docs/guides/LINUX_PATHS.md) and the
 [native Linux guide](docs/guides/GEMIX_LINUX.md) for device selection,
 permissions and deployment configuration.

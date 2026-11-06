@@ -288,7 +288,8 @@ int gemd_init_listener(void)
 
     memset(&addr, 0, sizeof(addr));
     addr.sun_family = AF_UNIX;
-    if (strlen(gem_rpc_socket_path()) >= sizeof(addr.sun_path)) {
+    if (!gem_rpc_socket_path()[0] ||
+        strlen(gem_rpc_socket_path()) >= sizeof(addr.sun_path)) {
         fprintf(stderr, "gemd: GEMD_SOCKET path exceeds %zu bytes: %s\n",
                 sizeof(addr.sun_path) - 1u, gem_rpc_socket_path());
         return 0;

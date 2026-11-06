@@ -65,23 +65,54 @@ int gemscape_preferences_save(const gemscape_preferences_t *preferences)
     return result;
 }
 
-int gemscape_profile_path(char *path, size_t capacity)
+static int gemscape_storage_path(char *path, size_t capacity, int kind)
 {
-    const char *base = gem_os_getenv_ref("GEMSCAPE_PROFILE");
-    const char *home;
-    int size;
-    if (base != NULL && base[0] == '/') {
-        size = snprintf(path, capacity, "%s", base);
+    const char *override = gem_os_getenv_ref("GEMSCAPE_PROFILE");
+    char base[GEM_OS_PATH_MAX], directory[GEM_OS_PATH_MAX];
+    int length;
+    if (override && override[0] == '/') {
+        length = snprintf(directory, sizeof(directory), "%s%s", override,
+                          kind == 1 ? "/cache" : "");
     } else {
-        base = gem_os_getenv_ref("XDG_DATA_HOME");
-        if (base != NULL && base[0] == '/')
-            size = snprintf(path, capacity, "%s/gemscape", base);
-        else {
-            home = gem_os_getenv_ref("HOME");
-            if (home == NULL || home[0] != '/')
+        int okay = kind == 0   ? gem_os_user_data_dir(base, sizeof(base))
+                   : kind == 1 ? gem_os_user_cache_dir(base, sizeof(base))
+                               : gem_os_user_state_dir(base, sizeof(base));
+        if (!okay)
+            return 0;
+        length =
+            snprintf(directory, sizeof(directory), "%s/gem/gemscape", base);
+        if (kind == 0 && length > 0 && (size_t)length < sizeof(directory) &&
+            !gem_os_path_exists(directory)) {
+            char old[GEM_OS_PATH_MAX], parent[GEM_OS_PATH_MAX];
+            int old_length = snprintf(old, sizeof(old), "%s/gemscape", base);
+            int parent_length =
+                snprintf(parent, sizeof(parent), "%s/gem", base);
+            if (old_length > 0 && (size_t)old_length < sizeof(old) &&
+                parent_length > 0 && (size_t)parent_length < sizeof(parent) &&
+                gem_os_path_exists(old) && gem_os_mkdir_p(parent) &&
+                !gem_os_copy_path(old, directory))
                 return 0;
-            size = snprintf(path, capacity, "%s/.local/share/gemscape", home);
         }
     }
-    return size > 0 && (size_t)size < capacity && gem_os_mkdir_p(path);
+    if (length <= 0 || (size_t)length >= sizeof(directory) ||
+        !gem_os_mkdir_p(directory))
+        return 0;
+    length = snprintf(path, capacity, "%s%s", directory,
+                      kind == 2 ? "/cef.log" : "");
+    return length > 0 && (size_t)length < capacity;
+}
+
+int gemscape_profile_path(char *path, size_t capacity)
+{
+    return gemscape_storage_path(path, capacity, 0);
+}
+
+int gemscape_cache_path(char *path, size_t capacity)
+{
+    return gemscape_storage_path(path, capacity, 1);
+}
+
+int gemscape_log_path(char *path, size_t capacity)
+{
+    return gemscape_storage_path(path, capacity, 2);
 }

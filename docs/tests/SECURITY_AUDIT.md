@@ -4,6 +4,50 @@ Reviewed 2026-09-06. This report distinguishes confirmed fixes, executable
 verification and remaining diagnostics. It does not certify the absence of
 vulnerabilities or complete Atari semantic compatibility.
 
+## Package review (2026-11-06)
+
+Runtime/SDK boundaries now use explicit payloads. Regressions reject unexpected
+runtime programs/libraries/resources, missing ELF dependencies, checkout RPATHs,
+debug sections, duplicate CEF resources and stale exports. SDK checks build
+independent samples after relocation. Required dependency notices are retained;
+CEF's existing sandbox limitations are unchanged. Native file/dependency checks
+do not establish framebuffer/input behavior on physical hardware.
+The native Release build passed with upstream Musashi disassembler
+`-Wformat-overflow` diagnostics; these are not suppressed or represented as a
+new analyzer pass. Evidence: [native package build](../../build/package-native/build.log).
+The restored hosted RelWithDebInfo build emitted no compiler warnings.
+
+## Linux paths and installation review (2026-11-06)
+
+- Default socket/framebuffer paths now use an owned, mode-0700 runtime directory.
+  A symlink or incorrectly owned/permitted existing directory is rejected.
+- Docker shares only GEM's XDG config/data/cache/state directories and home
+  Trash. System GEM configuration is read-only; runtime objects use a private
+  tmpfs. Legacy settings migration copies missing files without overwriting
+  existing settings or removing source profiles.
+- `test_paths` and `test_runtime_paths` cover overrides, resource precedence,
+  unsafe runtime symlinks, private permissions and migration idempotence.
+  `test_install_layout` relocates a staged package, checks ELF dependencies,
+  starts installed GUI applications without build-resource overrides and
+  verifies separate browser data/cache/state storage.
+- These are local-user storage boundaries, not isolation from hostile files or
+  browser content in the writable checkout. Existing CEF sandbox limits apply.
+
+## File Manager operations review (2026-11-06)
+
+- Creation publishes through the OS abstraction with no-replace semantics.
+  Unit regressions preserve existing files and both live and dangling symlinks.
+  Mounted-image file extraction uses exclusive creation as well.
+- Clipboard operations retain unfinished cut entries and preflight collisions.
+  Top-level Trash exports validate payload and metadata paths against the owning
+  store; successful moves remove metadata, while copies retain it. Restore also
+  uses the no-replace, cross-filesystem-capable move helper.
+- Direct/proxy acceptance covers right-click creation, rename traversal and
+  collision rejection, clipboard transfers, destructive-action cancellation and
+  removal of Trash metadata after cut/paste. The latest full-run evidence is in
+  [LATEST.md](LATEST.md). This is targeted regression coverage; no new broad
+  static-analyzer review or hostile-filesystem race certification is claimed.
+
 ## Gemscape interaction and profile review (2026-11-06)
 
 - CEF reference ownership is now explicit for browser hosts, frames, command

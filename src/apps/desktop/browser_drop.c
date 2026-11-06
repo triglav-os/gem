@@ -67,15 +67,15 @@ static int desktop_disk_copy_walk(const fat12_dirent_t *entry,
         context->okay = 0;
         return 0;
     }
-    context->okay = gem_os_write_file_atomic(destination, data, size);
+    context->okay = gem_os_create_file(destination, data, size);
     free(data);
     return context->okay;
 }
 
-static int desktop_disk_copy_entry(desktop_browser_window_t *source,
-                                   const desktop_browser_entry_t *entry,
-                                   const char *destination,
-                                   const char *destination_parent)
+int desktop_disk_copy_entry(desktop_browser_window_t *source,
+                            const desktop_browser_entry_t *entry,
+                            const char *destination,
+                            const char *destination_parent)
 {
     const fat12_image_t *image;
     const char *relative;
@@ -86,16 +86,18 @@ static int desktop_disk_copy_entry(desktop_browser_window_t *source,
     if (entry->is_dir == 0) {
         uint8_t *data = NULL;
         size_t size = 0u;
-        int okay = stout_disk_read_path(&source->disk, relative, &data, &size) &&
-                   gem_os_write_file_atomic(destination, data, size);
+        int okay =
+            stout_disk_read_path(&source->disk, relative, &data, &size) &&
+            gem_os_create_file(destination, data, size);
 
         free(data);
-        if (okay == 0) (void)gem_os_unlink(destination);
         return okay;
     }
 
     image = stout_disk_fat12(&source->disk);
-    if (image != NULL && gem_os_mkdir(destination) != 0) {
+    if (image == NULL || !gem_os_mkdir(destination))
+        return 0;
+    {
         desktop_disk_copy_context_t context;
         char error_text[FAT12_ERROR_LENGTH];
         int walked;

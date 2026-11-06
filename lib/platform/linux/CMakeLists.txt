@@ -22,3 +22,6 @@ target_compile_options(platform_linux
         $<$<CONFIG:Debug>:-g>
         $<$<CONFIG:Debug>:-fsanitize=address,undefined>
 )
+
+target_compile_definitions(platform_linux PRIVATE
+    GEM_INSTALL_DATA_DIR="${CMAKE_INSTALL_FULL_DATADIR}/gem")

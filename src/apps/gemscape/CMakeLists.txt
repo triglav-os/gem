@@ -1,5 +1,10 @@
 include(ExternalProject)
 
+set(GEM_CEF_LOCALE "en-US" CACHE STRING "CEF UI locale shipped in the runtime package")
+if(NOT GEM_CEF_LOCALE MATCHES "^[a-z][a-z](-[A-Za-z0-9]+)*$")
+    message(FATAL_ERROR "Invalid GEM_CEF_LOCALE")
+endif()
+
 set(GEMSCAPE_CEF_VERSION
     "154.0.23+g062ebe4+chromium-154.0.8037.17")
 set(GEMSCAPE_CEF_ARCHIVE
@@ -55,14 +60,13 @@ add_executable(gemscape gemscape.c gemscape_ui.c browser_settings.c preferences.
 target_compile_definitions(gemscape PRIVATE GEMSCAPE_OVERLAY=1)
 target_sources(gemscape PRIVATE cef_browser.c)
 target_compile_definitions(gemscape PRIVATE GEMSCAPE_CEF=1
-    GEM_CEF_ROOT_PATH="${GEMSCAPE_CEF_ROOT}")
+    GEM_CEF_ROOT_PATH="${GEMSCAPE_CEF_ROOT}"
+    GEM_CEF_LOCALE="${GEM_CEF_LOCALE}"
+    GEM_CEF_INSTALL_DIR="${CMAKE_INSTALL_LIBDIR}/gem/cef")
 target_link_libraries(gemscape PRIVATE gemscape_cef_runtime dl pthread)
 set_target_properties(gemscape PROPERTIES
-    BUILD_RPATH "${GEMSCAPE_CEF_ROOT}/Release"
-    # The project writes development executables directly to bin/apps while
-    # globally enabling install RPATHs. Point that output at the downloaded
-    # build cache, never at the former source-tree lib/cef location.
-    INSTALL_RPATH "${GEMSCAPE_CEF_ROOT}/Release;$ORIGIN/../lib")
+    BUILD_RPATH "${GEMSCAPE_CEF_ROOT}/Release;${GEM_LIBRARY_DIR}"
+    INSTALL_RPATH "$ORIGIN/../${CMAKE_INSTALL_LIBDIR};$ORIGIN/../${CMAKE_INSTALL_LIBDIR}/gem/cef")
 
 if(TARGET gem_runtime_gemscape_toolbar)
     add_dependencies(gemscape gem_runtime_gemscape_toolbar)

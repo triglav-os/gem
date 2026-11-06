@@ -344,6 +344,10 @@ static int gem_os_find_path(const char *name, int mode, char *out,
             return 1;
         }
     }
+    if (mode == GEM_OS_ACCESS_EXECUTE &&
+        gem_os_executable_dir(apps, sizeof(apps)) &&
+        gem_os_try_search_path(apps, name, mode, out, out_size))
+        return 1;
     path = gem_os_getenv_ref("PATH");
     if (gem_os_search_list(path, name, mode, out, out_size)) {
         return 1;
@@ -406,6 +410,12 @@ static int gem_os_find_special_program(const char *name, const char *env_name,
             return 1;
         }
     }
+    length =
+        snprintf(directories, sizeof(directories), "%s/%s", first_suffix, name);
+    if (length > 0 && (size_t)length < sizeof(directories) &&
+        gem_os_find_resource(directories, out, out_size))
+        return 1;
+    /* Read-only compatibility fallback for pre-XDG accessory installations. */
     if (home != NULL && home[0] == '/') {
         length = snprintf(directories, sizeof(directories),
                           "%s/.gem/%s:%s/.gem/%s", home, first_suffix, home,
@@ -1364,7 +1374,8 @@ int gem_os_read_file(const char *path, char *buf, size_t buf_size,
     return 1;
 }
 
-int gem_os_write_file_atomic(const char *path, const void *data, size_t size)
+static int gem_os_write_file(const char *path, const void *data, size_t size,
+                             int exclusive)
 {
     char temporary[GEM_OS_PATH_MAX];
     unsigned int attempt;
@@ -1407,15 +1418,28 @@ int gem_os_write_file_atomic(const char *path, const void *data, size_t size)
             return 0;
         }
     }
-    if (fsync(fd) != 0 || close(fd) != 0) {
+    int sync_result = fsync(fd);
+    int close_result = close(fd);
+    if (sync_result != 0 || close_result != 0) {
         (void)unlink(temporary);
         return 0;
     }
-    if (rename(temporary, path) != 0) {
+    if (exclusive ? !gem_os_rename_no_replace(temporary, path)
+                  : rename(temporary, path) != 0) {
         (void)unlink(temporary);
         return 0;
     }
     return 1;
+}
+
+int gem_os_write_file_atomic(const char *path, const void *data, size_t size)
+{
+    return gem_os_write_file(path, data, size, 0);
+}
+
+int gem_os_create_file(const char *path, const void *data, size_t size)
+{
+    return gem_os_write_file(path, data, size, 1);
 }
 
 static int gem_os_fill_info_from_stat(const char *name, const struct stat *st,

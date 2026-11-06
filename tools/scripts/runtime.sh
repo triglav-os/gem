@@ -4,7 +4,7 @@
 set -euo pipefail
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 key="$(printf '%s' "$root" | sha256sum)"
-name="gem-runtime-${key:0:16}-$(id -u)"
+name="${GEM_RUNTIME_CONTAINER:-gem-runtime-${key:0:16}-$(id -u)}"
 action="${1:-run}"
 shift || true
 case "$action" in run|session|exec|stop) ;; *) echo 'Unknown runtime action' >&2; exit 2;; esac
@@ -23,8 +23,7 @@ fi
 if [[ "$(docker inspect --format '{{.State.Running}}' "$name" 2>/dev/null || true)" != true ]]; then
     docker rm "$name" >/dev/null 2>&1 || true
     source "$root/tools/scripts/container-common.sh"
-    container_env+=(--env "GEMSCAPE_PROFILE=${GEMSCAPE_PROFILE:-$root/build/user-data/gemscape}")
-    container_env+=(--env "XDG_CONFIG_HOME=$root/build/user-data/config")
+    source "$root/tools/scripts/runtime-paths.sh"
     display_args=()
     if [[ -n "${DISPLAY:-}" ]]; then
         display_args+=(--env DISPLAY)
@@ -40,8 +39,8 @@ if [[ "$(docker inspect --format '{{.State.Running}}' "$name" 2>/dev/null || tru
     if [[ -n "${WAYLAND_DISPLAY:-}" && -n "${XDG_RUNTIME_DIR:-}" ]]; then
         socket="$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY"
         if [[ -S "$socket" ]]; then
-            display_args+=(--env XDG_RUNTIME_DIR=/tmp/gem-wayland --env WAYLAND_DISPLAY
-                --mount "type=bind,source=$socket,target=/tmp/gem-wayland/$WAYLAND_DISPLAY")
+            display_args+=(--env WAYLAND_DISPLAY
+                --mount "type=bind,source=$socket,target=/run/user/$(id -u)/$WAYLAND_DISPLAY")
         fi
     fi
     # Bash reads the kernel hostname without invoking host preload-sensitive tools.
@@ -49,9 +48,10 @@ if [[ "$(docker inspect --format '{{.State.Running}}' "$name" 2>/dev/null || tru
     docker run --detach --init --name "$name" --hostname "$runtime_hostname" \
         --user "$(id -u):$(id -g)" \
         --cap-drop ALL --cap-add SYS_PTRACE --security-opt no-new-privileges \
-        "${container_env[@]}" "${display_args[@]}" \
+        "${container_env[@]}" "${storage_args[@]}" "${display_args[@]}" \
         --mount "type=bind,source=$root,target=$root" --workdir "$root" \
         "$image" sleep infinity >/dev/null
+    docker exec "$name" mkdir -m 0700 "/run/user/$(id -u)/gem"
 fi
 flock --unlock 8
 case "$action" in

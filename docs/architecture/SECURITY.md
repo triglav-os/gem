@@ -7,6 +7,14 @@ GEM is a security sandbox. Public AES/VDI headers, signatures, constants and
 object layouts are unchanged. The private libgem/gemd protocol remains a
 same-host ABI protocol; it is not suitable for exposure as a network service.
 
+## Package boundary
+
+Runtime packages exclude build tools, static archives, headers, tests and sample
+disks. CEF uses explicit payload lists and required component notices. Staging
+strips copies, replaces obsolete exports, and tests ELF lookup after relocation.
+System libraries remain distribution dependencies; this is not a static or
+sandboxed operating-system image. See [packaging](../guides/PACKAGING.md).
+
 ## Deployment boundary
 
 Build/test containers run as the invoking UID with all capabilities dropped
@@ -31,8 +39,9 @@ Startup refuses an existing socket path, regular file or symlink. It does not
 delete a possibly live server's socket. Normal termination removes only the
 socket inode created by this process. After SIGKILL, an operator must verify
 that a socket is stale before removing it; a private directory per session
-avoids this ambiguity. The compatibility default `/tmp/gemd.sock` still
-exists, but a private session directory is the recommended deployment.
+avoids this ambiguity. The default is now `$XDG_RUNTIME_DIR/gem/gemd.sock`,
+with owned 0700 directories and a checked per-user fallback when XDG runtime
+storage is unavailable. Unsafe existing directories or symlinks are refused.
 
 The Rasta framebuffer is opened without following its final symlink and is
 checked through its open descriptor before truncation: regular file, same
@@ -154,7 +163,15 @@ store's `files/` root. Recursive deletion opens each component relative to an
 already validated directory descriptor with no-follow semantics and refuses
 the store root, preventing a symlink payload from redirecting deletion outside
 Trash. Restores never overwrite an existing entry; the UI can skip, cancel or
-select a generated collision name.
+select a generated collision name. Clipboard exports validate the top-level
+Trash payload and metadata against their store, preserve destination entries,
+and remove metadata only after a successful move. Rename and creation accept
+single leaf names; parent traversal and path separators are refused. Creation
+writes a private sibling temporary file and uses no-replace rename to publish
+it, including when the destination is a dangling symlink. File Manager's mounted
+image extraction uses the same exclusive publication for files. As with the
+existing OS copy/move helpers, these operations are for the local user's files;
+they do not establish isolation from hostile concurrent directory mutations.
 
 ## Resource parsing
 
@@ -275,8 +292,10 @@ avoids unsigned-underflow disconnects of healthy background applications.
 Gemscape keeps a private profile directory and holds an exclusive advisory lock
 through CEF shutdown. It removes only owned Chromium singleton symlinks, and only
 after acquiring that lock, to recover profiles left by killed Docker namespaces.
-Interactive profiles and settings persist under `build/user-data/`; acceptance
-tests override both paths. Cookie/cache/site-data removal uses CEF/DevTools APIs,
+Interactive profiles and settings use the host user's XDG data/config
+directories; HTTP cache and logs use separate cache/state directories. Docker
+shares only GEM subdirectories and home Trash, not the whole host home.
+Acceptance tests override these paths. Cookie/cache/site-data removal uses CEF/DevTools APIs,
 requires a native confirmation and reports asynchronous completion. Memory mode
 uses an explicit incognito request context, not the global disk-backed context.
 

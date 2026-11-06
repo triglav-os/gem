@@ -18,6 +18,10 @@ update this index when documents move or new essential guidance is added.
   dependencies and standalone builds against the public GEM SDK.
 - [Linux backend guide](docs/guides/GEMIX_LINUX.md): native backend configuration,
   packaging and deployment.
+- [Linux paths and installation](docs/guides/LINUX_PATHS.md): standard install
+  layout, XDG storage, Docker mounts and legacy settings migration.
+- [Packaging contract](docs/guides/PACKAGING.md): minimal runtime/SDK contents,
+  dependency notices, staging and integrity checks.
 - [Configuration guide](docs/guides/CONFIGURATION.md): XDG component files,
   syntax, Desktop locations and the libgemconf API.
 - [Gemscape browser](docs/guides/GEMSCAPE.md): input, settings, profiles,

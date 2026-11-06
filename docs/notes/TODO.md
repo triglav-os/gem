@@ -39,7 +39,9 @@ behavior is implemented. See the [audit](../tests/SECURITY_AUDIT.md) and
   optimizations. Preserve GEM update locking, write modes and clipping.
 - Establish a reviewed dependency-update procedure for Rasta, Musashi and the
   Docker base/packages; add an SBOM and a scheduled dependency advisory scan.
-  Archive hashes pin inputs but do not establish dependency safety.
+  Archive hashes pin inputs but do not establish dependency safety. Runtime
+  package dependency notices and exact-content checks are now implemented;
+  automated advisory/SBOM generation remains future work.
 - Isolate untrusted Atari programs in a separate restricted process if running
   arbitrary guest binaries becomes a supported use case. Musashi is an emulator,
   not a security sandbox.

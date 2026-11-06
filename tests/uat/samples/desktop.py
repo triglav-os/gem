@@ -50,7 +50,8 @@ def check(session):
     positions = [(36 + col * 78, 38 + row * 66)
                  for col in range(7) for row in range(5)]
     folders = [(x, y) for x, y in positions if matches(initial, 'folder', x, y)]
-    assert len(folders) == 1, 'Workspace folder icon is missing'
+    assert len(folders) == 2, 'Workspace and File Manager icons are missing'
+    assert matches(initial, 'prg', 36, 170), 'Gemscape launcher icon is missing'
     assert matches(initial, 'trash', 576, 332), 'Trash icon missing'
     x, y = folders[0]
     session.click(x + 16, y + 16)
@@ -150,6 +151,14 @@ def check(session):
         crop(initial, 80, 24, 112, 45)))
     assert difference < 16, \
         'File menu must be absent once the file manager is closed'
+    double_click(session, 52, 120)  # Files launcher.
+    launched = session.frame('file_manager_launcher')
+    assert crop(launched, 240, 42, 280, 16) == crop(opened, 240, 42, 280, 16), \
+        'Files launcher did not open its working directory'
+    session.click(229, 50)
+    double_click(session, 52, 186)  # Gemscape launcher through AES shell.
+    session.wait(lambda: (session.path/'browser-launched').exists(),
+                 'Gemscape launcher to execute its resolved program')
     print('PASS desktop file manager shows four list columns, icons, navigation and close')
 
 
@@ -181,6 +190,10 @@ def main():
     (session.path/'uat_child'/'z_large.txt').write_bytes(b'x' * 2048)
     for index in range(16):
         (session.path/'uat_child'/f'scroll_{index:02d}.dat').write_text(str(index))
+    (session.path/'browser-launched').unlink(missing_ok=True)
+    launcher_probe = session.path/'gemscape'
+    launcher_probe.write_text('#!/bin/sh\nprintf ready > browser-launched\n')
+    launcher_probe.chmod(0o700)
     result = {'passed': False}
     try:
         try:

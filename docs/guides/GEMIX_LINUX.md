@@ -15,20 +15,25 @@ tools/scripts/container.sh exec cmake -S . -B build/linux \
 tools/scripts/container.sh exec cmake --build build/linux --target gemix_package --parallel 4
 ```
 
-`bin/gemix` is relocatable and contains:
+`bin/gemix` stages the same GNUInstallDirs rules as `make install`: programs
+in `bin/`, required shared libraries in `lib/`, resources in `share/gem/`,
+and Gemscape's private CEF runtime in `lib/gem/cef/`. Gemread and Gemscape are
+included. Native packages omit Rasta and librasta. Debug symbols, headers,
+archives and build tools are excluded; `make sdk` exports development files.
+Documentation and component licenses live under `share/`. See
+[the packaging contract](PACKAGING.md).
 
-- `LICENSE`: the GNU GPL version 2 text for the GPL-2.0-or-later project code
-- `bin/`: `gemd`, desktop, terminal, calculator, and clock
-- `lib/`: AES, VDI, `libgem`, and the native Linux platform library
-- `include/`: the minimal public GEM application SDK
-- `share/gem/`: core fonts, cursors and alert resources
-- `bin/data/`: sample resources beside their executables
+Install this backend with the native option explicitly retained:
 
-Copy that directory into the target filesystem. Start `bin/gemd` from
-the distribution's service/session manager, wait for `/tmp/gemd.sock`,
-and then start `bin/desktop`. The service must set
-`GEM_RESOURCE_DIR=/opt/gemix/share/gem` (adjusted to its installation
-prefix).
+```sh
+make install BUILD_DIR="$PWD/build/linux" BUILD_TYPE=Release \
+    CMAKE_FLAGS=-DGEM_PLATFORM=linux PREFIX="$HOME/.local"
+```
+
+Add `DESTDIR` to stage a system package. The plain root Make defaults to Rasta.
+Libraries and resources resolve from the installation without requiring `GEM_RESOURCE_DIR`. See
+[Linux paths and installation](LINUX_PATHS.md) for commands, XDG storage,
+relocation and architecture-specific library directories.
 
 ## Devices
 
@@ -78,7 +83,7 @@ export GEM_LINUX_INPUT=/dev/input/event1,/dev/input/event4
 export GEM_LINUX_GRAB=1
 export GEM_RESOURCE_DIR=/opt/gemix/share/gem
 /opt/gemix/bin/gemd &
-while [ ! -S /tmp/gemd.sock ]; do sleep 0.02; done
+while [ ! -S "$XDG_RUNTIME_DIR/gem/gemd.sock" ]; do sleep 0.02; done
 exec /opt/gemix/bin/desktop
 ```
 
@@ -86,15 +91,15 @@ If the session starts without input, inspect device capabilities and
 permissions with `evtest`. If `gemd` cannot initialize the display,
 verify that fbdev is enabled and `/dev/fb0` exists.
 
-The packaging target uses `tools/scripts/package-gemix.cmake` to set library
-lookup paths. Build artifacts still belong in root `build/`; the installation
+The packaging target uses `tools/scripts/install.cmake` and normal CMake
+installation RPATH handling. Build artifacts still belong in root `build/`; the installation
 package is a final output under `bin/gemix/`.
 
 ## Application SDK
 
-Applications include `<gem.h>` or `<gem/gem.h>` from the package's `include/`
-directory and link against `libgem.so` in `lib/`. The client library connects
-to gemd through `GEMD_SOCKET` (default `/tmp/gemd.sock`). See
+Applications include `<gem.h>` or `<gem/gem.h>` from the separate SDK's
+`include/` directory and link against its `libgem.so` in `lib/`. The client library connects
+to gemd through `GEMD_SOCKET` (default `$XDG_RUNTIME_DIR/gem/gemd.sock`). See
 [API transport](../architecture/API_TRANSPORT.md) for interface coverage and
 compatibility limits.
 
@@ -102,4 +107,4 @@ For a separately exported SDK and standalone sample build, use the
 [samples guide](SAMPLES.md). `make sdk` uses the hosted RelWithDebInfo Docker
 configuration in `build/container-sdl/`;
 to export from an already configured native Release build, run
-`cmake --build build --target gem_sdk` directly.
+`tools/scripts/container.sh exec cmake --build build/linux --target gem_sdk`.

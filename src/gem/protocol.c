@@ -12,6 +12,7 @@
 #include "platform/os.h"
 
 #include <string.h>
+#include <stdio.h>
 
 /* A GEM tree has one parent per object; sibling tails point back to it.
  * Validate without recursion before AES walks any attacker-supplied links. */
@@ -49,7 +50,16 @@ static int valid_menu_tree(const gem_rpc_menu_bar_req_t *req)
 const char *gem_rpc_socket_path(void)
 {
     const char *path = gem_os_getenv_ref("GEMD_SOCKET");
-    return path != NULL && path[0] != '\0' ? path : GEMD_SOCKET_PATH;
+    static char socket_path[GEM_OS_PATH_MAX];
+    char directory[GEM_OS_PATH_MAX];
+    if (path != NULL && path[0] != '\0')
+        return path;
+    if (!gem_os_runtime_dir(directory, sizeof(directory)))
+        return "";
+    int length =
+        snprintf(socket_path, sizeof(socket_path), "%s/gemd.sock", directory);
+    return length > 0 && (size_t)length < sizeof(socket_path) ? socket_path
+                                                              : "";
 }
 
 int gem_rpc_valid_request(uint16_t opcode, const void *payload, uint32_t size)

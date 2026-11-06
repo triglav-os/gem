@@ -53,16 +53,16 @@ set(GEMREAD_MUPDF_LIBRARIES
     gemread_mupdf_threads m pthread dl)
 
 function(gemread_configure_target target hosted)
-    add_executable(${target} gemread.c)
+    add_executable(${target} gemread.c reader_settings.c)
     target_include_directories(${target} PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR} ${GEMREAD_MUPDF_SOURCE}/include)
     if(${hosted})
-        target_link_libraries(${target} PRIVATE aes vdi gemctl
+        target_link_libraries(${target} PRIVATE aes vdi gemctl gemconf
             ${GEMREAD_MUPDF_LIBRARIES})
         target_compile_definitions(${target} PRIVATE GEMREAD_HOSTED=1
             GEMREAD_OVERLAY=0)
     else()
-        target_link_libraries(${target} PRIVATE gem gemctl
+        target_link_libraries(${target} PRIVATE gem gemctl gemconf
             ${GEMREAD_MUPDF_LIBRARIES})
         target_compile_definitions(${target} PRIVATE GEMREAD_OVERLAY=1)
     endif()

@@ -91,7 +91,7 @@ static void preferences(void)
     assert(stat(path, &info) == 0 && S_ISDIR(info.st_mode));
     assert((info.st_mode & 077) == 0);
     assert(!gemscape_profile_path(path, 2));
-    snprintf(path, sizeof(path), "%s/gemscape", root);
+    snprintf(path, sizeof(path), "%s/gem/gemscape", root);
     rmdir(path);
     snprintf(path, sizeof(path), "%s/gem/gemscape.cfg", root);
     unlink(path);

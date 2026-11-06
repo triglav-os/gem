@@ -62,6 +62,13 @@ static const char *font_dir(void)
             return path;
         }
     }
+    if (gem_os_find_resource("fonts/AtariSTHigh.fnt", path, sizeof(path))) {
+        char *slash = strrchr(path, '/');
+        if (slash) {
+            *slash = '\0';
+            return path;
+        }
+    }
     if (gem_os_find_file("bin/resources/fonts/AtariSTHigh.fnt", path,
                          sizeof(path)) != 0) {
         char *slash = strrchr(path, '/');

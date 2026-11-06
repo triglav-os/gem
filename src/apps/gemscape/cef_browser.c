@@ -233,6 +233,15 @@ gem_app_before_command_line(cef_app_t *self, const cef_string_t *process_type,
     command_line->append_switch_with_value(command_line, &name, &value);
     cef_string_clear(&name);
     cef_string_clear(&value);
+    char disk_cache[GEM_OS_PATH_MAX];
+    if (g_state.preferences.persistent &&
+        gemscape_cache_path(disk_cache, sizeof(disk_cache))) {
+        gem_string(&name, "disk-cache-dir");
+        gem_string(&value, disk_cache);
+        command_line->append_switch_with_value(command_line, &name, &value);
+        cef_string_clear(&name);
+        cef_string_clear(&value);
+    }
     command_line->base.release(&command_line->base);
 }
 
@@ -808,7 +817,12 @@ extern int gemscape_cef_start(int argc, char **argv, uint16_t width,
     settings.size = sizeof(settings);
     settings.no_sandbox = 1;
     settings.windowless_rendering_enabled = 1;
-    settings.log_severity = LOGSEVERITY_INFO;
+    /* Headless Chromium probes optional desktop services (notably D-Bus).
+     * Keep normal launches quiet without hiding fatal CEF diagnostics. */
+    const char *debug = gem_os_getenv_ref("GEMSCAPE_DEBUG");
+    settings.log_severity = debug != NULL && strcmp(debug, "1") == 0
+                                ? LOGSEVERITY_INFO
+                                : LOGSEVERITY_FATAL;
     g_state.preferences = *preferences;
     g_state.profile_lock = -1;
     if (!gemscape_profile_path(cache_root, sizeof(cache_root))) {
@@ -839,15 +853,33 @@ extern int gemscape_cef_start(int argc, char **argv, uint16_t width,
             info.st_uid == geteuid())
             unlink(lock_path);
     }
-    snprintf(cache_path, sizeof(cache_path), "%s/cef.log", cache_root);
+    if (!gemscape_log_path(cache_path, sizeof(cache_path))) {
+        close(g_state.profile_lock);
+        g_state.profile_lock = -1;
+        return 0;
+    }
     gem_string(&settings.log_file, cache_path);
     gem_settings_path(&settings.root_cache_path, cache_root);
     snprintf(cache_path, sizeof(cache_path), "%s/profile", cache_root);
     gem_settings_path(&settings.cache_path, cache_path);
     settings.persist_session_cookies = preferences->session_cookies;
     settings.cookieable_schemes_exclude_defaults = !preferences->cookies;
-    snprintf(resources, sizeof(resources), "%s/Resources", GEM_CEF_ROOT_PATH);
+    char executable_directory[GEM_OS_PATH_MAX];
+    const char *cef_root = gem_os_getenv_ref("GEM_CEF_ROOT");
+    if (cef_root && cef_root[0] == '/') {
+        snprintf(resources, sizeof(resources), "%s/Resources", cef_root);
+    } else if (gem_os_executable_dir(executable_directory,
+                                     sizeof(executable_directory)) &&
+               snprintf(resources, sizeof(resources), "%s/../%s",
+                        executable_directory,
+                        GEM_CEF_INSTALL_DIR) < (int)sizeof(resources) &&
+               gem_os_access(resources, GEM_OS_ACCESS_READ)) {
+        /* Installed private runtime, including relocated package trees. */
+    } else
+        snprintf(resources, sizeof(resources), "%s/Resources",
+                 GEM_CEF_ROOT_PATH);
     snprintf(locales, sizeof(locales), "%s/locales", resources);
+    gem_string(&settings.locale, GEM_CEF_LOCALE);
     gem_string(&settings.resources_dir_path, resources);
     gem_string(&settings.locales_dir_path, locales);
 
@@ -857,6 +889,7 @@ extern int gemscape_cef_start(int argc, char **argv, uint16_t width,
     cef_string_clear(&settings.log_file);
     cef_string_clear(&settings.root_cache_path);
     cef_string_clear(&settings.cache_path);
+    cef_string_clear(&settings.locale);
     cef_string_clear(&settings.resources_dir_path);
     cef_string_clear(&settings.locales_dir_path);
     if (!initialized) {

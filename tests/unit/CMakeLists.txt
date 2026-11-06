@@ -13,3 +13,5 @@ add_test(NAME test_report COMMAND ${Python3_EXECUTABLE} -B
 set_tests_properties(test_report PROPERTIES LABELS unit)
 
 add_subdirectory(security)
+
+add_subdirectory(paths)

@@ -8,6 +8,8 @@ add_executable(desktop
     browser_view.c
     gem_trash.c
     trash_ui.c
+    file_commands.c
+    file_dialog.c
     disks.c
     icons.c
     desk_redraw.c
@@ -19,7 +21,7 @@ target_include_directories(desktop
         ${PROJECT_SOURCE_DIR}/src/gem
 )
 
-target_link_libraries(desktop PRIVATE gem gemconf libstout)
+target_link_libraries(desktop PRIVATE gem gemctl gemconf libstout)
 
 set_target_properties(desktop PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${GEM_APPS_DIR}
@@ -55,6 +57,8 @@ add_executable(desktop_hosted
     browser_view.c
     gem_trash.c
     trash_ui.c
+    file_commands.c
+    file_dialog.c
     disks.c
     icons.c
     desk_redraw.c
@@ -65,7 +69,7 @@ target_include_directories(desktop_hosted
         ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
-target_link_libraries(desktop_hosted PRIVATE aes vdi gemconf libstout)
+target_link_libraries(desktop_hosted PRIVATE aes vdi gemctl gemconf libstout)
 target_compile_definitions(desktop_hosted PRIVATE GEM_DESKTOP_HOSTED=1)
 
 set_target_properties(desktop_hosted PROPERTIES

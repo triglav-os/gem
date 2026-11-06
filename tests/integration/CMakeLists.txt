@@ -22,3 +22,17 @@ add_test(NAME test_rasta_startup
         --artifacts ${CMAKE_BINARY_DIR}/rasta_startup)
 set_tests_properties(test_rasta_startup PROPERTIES LABELS integration TIMEOUT 15
     ENVIRONMENT "RASTA_BIN=${GEM_TOOLS_DIR}/rasta")
+
+add_test(NAME test_runtime_paths COMMAND ${Python3_EXECUTABLE} -B
+    ${CMAKE_CURRENT_SOURCE_DIR}/runtime_paths.py)
+set_tests_properties(test_runtime_paths PROPERTIES LABELS integration TIMEOUT 15)
+
+if(GEM_PLATFORM STREQUAL "rasta")
+    add_test(NAME test_install_layout COMMAND ${Python3_EXECUTABLE} -B
+        ${CMAKE_CURRENT_SOURCE_DIR}/install_layout.py --build ${CMAKE_BINARY_DIR})
+    set_tests_properties(test_install_layout PROPERTIES LABELS integration TIMEOUT 90)
+endif()
+
+add_test(NAME test_sdk_layout COMMAND ${Python3_EXECUTABLE} -B
+    ${CMAKE_CURRENT_SOURCE_DIR}/sdk_layout.py --build ${CMAKE_BINARY_DIR})
+set_tests_properties(test_sdk_layout PROPERTIES LABELS integration TIMEOUT 120)

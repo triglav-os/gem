@@ -164,6 +164,14 @@ void desktop_open_selected_icon(void)
     }
     if (selected->is_trash != 0) {
         desktop_open_trash();
+    } else if (selected->launcher == 2) {
+        char program[GEM_OS_PATH_MAX], tail[2] = {0};
+        if ((gem_os_find_executable("gemscape", program, sizeof(program)) ||
+             gem_os_find_file("bin/apps/gemscape", program, sizeof(program))) &&
+            shel_write(1, 1, 0, program, tail))
+            desktop_set_status("Gemscape launched.");
+        else
+            form_alert(1, "[1][ Unable to launch Gemscape. ][ OK ]");
     } else {
         desktop_open_disk_path(selected->path, selected->label);
     }
@@ -406,6 +414,11 @@ static void desktop_status_for_icon(const desktop_icon_entry_t *entry)
         return;
     }
 
+    if (entry->launcher) {
+        snprintf(text, sizeof(text), "Open %s.", entry->label);
+        desktop_set_status(text);
+        return;
+    }
     label_max = (int)sizeof(text) - 20;
     (void)snprintf(text, sizeof(text), "%.*s  %llu MB free", label_max,
                    entry->label,
@@ -429,6 +442,7 @@ void desktop_handle_icon_click(WORD object_id)
         is_double_click = 1;
     }
 
+    g_desktop.active_browser_handle = NIL;
     desktop_select_icon(object_id);
     desktop_status_for_icon(entry);
     if (previous != NIL) {
@@ -460,11 +474,7 @@ void desktop_handle_icon_click(WORD object_id)
     if (is_double_click != 0) {
         g_desktop.last_desktop_click_object = NIL;
         g_desktop.last_desktop_click_ms = 0u;
-        if (entry != NULL && entry->is_trash != 0) {
-            desktop_open_trash();
-        } else if (entry != NULL) {
-            desktop_open_disk_path(entry->path, entry->label);
-        }
+        desktop_open_selected_icon();
     } else {
         g_desktop.last_desktop_click_object = object_id;
         g_desktop.last_desktop_click_ms = now;
@@ -490,4 +500,23 @@ void desktop_install_trash_icon(void)
     entry->object_id = (WORD)(DESKTOP_ICON_BASE + g_desktop.icon_count);
     entry->is_trash = 1;
     ++g_desktop.icon_count;
+}
+
+void desktop_install_launchers(void)
+{
+    for (int launcher = 1; launcher <= 2; ++launcher) {
+        if (g_desktop.icon_count >= DESKTOP_MAX_ICONS)
+            return;
+        desktop_icon_entry_t *entry = &g_desktop.icons[g_desktop.icon_count];
+        memset(entry, 0, sizeof(*entry));
+        snprintf(entry->label, sizeof(entry->label), "%s",
+                 launcher == 1 ? "Files" : "Gemscape");
+        if (launcher == 1 && !gem_os_getcwd(entry->path, sizeof(entry->path)))
+            strcpy(entry->path, "/");
+        entry->asset = launcher == 1 ? &desktop_folder_icon_asset
+                                     : &desktop_prg_icon_asset;
+        entry->launcher = (WORD)launcher;
+        entry->object_id = (WORD)(DESKTOP_ICON_BASE + g_desktop.icon_count++);
+    }
+    desktop_refresh_icon_bindings();
 }

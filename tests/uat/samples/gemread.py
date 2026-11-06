@@ -11,6 +11,7 @@ from docker_context import ensure_container
 ensure_container()
 import argparse
 import json
+import shutil
 from pathlib import Path
 import struct
 import sys
@@ -186,11 +187,58 @@ def check_empty(session, selector_document):
         sum(crop(rendered, 22, 52, 600, 325)) > 500, \
         'Gemread did not open the PDF selected through File/Open'
 
+    check_settings(session)
+
     session.click(29, 40)
     session.wait(lambda: session.demo.poll() is not None,
                  'Gemread to close cleanly')
     assert session.demo.returncode == 0, 'Gemread returned an error on close'
     print('PASS Gemread empty page, File menu, Open chooser and cancel')
+
+
+def control_key(session, scan):
+    session.event(1, 224)
+    session.key(scan)
+    session.event(2, 224)
+
+
+def check_settings(session):
+    before = session.frame('gemread_before_settings')
+    session.click(590, 63)  # Three-line settings button.
+    opened = session.frame('gemread_settings_display')
+    assert crop(opened, 80, 72, 480, 256) != crop(before, 80, 72, 480, 256), \
+        'Gemread settings button did not open its dialog'
+    session.click(200, 135)  # Fit Width draft.
+    session.click(480, 303)  # Cancel.
+    cancelled = session.frame('gemread_settings_cancelled')
+    assert crop(cancelled, 150, 80, 430, 250) == crop(before, 150, 80, 430, 250), \
+        'Cancel changed the document display'
+    session.click(590, 63)
+    session.click(200, 135)  # Fit Width.
+    session.click(200, 167)  # Hide thumbnails.
+    session.click(500, 230)  # Default zoom +25.
+    session.click(430, 97)  # Files tab.
+    session.frame('gemread_settings_files')
+    session.click(200, 135)  # Disable remembering folders.
+    session.click(365, 303)  # Save.
+    saved = session.frame('gemread_settings_saved')
+    assert crop(saved, 22, 75, 575, 270) != crop(before, 22, 75, 575, 270), \
+        'Saved display settings did not rerender the PDF'
+    config = Path(session.env['XDG_CONFIG_HOME'])/'gem/gemread.cfg'
+    text = config.read_text()
+    for setting in ('zoom = 125', 'fit_width = true', 'thumbnails = false',
+                    'remember_folder = false', 'folder = '):
+        assert setting in text, f'Missing persisted setting: {setting}'
+    control_key(session, 26)  # Ctrl+W closes only the document.
+    closed = session.frame('gemread_document_closed')
+    assert session.demo.poll() is None, 'Close Document quit Gemread'
+    assert sum(crop(closed, 150, 80, 430, 250)) < 64, \
+        'Close Document left stale page pixels'
+    control_key(session, 18)  # Ctrl+O.
+    chooser = session.frame('gemread_shortcut_open')
+    assert crop(chooser, 80, 60, 480, 280) != crop(closed, 80, 60, 480, 280), \
+        'Ctrl+O did not open the chooser'
+    session.key(41)
 
 
 def resize_window(session):
@@ -278,6 +326,24 @@ def check_document(session, document_kind, color_fixture=False):
           'vertical scrollbar')
 
 
+def check_restart(previous, args, document):
+    args.binary_args = [str(document)]
+    restarted = Session(args)
+    restarted.path = previous.path/'restart'
+    restarted.path.mkdir(parents=True, exist_ok=True)
+    restarted.env['GEM_RASTA_FRAMEBUFFER'] = str(restarted.path/'framebuffer')
+    restarted.env['GEMD_SOCKET'] = str(restarted.path/'socket')
+    restarted.env['XDG_CONFIG_HOME'] = previous.env['XDG_CONFIG_HOME']
+    try:
+        restarted.run()
+        frame = restarted.frame('gemread_restored_preferences')
+        saved = (previous.path/'gemread_settings_saved.pbm').read_bytes()[-32000:]
+        assert crop(frame, 22, 75, 575, 270) == crop(saved, 22, 75, 575, 270), \
+            'Restart did not restore fit, zoom and thumbnail preferences'
+    finally:
+        restarted.close()
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--mode', choices=('direct', 'proxy'), required=True)
@@ -303,6 +369,8 @@ def main():
     session.path.mkdir(parents=True, exist_ok=True)
     session.env['GEM_RASTA_FRAMEBUFFER'] = str(session.path/'framebuffer')
     session.env['GEMD_SOCKET'] = str(session.path/'socket')
+    session.env['XDG_CONFIG_HOME'] = str(session.path/'config')
+    shutil.rmtree(session.path/'config', ignore_errors=True)
     assert sum(bool(value) for value in
                (args.document, args.epub_fixture, args.pdf_fixture)) <= 1, \
         'Choose one document fixture'
@@ -338,6 +406,8 @@ def main():
                 check_empty(session, selector_document)
         finally:
             session.close()
+        if document is None:
+            check_restart(session, args, selector_document)
         result['passed'] = True
     except Exception as error:
         result['error'] = str(error)

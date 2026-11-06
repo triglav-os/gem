@@ -23,7 +23,13 @@ static desktop_browser_entry_t *desktop_selected_entry(
         browser->selected_index >= browser->entry_count) {
         return NULL;
     }
-    return &browser->entries[browser->selected_index];
+    desktop_browser_entry_t *entry = &browser->entries[browser->selected_index];
+    if (!entry->is_parent)
+        return entry;
+    for (int i = 0; i < browser->entry_count; ++i)
+        if (browser->entries[i].selected && !browser->entries[i].is_parent)
+            return &browser->entries[i];
+    return entry;
 }
 
 static void desktop_refresh_browser(desktop_browser_window_t *browser)
@@ -46,7 +52,7 @@ void desktop_refresh_trash_availability(void)
     }
 }
 
-static void desktop_refresh_trash_windows(void)
+void desktop_refresh_trash_windows(void)
 {
     WORD index;
 
@@ -180,26 +186,41 @@ void desktop_trash_browser_entry(desktop_browser_window_t *browser, WORD index)
     desktop_trash_filesystem_selection(browser, index);
 }
 
-static void desktop_purge_trash_entry(desktop_browser_entry_t *entry)
+static void desktop_purge_trash_entry(desktop_browser_window_t *browser)
 {
+    desktop_browser_entry_t *entry = &browser->entries[browser->selected_index];
+    int count = 0, completed = 0;
+    for (int i = 0; i < browser->entry_count; ++i)
+        if (browser->entries[i].selected &&
+            browser->entries[i].is_trash_root_item)
+            ++count;
     char alert[GEM_OS_PATH_MAX + 96];
 
     (void)snprintf(
         alert, sizeof(alert),
         "[3][ Permanently delete %.*s?|This cannot be undone. ][ Delete | Cancel ]",
         350, entry->name);
+    if (count > 1)
+        snprintf(alert, sizeof(alert),
+                 "[3][ Permanently delete %d items?|This cannot be undone. ][ "
+                 "Delete | Cancel ]",
+                 count);
     if (form_alert(2, alert) != 1) {
         desktop_set_status("Permanent delete cancelled.");
         desktop_redraw(NULL);
         return;
     }
-    if (gem_trash_purge(&entry->trash_item) != GEM_TRASH_OK) {
-        desktop_set_status("Unable to permanently delete item.");
-    } else {
-        (void)snprintf(alert, sizeof(alert), "Permanently deleted %.*s.", 450,
-                       entry->name);
-        desktop_set_status(alert);
+    for (int i = 0; i < browser->entry_count; ++i) {
+        entry = &browser->entries[i];
+        if (!entry->selected || !entry->is_trash_root_item)
+            continue;
+        if (gem_trash_purge(&entry->trash_item) != GEM_TRASH_OK)
+            break;
+        ++completed;
     }
+    desktop_set_status(completed == count
+                           ? "Selection permanently deleted."
+                           : "Unable to delete the entire selection.");
     desktop_refresh_trash_windows();
 }
 
@@ -214,10 +235,11 @@ void desktop_delete_active_selection(void)
         return;
     }
     if (browser->backend == DESKTOP_BROWSER_FILES) {
-        desktop_trash_filesystem_selection(browser, browser->selected_index);
+        desktop_trash_filesystem_selection(browser,
+                                           (WORD)(entry - browser->entries));
     } else if (strcmp(browser->path, "trash://") == 0 &&
                entry->is_trash_root_item != 0) {
-        desktop_purge_trash_entry(entry);
+        desktop_purge_trash_entry(browser);
     } else {
         desktop_set_status("Return to Trash root to delete this item.");
         desktop_redraw(NULL);
@@ -238,39 +260,47 @@ void desktop_restore_active_selection(void)
         desktop_redraw(NULL);
         return;
     }
-    (void)snprintf(restored_path, sizeof(restored_path), "%s",
-                   entry->trash_item.original_path);
-    result = gem_trash_restore(&entry->trash_item);
-    if (result == GEM_TRASH_EXISTS) {
-        char alert[GEM_OS_PATH_MAX + 80];
-        WORD choice;
+    for (int index = 0; index < browser->entry_count; ++index) {
+        entry = &browser->entries[index];
+        if (!entry->selected || !entry->is_trash_root_item)
+            continue;
+        (void)snprintf(restored_path, sizeof(restored_path), "%s",
+                       entry->trash_item.original_path);
+        result = gem_trash_restore(&entry->trash_item);
+        if (result == GEM_TRASH_EXISTS) {
+            char alert[GEM_OS_PATH_MAX + 80];
+            WORD choice;
 
-        (void)snprintf(alert, sizeof(alert),
-                       "[2][ %.*s already exists. ][ Skip | Rename | Cancel ]",
-                       360, entry->name);
-        choice = form_alert(3, alert);
-        if (choice == 2) {
-            result = gem_trash_restore_renamed(&entry->trash_item);
+            (void)snprintf(
+                alert, sizeof(alert),
+                "[2][ %.*s already exists. ][ Skip | Rename | Cancel ]", 360,
+                entry->name);
+            choice = form_alert(3, alert);
+            if (choice == 2) {
+                result = gem_trash_restore_renamed(&entry->trash_item);
+            } else {
+                desktop_set_status(choice == 1 ? "Restore skipped."
+                                               : "Restore cancelled.");
+            }
+            if (choice != 2) {
+                desktop_redraw(NULL);
+                if (choice == 3)
+                    break;
+                continue;
+            }
+            if (result == GEM_TRASH_OK) {
+                desktop_set_status("Item restored under a new name.");
+            } else {
+                desktop_set_status("Unable to restore Trash item.");
+            }
+        } else if (result != GEM_TRASH_OK) {
+            desktop_set_status("Unable to restore Trash item.");
         } else {
-            desktop_set_status(choice == 1 ? "Restore skipped."
-                                           : "Restore cancelled.");
-        }
-        if (choice != 2) {
-            desktop_redraw(NULL);
-            return;
+            desktop_set_status("Item restored to its original location.");
         }
         if (result == GEM_TRASH_OK) {
-            desktop_set_status("Item restored under a new name.");
-        } else {
-            desktop_set_status("Unable to restore Trash item.");
+            desktop_refresh_file_windows_for_path(restored_path);
         }
-    } else if (result != GEM_TRASH_OK) {
-        desktop_set_status("Unable to restore Trash item.");
-    } else {
-        desktop_set_status("Item restored to its original location.");
-    }
-    if (result == GEM_TRASH_OK) {
-        desktop_refresh_file_windows_for_path(restored_path);
     }
     desktop_refresh_trash_windows();
 }

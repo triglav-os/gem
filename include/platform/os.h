@@ -133,6 +133,17 @@ int gem_os_system_config_dirs(char *out, size_t out_size);
 /* Returns the platform's per-user data directory. */
 int gem_os_user_data_dir(char *out, size_t out_size);
 
+/* Return the XDG cache base, falling back to HOME/.cache. */
+int gem_os_user_cache_dir(char *out, size_t capacity);
+/* Return the XDG persistent-state base, falling back to HOME/.local/state. */
+int gem_os_user_state_dir(char *out, size_t capacity);
+/* Create/resolve the private GEM runtime directory; reject unsafe ownership. */
+int gem_os_runtime_dir(char *out, size_t capacity);
+/* Resolve the running executable's directory, independent of the cwd. */
+int gem_os_executable_dir(char *out, size_t capacity);
+/* Find GEM data through overrides, XDG data roots and installation prefixes. */
+int gem_os_find_resource(const char *name, char *out, size_t capacity);
+
 /*
  * Starts a GEM child with a TOS-tail payload and child-only launch metadata.
  * `appl_id` is the AES id reserved before exec. Returns nonzero on success.
@@ -298,6 +309,9 @@ int gem_os_read_file(const char *path, char *buf, size_t buf_size,
  * temporary file in the same directory. Returns nonzero on success.
  */
 int gem_os_write_file_atomic(const char *path, const void *data, size_t size);
+
+/* Atomically create a file without replacing any existing entry or symlink. */
+int gem_os_create_file(const char *path, const void *data, size_t size);
 
 /*
  * Populates `info` with host metadata for `path`.

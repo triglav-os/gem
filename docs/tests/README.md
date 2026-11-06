@@ -13,6 +13,13 @@ with different build directories, because they can share `bin/` and reports.
 `test_container_lock` verifies waiting and lock release after command failure.
 `test_container_identity` checks passwd/group lookup, a writable owned home,
 and login-shell startup without missing-account diagnostics.
+`test_paths` verifies XDG overrides, resource lookup and private runtime
+permissions. `test_runtime_paths` checks Docker mounts and non-overwriting
+settings/profile migration, including shared XDG bases. `test_install_layout`
+checks exact contents, strips/dependency closure, removes stale files and
+launches relocated installed applications without checkout resource overrides.
+`test_sdk_layout` exports a clean SDK and builds independent samples after
+relocation; see [Linux paths](../guides/LINUX_PATHS.md).
 CTest still runs independent tests in parallel inside each invocation; select
 the parallelism with `make tests TEST_JOBS=4`.
 
@@ -76,8 +83,8 @@ with a fresh post-I/O timestamp.
 ## Security and build verification
 
 The optional IDE-level check uses the installed VS Code C++ debug adapter on
-the host, as F5 does; all GEM programs and GDB run in Docker. Close an existing
-session with `make stop`, then run:
+the host, as F5 does; all GEM programs and GDB run in Docker. It uses a separate
+container and private XDG bases, leaving any desktop session untouched. Run:
 
 ```sh
 python3 -B tests/integration/session/debug_adapter.py \
@@ -86,7 +93,8 @@ python3 -B tests/integration/session/debug_adapter.py \
 
 It reads the checked-in launch/tasks configuration, hits and continues a
 breakpoint at `main`, keeps Desktop and Terminal ready for ten seconds, then
-checks that the post-debug Make task removes the container. Its evidence lives
+checks private runtime permissions, persistent XDG logs and that the post-debug
+Make task removes the test container. Its evidence lives
 in `build/f5-adapter/`. This check is separate from CTest because the IDE adapter
 is installed on the host. A direct GDB batch check does not cover VS Code's
 terminal allocation: the previous local launch passed `/dev/pts/0` into Docker,
@@ -156,3 +164,11 @@ right/bottom scrollbar strips become thin resize borders. The earlier rerun
 recorded 96/101, retaining the then-unresolved demo34, Gemread and Gemscape
 failures. The geometry check also covers compact grips on tiny windows under
 ASan/UBSan. See the generated latest report for full-suite evidence.
+
+The 2026-11-06 package audit additionally ran `gemscape_browser.py` with
+`bin/gemix/bin/gemscape`, its installed gemd/Rasta and `share/gem` resources.
+All nine browser scenarios passed against the stripped, single-locale CEF
+payload. Evidence is under `build/packaged-browser/`; this additional run is
+separate from the numbered CTest report. Native Release package and relocated
+SDK checks also passed with `/usr` and `lib/x86_64-linux-gnu`; their log is
+`build/package-native/build.log`. Native display/input hardware was not used.

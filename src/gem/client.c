@@ -98,7 +98,8 @@ static int gem_rpc_connect(void)
 
     memset(&addr, 0, sizeof(addr));
     addr.sun_family = AF_UNIX;
-    if (strlen(gem_rpc_socket_path()) >= sizeof(addr.sun_path)) {
+    if (!gem_rpc_socket_path()[0] ||
+        strlen(gem_rpc_socket_path()) >= sizeof(addr.sun_path)) {
         (void)close(fd);
         return 0;
     }

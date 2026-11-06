@@ -44,6 +44,10 @@ void gemscape_preferences_load(gemscape_preferences_t *preferences);
 int gemscape_preferences_save(const gemscape_preferences_t *preferences);
 /* Resolves and creates a private browser profile; returns zero on failure. */
 int gemscape_profile_path(char *path, size_t capacity);
+/* Resolve/create disposable browser cache storage, separately from cookies. */
+int gemscape_cache_path(char *path, size_t capacity);
+/* Resolve the CEF diagnostic log in persistent state storage. */
+int gemscape_log_path(char *path, size_t capacity);
 /* Shows a website alert (0), confirmation (1), or prompt (2); bounds prompt
  * text. */
 int gemscape_script_dialog(int kind, const char *origin, const char *message,

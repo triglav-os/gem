@@ -47,6 +47,16 @@ enum {
     MENU_FILE_DELETE,
     MENU_FILE_RESTORE,
     MENU_FILE_EMPTY_TRASH,
+    MENU_FILE_RENAME,
+    MENU_FILE_CUT,
+    MENU_FILE_COPY,
+    MENU_FILE_PASTE,
+    MENU_FILE_NEW_FOLDER,
+    MENU_FILE_NEW_TEXT,
+    MENU_FILE_NEW_MARKDOWN,
+    MENU_FILE_NEW_HTML,
+    MENU_FILE_NEW_CSV,
+    MENU_FILE_SELECT_ALL,
     MENU_ARRANGE_BOX,
     MENU_ARRANGE_SHOW_AS_ICONS,
     MENU_ARRANGE_SEPARATOR,
@@ -59,7 +69,7 @@ enum {
 
 enum {
     DESKTOP_MAX_DISKS = 12,
-    DESKTOP_MAX_ICONS = DESKTOP_MAX_DISKS + 2,
+    DESKTOP_MAX_ICONS = DESKTOP_MAX_DISKS + 4,
     DESKTOP_OBJECT_COUNT = DESKTOP_ICON_BASE + DESKTOP_MAX_ICONS,
     DESKTOP_ICON_OBJECT_W = 72,
     DESKTOP_ICON_OBJECT_H = 58,
@@ -103,6 +113,7 @@ typedef struct desktop_icon_entry {
     WORD object_id;
     WORD is_trash;
     WORD is_folder;
+    WORD launcher;
 } desktop_icon_entry_t;
 
 typedef struct desktop_browser_entry {
@@ -188,6 +199,27 @@ void desktop_browser_handle_click(WORD handle, WORD mx, WORD my,
                                   WORD key_state);
 /* Handle a WM_* message addressed to a browser window. */
 void desktop_browser_handle_message(WORD msg[8]);
+/* File commands shared by the menu bar, keyboard and context menu. */
+void desktop_file_command(WORD command);
+/* Return nonzero when this command is meaningful for the active selection. */
+int desktop_file_command_enabled(WORD command);
+/* Display the shared context menu at a pointer location. */
+void desktop_file_popup(WORD handle, WORD x, WORD y);
+/* Map a browser point to an entry, or NIL for empty space. */
+WORD desktop_browser_entry_at(const desktop_browser_window_t *browser, WORD x,
+                              WORD y);
+/* Handle Ctrl shortcuts and F2; return nonzero when consumed. */
+int desktop_file_shortcut(WORD key, WORD modifiers);
+/* Ask for a leaf name, preserving the supplied buffer on cancellation. */
+int desktop_name_dialog(const char *title, char *text, size_t capacity);
+/* Refresh all Trash windows after an operation changes its metadata. */
+void desktop_refresh_trash_windows(void);
+/* Extract a mounted-image entry into an unused destination. */
+int desktop_disk_copy_entry(desktop_browser_window_t *source,
+                            const desktop_browser_entry_t *entry,
+                            const char *destination, const char *parent);
+/* Append File Manager and Gemscape quick launch icons. */
+void desktop_install_launchers(void);
 /* Route Return and arrow-key navigation to the active browser. */
 void desktop_browser_handle_key(WORD key);
 /* Remember a selected filesystem entry as a possible drag source. */

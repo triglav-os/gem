@@ -7,6 +7,7 @@ endif()
 project(gem C)
 
 include(CTest)
+include(GNUInstallDirs)
 find_package(Threads REQUIRED)
 
 set(GEM_PLATFORM "rasta" CACHE STRING
@@ -52,8 +53,9 @@ endif()
 
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${GEM_LIBRARY_DIR})
-set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
-set(CMAKE_INSTALL_RPATH "$ORIGIN/../lib")
+set(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)
+set(CMAKE_BUILD_RPATH "${GEM_LIBRARY_DIR}")
+set(CMAKE_INSTALL_RPATH "$ORIGIN/../${CMAKE_INSTALL_LIBDIR}")
 
 file(GLOB gem_runtime_font_files CONFIGURE_DEPENDS
     ${PROJECT_SOURCE_DIR}/src/resources/fonts/*.fnt)
@@ -97,105 +99,30 @@ if(BUILD_TESTING)
     add_subdirectory(tests)
 endif()
 
-set(GEMIX_ROOT ${PROJECT_SOURCE_DIR}/bin/gemix)
-set(GEMIX_BIN ${GEMIX_ROOT}/bin)
-set(GEMIX_LIB ${GEMIX_ROOT}/lib)
-set(GEMIX_INCLUDE ${GEMIX_ROOT}/include)
-set(GEMIX_SHARE ${GEMIX_ROOT}/share/gem)
+include(tools/scripts/install.cmake)
 
-add_custom_target(gemix_package
-    COMMAND ${CMAKE_COMMAND} -E remove_directory ${GEMIX_ROOT}
-    COMMAND ${CMAKE_COMMAND} -E make_directory ${GEMIX_BIN}
-    COMMAND ${CMAKE_COMMAND} -E make_directory ${GEMIX_LIB}
-    COMMAND ${CMAKE_COMMAND} -E make_directory ${GEMIX_INCLUDE}
-    COMMAND ${CMAKE_COMMAND} -E make_directory ${GEMIX_SHARE}/fonts ${GEMIX_ROOT}/bin/data
-    COMMAND ${CMAKE_COMMAND} -E copy
-        ${PROJECT_SOURCE_DIR}/LICENSE ${GEMIX_ROOT}/LICENSE
-    COMMAND ${CMAKE_COMMAND} -E copy
-        $<TARGET_FILE:gemd> ${GEMIX_BIN}/
-    COMMAND ${CMAKE_COMMAND} -E copy
-        $<TARGET_FILE:desktop> ${GEMIX_BIN}/
-    COMMAND ${CMAKE_COMMAND} -E copy
-        $<TARGET_FILE:terminal> ${GEMIX_BIN}/
-    COMMAND ${CMAKE_COMMAND} -E copy
-        $<TARGET_FILE:calc_gemd> ${GEMIX_BIN}/
-    COMMAND ${CMAKE_COMMAND} -E copy
-        $<TARGET_FILE:clock_gemd> ${GEMIX_BIN}/
-    COMMAND ${CMAKE_COMMAND} -E copy
-        $<TARGET_FILE:stout> ${GEMIX_BIN}/
-    COMMAND ${CMAKE_COMMAND} -E copy
-        $<TARGET_FILE:gem> ${GEMIX_LIB}/
-    COMMAND ${CMAKE_COMMAND} -E copy
-        $<TARGET_FILE:platform_linux> ${GEMIX_LIB}/
-    COMMAND ${CMAKE_COMMAND} -E copy
-        $<TARGET_FILE:aes> ${GEMIX_LIB}/
-    COMMAND ${CMAKE_COMMAND} -E copy
-        $<TARGET_FILE:vdi> ${GEMIX_LIB}/
-    COMMAND ${CMAKE_COMMAND} -E copy
-        $<TARGET_FILE:gemconf> ${GEMIX_LIB}/
-    COMMAND ${CMAKE_COMMAND} -E copy
-        $<TARGET_FILE:gemctl> ${GEMIX_LIB}/
-    COMMAND ${CMAKE_COMMAND} -E copy
-        $<TARGET_FILE:libstout> ${GEMIX_LIB}/
-    COMMAND ${CMAKE_COMMAND} -E copy
-        $<TARGET_FILE:fat12> ${GEMIX_LIB}/
-    COMMAND ${CMAKE_COMMAND} -E copy
-        $<TARGET_FILE:msa> ${GEMIX_LIB}/
-    COMMAND ${CMAKE_COMMAND} -E copy
-        $<TARGET_FILE:prg> ${GEMIX_LIB}/
-    COMMAND ${CMAKE_COMMAND} -E copy
-        ${PROJECT_SOURCE_DIR}/include/gem.h ${GEMIX_INCLUDE}/gem.h
-    COMMAND ${CMAKE_COMMAND} -E make_directory ${GEMIX_INCLUDE}/gem
-    COMMAND ${CMAKE_COMMAND} -E copy
-        ${PROJECT_SOURCE_DIR}/include/gem/gem.h ${GEMIX_INCLUDE}/gem/
-    COMMAND ${CMAKE_COMMAND} -E copy
-        ${PROJECT_SOURCE_DIR}/include/gem/aes.h ${GEMIX_INCLUDE}/gem/
-    COMMAND ${CMAKE_COMMAND} -E copy
-        ${PROJECT_SOURCE_DIR}/include/gem/vdi.h ${GEMIX_INCLUDE}/gem/
-    COMMAND ${CMAKE_COMMAND} -E copy
-        ${PROJECT_SOURCE_DIR}/include/gem/portab.h
-        ${PROJECT_SOURCE_DIR}/include/gem/input.h ${GEMIX_INCLUDE}/gem/
-    COMMAND ${CMAKE_COMMAND} -E copy
-        ${PROJECT_SOURCE_DIR}/include/gem/os.h ${GEMIX_INCLUDE}/gem/
-    COMMAND ${CMAKE_COMMAND} -E copy
-        ${PROJECT_SOURCE_DIR}/include/gem/gemconf.h ${GEMIX_INCLUDE}/gem/
-    COMMAND ${CMAKE_COMMAND} -E copy
-        ${PROJECT_SOURCE_DIR}/include/gem/gemctl.h ${GEMIX_INCLUDE}/gem/
-    COMMAND ${CMAKE_COMMAND} -E make_directory ${GEMIX_INCLUDE}/stout
-    COMMAND ${CMAKE_COMMAND} -E copy
-        ${PROJECT_SOURCE_DIR}/include/stout/disk.h ${GEMIX_INCLUDE}/stout/
-    COMMAND ${CMAKE_COMMAND} -E make_directory ${GEMIX_INCLUDE}/platform
-    COMMAND ${CMAKE_COMMAND} -E copy
-        ${PROJECT_SOURCE_DIR}/include/platform/os.h ${GEMIX_INCLUDE}/platform/
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-        ${GEM_RESOURCES_DIR}/fonts ${GEMIX_SHARE}/fonts
-    COMMAND ${CMAKE_COMMAND} -E copy
-        ${GEM_RESOURCES_DIR}/cursors.rsc ${GEMIX_SHARE}/
-    COMMAND ${CMAKE_COMMAND} -E copy
-        ${GEM_SAMPLES_DIR}/data/desktop_icons.rsc ${GEMIX_ROOT}/bin/data/
-    COMMAND ${CMAKE_COMMAND} -E copy
-        ${GEM_SAMPLES_DIR}/data/clock_numbers.rsc ${GEMIX_ROOT}/bin/data/
-    COMMAND ${CMAKE_COMMAND}
-        -DGEMIX_ROOT=${GEMIX_ROOT}
-        -P ${PROJECT_SOURCE_DIR}/tools/scripts/package-gemix.cmake
-    DEPENDS
-        gemd desktop terminal calc_gemd clock_gemd stout gemconf gemctl libstout
-        fat12 msa prg
-        gem_runtime_fonts gem_runtime_cursors
-        gem_runtime_desktop_icons gem_runtime_clock_numbers
-    COMMENT "Assembling the Gemix Linux deployment tree"
-)
-
+set(gem_sdk_libraries gem aes vdi gemconf gemctl fat12 msa platform_linux)
+if(GEM_PLATFORM STREQUAL "rasta")
+    list(APPEND gem_sdk_libraries rasta)
+endif()
+set(gem_sdk_library_files)
+foreach(library IN LISTS gem_sdk_libraries)
+    list(APPEND gem_sdk_library_files "$<TARGET_FILE:${library}>")
+endforeach()
+file(GENERATE OUTPUT ${CMAKE_BINARY_DIR}/sdk-export.cmake CONTENT
+"if(NOT DEFINED SDK_ROOT)
+  set(SDK_ROOT \"${GEM_OUTPUT_ROOT}/sdk\")
+endif()
+set(GEM_PLATFORM ${GEM_PLATFORM})
+set(SOURCE_ROOT \"${PROJECT_SOURCE_DIR}\")
+set(RESOURCE_ROOT \"${GEM_RESOURCES_DIR}\")
+set(RESGEN \"$<TARGET_FILE:resgen>\")
+set(GEM_LIBRARIES \"${gem_sdk_library_files}\")
+include(\"${PROJECT_SOURCE_DIR}/tools/scripts/gem_sdk.cmake\")
+")
 add_custom_target(gem_sdk
-    COMMAND ${CMAKE_COMMAND}
-        -DGEM_PLATFORM=${GEM_PLATFORM}
-        -DSDK_ROOT=${GEM_OUTPUT_ROOT}/sdk
-        -DSOURCE_ROOT=${PROJECT_SOURCE_DIR}
-        -DRESOURCE_ROOT=${GEM_RESOURCES_DIR}
-        -DRESGEN=$<TARGET_FILE:resgen>
-        "-DGEM_LIBRARIES=$<TARGET_FILE:gem>;$<TARGET_FILE:aes>;$<TARGET_FILE:vdi>;$<TARGET_FILE:gemconf>;$<TARGET_FILE:gemctl>;$<TARGET_FILE:libstout>;$<TARGET_FILE:fat12>;$<TARGET_FILE:msa>;$<TARGET_FILE:prg>;$<TARGET_FILE:platform_linux>;$<TARGET_FILE:rasta>"
-        -P ${PROJECT_SOURCE_DIR}/tools/scripts/gem_sdk.cmake
-    DEPENDS gem aes vdi gemconf gemctl libstout fat12 msa prg platform_linux rasta gem_runtime_fonts
-        gem_runtime_cursors gem_runtime_alert_icons resgen
+    COMMAND ${CMAKE_COMMAND} -P ${CMAKE_BINARY_DIR}/sdk-export.cmake
+    DEPENDS ${gem_sdk_libraries} gem_runtime_fonts gem_runtime_cursors
+        gem_runtime_alert_icons resgen
     COMMENT "Exporting the public GEM SDK"
     VERBATIM)

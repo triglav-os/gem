@@ -540,6 +540,7 @@ static int desktop_browser_open_window(desktop_browser_window_t *browser,
         return 0;
     }
     g_desktop.active_browser_handle = browser->handle;
+    desktop_select_icon(NIL);
     desktop_browser_sync_work(browser);
     desktop_update_desk_menu_labels();
     desktop_browser_redraw(browser, NULL);

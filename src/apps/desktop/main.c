@@ -38,15 +38,6 @@ void desktop_update_desk_menu_labels(void)
     OBJECT *tree = g_desktop.menu_tree;
     size_t item_index;
     WORD used_count = 0;
-    desktop_browser_window_t *active =
-        desktop_find_browser_by_handle(g_desktop.active_browser_handle);
-    desktop_browser_entry_t *active_entry = NULL;
-
-    if (active != NULL && active->selected_index >= 0 &&
-        active->selected_index < active->entry_count) {
-        active_entry = &active->entries[active->selected_index];
-    }
-
     for (item_index = 0; item_index < 6; ++item_index) {
         OBJECT *item = &tree[menu_items[item_index]];
         desktop_browser_window_t *browser =
@@ -96,16 +87,10 @@ void desktop_update_desk_menu_labels(void)
                       g_desktop.sort_mode == DESKTOP_SORT_SIZE);
     (void)menu_icheck(tree, MENU_ARRANGE_SORT_TYPE,
                       g_desktop.sort_mode == DESKTOP_SORT_TYPE);
-    (void)menu_ienable(tree, MENU_FILE_OPEN, active_entry != NULL);
-    (void)menu_ienable(tree, MENU_FILE_DELETE,
-                       active_entry != NULL && active_entry->is_parent == 0);
-    (void)menu_ienable(
-        tree, MENU_FILE_RESTORE,
-        active != NULL && active->backend == DESKTOP_BROWSER_TRASH &&
-            strcmp(active->path, "trash://") == 0 && active_entry != NULL &&
-            active_entry->is_trash_root_item != 0);
-    (void)menu_ienable(tree, MENU_FILE_EMPTY_TRASH,
-                       g_desktop.trash_nonempty != 0);
+    for (WORD command = MENU_FILE_OPEN; command <= MENU_FILE_SELECT_ALL;
+         ++command)
+        (void)menu_ienable(tree, command,
+                           desktop_file_command_enabled(command));
 
     if (g_desktop.work.g_w > 0) {
         (void)menu_bar(tree, 1);
@@ -213,22 +198,31 @@ static void desktop_init_menu_tree(void)
     desktop_init_object(&tree[MENU_DESK_6], MENU_DESK_BOX, NIL, NIL, G_STRING,
                         NONE, DISABLED, (LONG)(intptr_t)"", 0, 5, 22, 1);
 
-    /* File popup. */
+    /* Preserve the original four menu rows; append editing and creation. */
+    static const char *const labels[] = {"  Open",
+                                         "  Delete",
+                                         "  Restore",
+                                         "  Empty Trash",
+                                         "  Rename",
+                                         "  Cut",
+                                         "  Copy",
+                                         "  Paste",
+                                         "  New Folder",
+                                         "  New Text File",
+                                         "  New Markdown File",
+                                         "  New HTML File",
+                                         "  New CSV File",
+                                         "  Select All"};
     desktop_init_object(&tree[MENU_FILE_BOX], MENU_ARRANGE_BOX, MENU_FILE_OPEN,
-                        MENU_FILE_EMPTY_TRASH, G_BOX, NONE, NORMAL, 0x1100L, 0,
-                        0, 18, 4);
-    desktop_init_object(&tree[MENU_FILE_OPEN], MENU_FILE_DELETE, NIL, NIL,
-                        G_STRING, NONE, NORMAL, (LONG)(intptr_t)"  Open", 0, 0,
-                        18, 1);
-    desktop_init_object(&tree[MENU_FILE_DELETE], MENU_FILE_RESTORE, NIL, NIL,
-                        G_STRING, NONE, NORMAL, (LONG)(intptr_t)"  Delete", 0,
-                        1, 18, 1);
-    desktop_init_object(&tree[MENU_FILE_RESTORE], MENU_FILE_EMPTY_TRASH, NIL,
-                        NIL, G_STRING, NONE, NORMAL,
-                        (LONG)(intptr_t)"  Restore", 0, 2, 18, 1);
-    desktop_init_object(&tree[MENU_FILE_EMPTY_TRASH], MENU_FILE_BOX, NIL, NIL,
-                        G_STRING, NONE, NORMAL, (LONG)(intptr_t)"  Empty Trash",
-                        0, 3, 18, 1);
+                        MENU_FILE_SELECT_ALL, G_BOX, NONE, NORMAL, 0x1100L, 0,
+                        0, 24, 14);
+    for (WORD item = MENU_FILE_OPEN; item <= MENU_FILE_SELECT_ALL; ++item)
+        desktop_init_object(&tree[item],
+                            item == MENU_FILE_SELECT_ALL ? MENU_FILE_BOX
+                                                         : item + 1,
+                            NIL, NIL, G_STRING, NONE, NORMAL,
+                            (LONG)(intptr_t)labels[item - MENU_FILE_OPEN], 0,
+                            item - MENU_FILE_OPEN, 24, 1);
 
     /* Arrange popup: view toggle, a separator, then the sort radio group. */
     desktop_init_object(&tree[MENU_ARRANGE_BOX], MENU_POPUPS,
@@ -337,6 +331,10 @@ static void desktop_handle_menu_item(WORD item)
 {
     char text[96];
 
+    if (item >= MENU_FILE_OPEN && item <= MENU_FILE_SELECT_ALL) {
+        desktop_file_command(item);
+        return;
+    }
     switch (item) {
         case MENU_DESK_1:
         case MENU_DESK_2:
@@ -358,26 +356,6 @@ static void desktop_handle_menu_item(WORD item)
             }
             break;
         }
-        case MENU_FILE_OPEN: {
-            desktop_browser_window_t *browser =
-                desktop_find_browser_by_handle(g_desktop.active_browser_handle);
-
-            if (browser != NULL && browser->selected_index >= 0 &&
-                browser->selected_index < browser->entry_count) {
-                desktop_browser_open_entry(browser, browser->selected_index);
-            } else {
-                desktop_set_status("Select a File Manager item first.");
-            }
-        } break;
-        case MENU_FILE_DELETE:
-            desktop_delete_active_selection();
-            break;
-        case MENU_FILE_RESTORE:
-            desktop_restore_active_selection();
-            break;
-        case MENU_FILE_EMPTY_TRASH:
-            desktop_empty_trash();
-            break;
         case MENU_ARRANGE_SHOW_AS_ICONS:
             /* One toggle drives both views; the tick tracks the state. */
             g_desktop.icon_view = g_desktop.icon_view ? 0 : 1;
@@ -457,6 +435,7 @@ static int desktop_init(void)
     desktop_probe_disks();
     desktop_sort_icons_by_label();
     desktop_install_trash_icon();
+    desktop_install_launchers();
     desktop_refresh_trash_availability();
     desktop_update_desk_menu_labels();
     wind_get(0, WF_WORKXYWH, &g_desktop.work.g_x, &g_desktop.work.g_y,
@@ -512,7 +491,7 @@ int main(void)
         WORD br = 0;
         WORD event;
 
-        event = evnt_multi((UWORD)(MU_MESAG | MU_BUTTON | MU_KEYBD), 1, 1, 1, 0,
+        event = evnt_multi((UWORD)(MU_MESAG | MU_BUTTON | MU_KEYBD), 1, 0, 0, 0,
                            0, 0, 0, 0, 0, 0, 0, 0, 0, msg, 0, 0, &mx, &my, &mb,
                            &ks, &kr, &br);
         (void)mb;
@@ -527,6 +506,9 @@ int main(void)
             (void)scan;
 #endif
 
+            if (desktop_file_shortcut(kr, ks)) {
+                continue;
+            }
             if (ch == 27 || ch == 'q' || ch == 'Q') {
                 done = 1;
             }
@@ -578,7 +560,7 @@ int main(void)
             }
         }
 
-        if ((event & MU_BUTTON) != 0) {
+        if ((event & MU_BUTTON) != 0 && (mb & 3) != 0) {
             WORD handle = wind_find(mx, my);
             WORD object = desktop_find_icon_at(mx, my);
 
@@ -587,10 +569,15 @@ int main(void)
             }
 
             if (handle > 0) {
-                desktop_browser_handle_click(handle, mx, my, ks);
+                if (mb & 2)
+                    desktop_file_popup(handle, mx, my);
+                else
+                    desktop_browser_handle_click(handle, mx, my, ks);
                 continue;
             }
 
+            if (mb & 2)
+                continue;
             if (object >= DESKTOP_ICON_BASE &&
                 object < DESKTOP_ICON_BASE + g_desktop.icon_count) {
                 desktop_handle_icon_click(object);

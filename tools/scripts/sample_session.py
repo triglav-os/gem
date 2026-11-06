@@ -27,7 +27,8 @@ if os.environ.get('GEM_IN_CONTAINER') != '1':
 
 ROOT = Path(__file__).resolve().parents[2]
 RUNTIME = Path(os.environ.get('GEM_RUNTIME_ROOT', str(ROOT/'bin'))).resolve()
-SESSION = ROOT / 'build/f5'
+SESSION = Path(os.environ.get('GEM_SESSION_DIRECTORY', ROOT/'build/f5'))
+LOGS = Path(os.environ.get('GEM_SESSION_LOG_DIRECTORY', SESSION))
 STATE = SESSION / 'state.json'
 BUNDLED_APPS = (
     'desktop', 'calc', 'clock', 'terminal', 'gemscape', 'gemread', 'stout'
@@ -178,14 +179,15 @@ class Session:
                 return value
             for record in self.state['processes']:
                 if record.get('required') and not alive(record):
-                    raise RuntimeError(f"{record['name']} exited; see {SESSION}/{record['name']}.log")
+                    raise RuntimeError(f"{record['name']} exited; see {LOGS}/{record['name']}.log")
             time.sleep(.05)
         if not self.running:
             raise InterruptedError('Session stopped')
         raise RuntimeError(f'Timed out while waiting for {description}')
 
     def start_process(self, name, command, required=True):
-        log = (SESSION / f'{name}.log').open('w')
+        LOGS.mkdir(parents=True, exist_ok=True, mode=0o700)
+        log = (LOGS / f'{name}.log').open('w')
         self.logs.append(log)
         process = subprocess.Popen(command, cwd=ROOT, env=self.env,
                                    stdout=log, stderr=log, start_new_session=True)
@@ -207,7 +209,7 @@ class Session:
                    if p.is_dir() and (p/'CMakeLists.txt').exists()}
         if bundled != SOURCE_BUNDLED_APPS or samples != {'maestro', 'msa'}:
             raise RuntimeError('Update the session launcher for the changed application inventory')
-        SESSION.mkdir(parents=True, exist_ok=True)
+        SESSION.mkdir(parents=True, exist_ok=True, mode=0o700)
         SESSION.chmod(0o700)
         sock = SESSION / 'socket'
         if sock.exists():
@@ -224,11 +226,14 @@ class Session:
             'GEM_VDI_WIDTH': str(F5_WIDTH), 'GEM_VDI_HEIGHT': str(F5_HEIGHT),
             'GEM_RESOURCE_DIR': str(RUNTIME/'resources'),
             'GEMIX_HOME': str(RUNTIME),
-            'XDG_CONFIG_HOME': str(SESSION/'config'),
             'STOUT_MAX_CYCLES': '0',
             'ASAN_OPTIONS': 'detect_leaks=0:abort_on_error=1',
             'UBSAN_OPTIONS': 'halt_on_error=1:print_stacktrace=1'}
         if self.duration is not None:
+            overrides['XDG_CONFIG_HOME'] = str(SESSION/'config')
+            overrides['XDG_DATA_HOME'] = str(SESSION/'data')
+            overrides['XDG_STATE_HOME'] = str(SESSION/'state')
+            overrides['XDG_CACHE_HOME'] = str(SESSION/'cache')
             overrides['GEMSCAPE_PROFILE'] = str(SESSION/'browser-profile')
         self.env = dict(os.environ, **overrides)
         (SESSION/'session.env').write_text(''.join(f'{key}={value}\n' for key, value in overrides.items()))
@@ -363,7 +368,7 @@ class Session:
 
 
 def main():
-    global SESSION, STATE
+    global SESSION, STATE, LOGS
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('action', choices=('start', 'stop', 'supervise', 'check', 'run'))
     parser.add_argument('--directory', type=Path, default=SESSION)
@@ -372,13 +377,15 @@ def main():
     args = parser.parse_args()
     SESSION = args.directory.resolve()
     STATE = SESSION/'state.json'
-    SESSION.mkdir(parents=True, exist_ok=True)
+    LOGS = Path(os.environ.get('GEM_SESSION_LOG_DIRECTORY', SESSION))
+    LOGS.mkdir(parents=True, exist_ok=True, mode=0o700)
+    SESSION.mkdir(parents=True, exist_ok=True, mode=0o700)
     if args.action == 'stop':
         stop()
         return
     if args.action == 'start':
         stop()
-        with (SESSION/'session.log').open('w') as log:
+        with (LOGS/'session.log').open('w') as log:
             command = [sys.executable, '-B', __file__, 'supervise',
                        '--directory', str(SESSION), '--apps',
                        ','.join(INITIAL_APPS)]
@@ -389,13 +396,13 @@ def main():
             state = read_state()
             if state.get('manager', {}).get('pid') == proc.pid and state.get('phase') == 'viewer-ready':
                 print('Rasta ready. F5 will start gemd, Desktop and Terminal. '
-                      f'Logs: {SESSION}')
+                      f'Logs: {LOGS}')
                 return
             time.sleep(.05)
         if proc.poll() is None:
             proc.terminate()
             proc.wait(timeout=5)
-        raise RuntimeError(f'Session preparation failed; see {SESSION}/session.log')
+        raise RuntimeError(f'Session preparation failed; see {LOGS}/session.log')
     if args.action == 'check':
         stop()
     if args.apps is None:

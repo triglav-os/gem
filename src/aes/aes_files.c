@@ -109,6 +109,8 @@ int aes_try_resolve_path(const char *filename, char *resolved,
         return 0;
     }
 
+    if (gem_os_find_resource(filename, resolved, resolved_size))
+        return 1;
     aes_ascii_lower(filename, lowercase, sizeof(lowercase));
     resource_dir = gem_os_getenv_ref("GEM_RESOURCE_DIR");
     if (resource_dir != NULL && resource_dir[0] != '\0') {

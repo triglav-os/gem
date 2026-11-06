@@ -15,7 +15,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define GEMD_SOCKET_PATH "/tmp/gemd.sock"
 #define GEM_RPC_MAGIC 0x47454d31u
 #define GEM_RPC_VERSION 2u
 #define GEM_RPC_TEXT_MAX 512u

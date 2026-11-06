@@ -11,6 +11,8 @@
 #include "rasta_internal.h"
 
 #include <stdlib.h>
+#include <stdio.h>
+#include <platform/os.h>
 #include <string.h>
 
 const char *rasta_framebuffer_path(void)
@@ -26,7 +28,12 @@ const char *rasta_framebuffer_path(void)
         return value;
     }
 
-    return "/tmp/rasta.fb";
+    static char path[GEM_OS_PATH_MAX];
+    char directory[GEM_OS_PATH_MAX];
+    if (!gem_os_runtime_dir(directory, sizeof(directory)))
+        return "";
+    int length = snprintf(path, sizeof(path), "%s/rasta.fb", directory);
+    return length > 0 && (size_t)length < sizeof(path) ? path : "";
 }
 
 const char *rasta_host(void)

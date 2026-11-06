@@ -12,7 +12,8 @@ the desktop. Build and directory rules are linked from
 [project guidance](../../../AGENTS.md).
 
 Desktop menus expose implemented actions only: Desk lists open file-manager
-windows, File has Open, Delete, Restore and Empty Trash, and Arrange switches
+windows, File has Open, Delete, Restore, Empty Trash, Rename, Cut, Copy, Paste,
+New Folder, text/Markdown/HTML/CSV creation and Select All. Arrange switches
 between list and icon views and sorts by name, date, size or type. The list is a
 details view with system-font rows and clickable system-font Name, Date, Size and
 Type headers on the normal background. The header matches Gemscape's
@@ -77,3 +78,31 @@ the Trash contains an item; it does not depend on which window is active.
 AES sizes popup menus from rendered labels and optional shortcuts. Popup item
 text uses equal left and right padding; leading resource blanks remain available
 as the checkmark gutter rather than becoming visible label indentation.
+
+## File commands and launchers
+
+Right-click an item or empty browser space for the same File commands. A
+right-click on an existing multi-selection preserves it; blank space clears it.
+Unavailable commands are disabled. Ctrl+C/X/V copy, cut and paste; Ctrl+A selects
+all children, F2 renames, Ctrl+N creates text, and Ctrl+Shift+N creates a folder.
+Naming dialogs support caret placement, selection, typing, Enter and Escape.
+Names must be single components; existing entries (including dangling links)
+are never replaced. New files use text, Markdown, HTML and CSV templates.
+
+The process-local clipboard survives navigation and closing its source window.
+Paste targets the current folder, preflights name collisions across the batch,
+and retains unfinished cut entries on failure. Copy can extract mounted-image
+entries; mounted images remain read-only in File Manager. File operations run
+synchronously. Very large directory trees can keep the UI busy until completion.
+
+Delete moves regular files and directories to Trash after confirmation. At the
+Trash root, the shared menu offers multi-item Restore, Copy/Cut out, permanent
+Delete and Empty Trash. Rename, Paste and creation remain disabled there; restore
+items before editing them. Nested Trash browsing is read-only, with Copy enabled.
+Successful moves out remove their `.trashinfo` records. Permanent deletion and
+emptying keep Cancel as the default choice.
+
+The desktop also supplies Files (File Manager) and Gemscape launch icons using existing
+folder/program artwork. File Manager opens the launch working directory;
+Gemscape uses the AES shell launcher and its normal executable search path.
+Configured locations and the bottom-right Trash icon retain their positions.

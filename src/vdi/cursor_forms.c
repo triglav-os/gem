@@ -87,6 +87,8 @@ static const char *cursor_resource_path(void)
             return path;
         }
     }
+    if (gem_os_find_resource("cursors.rsc", path, sizeof(path)))
+        return path;
     if (gem_os_find_file("bin/resources/cursors.rsc", path, sizeof(path)) !=
         0) {
         return path;

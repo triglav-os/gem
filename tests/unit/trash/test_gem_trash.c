@@ -191,6 +191,37 @@ static void test_copy_path(const char *work)
     test_read(destination, "move-destination");
 }
 
+static void test_create_and_export(const char *work)
+{
+    char source[GEM_OS_PATH_MAX], target[GEM_OS_PATH_MAX],
+        link[GEM_OS_PATH_MAX];
+    gem_trash_item_t item;
+    test_join(work, "created.txt", source, sizeof(source));
+    test_join(work, "exported.txt", target, sizeof(target));
+    test_join(work, "create-link", link, sizeof(link));
+    assert(gem_os_create_file(source, "original", 8));
+    assert(!gem_os_create_file(source, "replacement", 11));
+    test_read(source, "original");
+    assert(symlink(source, link) == 0);
+    assert(!gem_os_create_file(link, "replacement", 11));
+    test_read(source, "original");
+    assert(unlink(link) == 0);
+    assert(symlink("missing-target", link) == 0);
+    assert(!gem_os_create_file(link, "replacement", 11));
+    assert(gem_trash_put(source, &item) == GEM_TRASH_OK);
+    assert(gem_trash_export(&item, target, 0) == GEM_TRASH_OK);
+    test_read(target, "original");
+    assert(gem_os_path_exists(item.payload_path));
+    assert(gem_os_path_exists(item.info_path));
+    assert(gem_trash_export(&item, target, 1) == GEM_TRASH_EXISTS);
+    assert(gem_os_path_exists(item.payload_path));
+    assert(gem_trash_export(&item, source, 1) == GEM_TRASH_OK);
+    test_read(source, "original");
+    assert(!gem_os_path_exists(item.payload_path));
+    assert(!gem_os_path_exists(item.info_path));
+    assert(gem_trash_export(&item, link, 1) != GEM_TRASH_OK);
+}
+
 int main(void)
 {
     char root[] = "/tmp/gem-trash-test-XXXXXX";
@@ -213,6 +244,7 @@ int main(void)
     assert(gem_os_mkdir_p(work) != 0);
     assert(setenv("XDG_DATA_HOME", data, 1) == 0);
     test_copy_path(work);
+    test_create_and_export(work);
     test_cross_device_directory_move(work);
     test_other_mount(data);
 

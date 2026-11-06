@@ -5,8 +5,10 @@ JOBS ?= 4
 TEST_JOBS ?= 4
 BUILD_TYPE ?= RelWithDebInfo
 DEBUG ?= 0
-export BUILD_DIR GEM_OUTPUT_ROOT JOBS TEST_JOBS BUILD_TYPE CMAKE_FLAGS
-TARGETS := all configure rasta cef mupdf tests unit integration uat sdk clean audit standards
+PREFIX ?= /usr/local
+DESTDIR ?=
+export BUILD_DIR GEM_OUTPUT_ROOT JOBS TEST_JOBS BUILD_TYPE CMAKE_FLAGS PREFIX DESTDIR
+TARGETS := all configure rasta cef mupdf tests unit integration uat sdk package install clean audit standards
 .PHONY: $(TARGETS) container run stop
 # Keep simultaneous top-level goals from sharing a CMake tree across containers.
 .NOTPARALLEL:

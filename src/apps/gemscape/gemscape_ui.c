@@ -520,6 +520,9 @@ static void gemscape_draw_frame(gemscape_state_t *state, const GRECT *dirty)
                                            address.g_y, button_size, 3);
             }
             address_text = address;
+            /* The editor clears its rectangle; keep the toolbar border out. */
+            if (address_text.g_h > 0)
+                --address_text.g_h;
             address_text.g_x = (WORD)(address.g_x + 3 * button_size);
             address_text.g_w = (WORD)(right_button_left - address_text.g_x);
             if (address_text.g_w < 0) {

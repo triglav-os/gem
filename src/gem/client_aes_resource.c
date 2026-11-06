@@ -101,6 +101,8 @@ WORD rsrc_load(char *filename)
     } else {
         path[0] = '\0';
     }
+    if (path[0] == '\0')
+        (void)gem_os_find_resource(filename, path, sizeof(path));
     if (path[0] == '\0') {
         strcpy(path, filename);
         if (shel_find(path) == 0) {

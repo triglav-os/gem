@@ -40,6 +40,7 @@ FetchContent_Declare(gem_musashi
         ${GIT_EXECUTABLE} apply --whitespace=nowarn ${musashi_patch})
 FetchContent_MakeAvailable(gem_musashi)
 set(musashi_source_dir ${gem_musashi_SOURCE_DIR})
+set(GEM_MUSASHI_SOURCE ${musashi_source_dir} PARENT_SCOPE)
 
 set(musashi_generated_dir ${CMAKE_CURRENT_BINARY_DIR}/generated)
 set(musashi_generated_c ${musashi_generated_dir}/m68kops.c)

@@ -77,6 +77,9 @@ def check(session, cover_binary, next_page):
     initial = session.frame('gemscape_initial')
     browser = 1
     assert field(session, browser, 4)[2] > 0, 'Gemscape window is missing'
+    work_x, work_y, work_width, _ = field(session, browser, 5)
+    assert all(crop(initial, work_x, work_y + 19, work_width, 1)), \
+        'Address editor erased the toolbar bottom border'
     session.wait(lambda: field(session, browser, 16)[0] < 1000 and
                   field(session, browser, 15)[0] < 1000,
                   'CEF page metrics to resize both GEM slider thumbs', 8)
@@ -111,6 +114,9 @@ def check(session, cover_binary, next_page):
     session.click(300, 58)
     target = next_page.as_uri() + '?y'
     type_text(session, target)
+    edited = session.frame('gemscape_address_edited')
+    assert all(crop(edited, work_x, work_y + 19, work_width, 1)), \
+        'Editing or selecting the URL erased its bottom border'
     session.key(40)
     navigated = wait_frame_change(session, scrolled, 'gemscape_enter_navigated')
     session.pause(.8)
@@ -145,6 +151,9 @@ def check(session, cover_binary, next_page):
     session.wait(lambda: session.demo.poll() is not None,
                  'Gemscape to close cleanly', 10)
     assert session.demo.returncode == 0, 'Gemscape returned an error on close'
+    if session.env.get('GEMSCAPE_DEBUG') != '1':
+        log = (session.path / 'demo.log').read_text(errors='replace')
+        assert 'ERROR:dbus/' not in log, 'Routine Chromium diagnostics reached the terminal'
     print('PASS Gemscape click, complete punctuation input, page keyboard '
           'focus, y/Enter URL navigation, Back, title repaint and sliders')
 

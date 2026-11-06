@@ -57,6 +57,24 @@ Only normal top-level project metadata, such as `LICENSE`, `README.md`,
 - `make` builds the project, including tests; `make tests` runs all suites
   in Docker and generates the test report.
 
+## Installed files and user storage
+
+Installed programs follow GNUInstallDirs: `bin/`, architecture-specific `lib/`,
+and `share/gem/`. Headers and static archives belong only in the SDK export. Private CEF dependencies belong under
+`lib/gem/cef/`. `make package` stages the same install rules into `bin/gemix`;
+`make install` supports a prefix and DESTDIR. Do not place installed resources
+beside executables in `bin/data` or embed build-dependency paths in installed
+ELF lookup paths. Runtime packages must use explicit payload lists, strip staged
+binaries and remove stale generated contents. Never package both a disk image
+and a second extracted copy of the same content. Required licenses are retained.
+See [packaging](../guides/PACKAGING.md).
+
+Persistent configuration, data, cache and logs use the XDG configuration, data,
+cache and state bases. Sockets and other temporary session files use a private
+runtime directory. Interactive settings must survive checkout cleanup; only
+explicit test fixtures belong in build directories. See
+[Linux paths](../guides/LINUX_PATHS.md) for exact locations and migration.
+
 ## Tests and data
 
 - `tests/unit/`: focused unit tests.
@@ -76,6 +94,7 @@ Do not place files directly in `docs/`. Use a meaningful subdirectory:
 - `docs/standards/`: coding and repository organization rules.
 - `docs/architecture/`: system design, API transport and security boundaries.
 - `docs/guides/`: build, usage and deployment guides.
+- `docs/licenses/`: dependency license notices missing from pinned archives.
 - `docs/manuals/`: original reference manuals.
 - `docs/notes/`: project notes, implementation details and gap analyses.
 - `docs/images/originals/`: original visual reference assets.

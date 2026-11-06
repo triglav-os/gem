@@ -26,14 +26,14 @@ def main():
     if not adapter.is_file():
         parser.error('Supply the C++ extension debugAdapters/bin/OpenDebugAD7')
     name = 'gem-runtime-' + hashlib.sha256(str(ROOT).encode()).hexdigest()[:16]
-    name += '-' + str(os.getuid())
+    name += '-' + str(os.getuid()) + '-f5-test'
 
     def container_exists():
         return subprocess.run(['docker', 'inspect', name], stdout=subprocess.DEVNULL,
                               stderr=subprocess.DEVNULL).returncode == 0
 
     if container_exists():
-        parser.error('Close the existing session with make stop before this check')
+        parser.error('An isolated F5 test container already exists: ' + name)
     config = json.loads((ROOT / '.vscode/launch.json').read_text())['configurations'][0]
     config = json.loads(json.dumps(config).replace('${workspaceFolder}', str(ROOT)))
     tasks = {task['label']: task for task in
@@ -47,14 +47,19 @@ def main():
     config['logging'] = {'engineLogging': True}
     evidence = ROOT / 'build/f5-adapter'
     evidence.mkdir(parents=True, exist_ok=True)
+    test_env = dict(os.environ, GEM_RUNTIME_CONTAINER=name, SDL_VIDEODRIVER='dummy',
+                    XDG_CONFIG_HOME=str(evidence/'config'),
+                    XDG_DATA_HOME=str(evidence/'data'),
+                    XDG_CACHE_HOME=str(evidence/'cache'),
+                    XDG_STATE_HOME=str(evidence/'state'))
     process = None
     with (evidence / 'tasks.log').open('w') as task_log, \
             (evidence / 'adapter.stderr').open('w') as errors, \
             (evidence / 'protocol.jsonl').open('w') as protocol:
         try:
-            subprocess.run(start, cwd=ROOT, env=dict(os.environ, SDL_VIDEODRIVER='dummy'),
+            subprocess.run(start, cwd=ROOT, env=test_env,
                            stdout=task_log, stderr=task_log, check=True, timeout=600)
-            process = subprocess.Popen([str(adapter)], cwd=ROOT, stdin=subprocess.PIPE,
+            process = subprocess.Popen([str(adapter)], cwd=ROOT, env=test_env, stdin=subprocess.PIPE,
                                        stdout=subprocess.PIPE, stderr=errors)
             messages = queue.Queue()
 
@@ -119,7 +124,9 @@ def main():
                     request('continue', {'threadId': message['body']['threadId']})
                 elif event in ('terminated', 'exited'):
                     raise RuntimeError('Debuggee exited before session validation')
-                state = json.loads((ROOT / 'build/f5/state.json').read_text())
+                directory = '/run/user/' + str(os.getuid()) + '/gem/session-' + hashlib.sha256(str(ROOT).encode()).hexdigest()[:16]
+                state = json.loads(subprocess.check_output(
+                    ['docker', 'exec', name, 'cat', directory + '/state.json'], text=True))
                 if breakpoint_hit and state.get('phase') == 'applications-ready':
                     assert state['started_apps'] == ['desktop', 'terminal'], state
                     if ready_since is None:
@@ -130,6 +137,12 @@ def main():
                     raise RuntimeError('Session stopped after becoming ready')
             else:
                 raise RuntimeError('Debugger session did not become ready; see protocol.jsonl')
+            permissions = subprocess.check_output(
+                ['docker', 'exec', name, 'stat', '-c', '%a', directory,
+                 str(Path(directory).parent)], text=True).splitlines()
+            assert permissions == ['700', '700'], permissions
+            logs = evidence/'state/gem/sessions'/hashlib.sha256(str(ROOT).encode()).hexdigest()[:16]
+            assert (logs/'terminal.log').is_file(), 'Runtime logs did not reach XDG state storage'
             request('disconnect', {'terminateDebuggee': True})
             process.wait(timeout=10)
         finally:
@@ -140,7 +153,7 @@ def main():
                 except subprocess.TimeoutExpired:
                     process.kill()
                     process.wait()
-            subprocess.run(stop, cwd=ROOT, stdout=task_log, stderr=task_log,
+            subprocess.run(stop, cwd=ROOT, env=test_env, stdout=task_log, stderr=task_log,
                            check=True, timeout=20)
     assert not container_exists(), 'Post-debug task left the session container running'
     print('PASS actual F5 adapter, breakpoint/continue, stable applications and make stop')

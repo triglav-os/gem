@@ -63,6 +63,24 @@ foreach(mode direct proxy)
         LABELS "uat;${mode}" TIMEOUT 30)
 endforeach()
 
+# File Manager context menu, creation, clipboard and Trash operations.
+foreach(mode direct proxy)
+    if(mode STREQUAL "direct")
+        set(file_commands_desktop_target desktop_hosted)
+    else()
+        set(file_commands_desktop_target desktop)
+    endif()
+    add_test(NAME uat_file_commands_${mode}
+        COMMAND ${Python3_EXECUTABLE} -B
+            ${CMAKE_CURRENT_SOURCE_DIR}/samples/file_commands.py
+            --mode ${mode} --binary $<TARGET_FILE:${file_commands_desktop_target}>
+            --gemd $<TARGET_FILE:gemd> --artifacts ${CMAKE_BINARY_DIR}/uat
+            --resources ${GEM_RESOURCES_DIR})
+    set_tests_properties(uat_file_commands_${mode} PROPERTIES
+        ENVIRONMENT "RASTA_BIN=${GEM_TOOLS_DIR}/rasta"
+        LABELS "uat;${mode}" TIMEOUT 90)
+endforeach()
+
 # Trash drop, cancel-default confirmation and confirmed emptying.
 foreach(mode direct proxy)
     if(mode STREQUAL "direct")

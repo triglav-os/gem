@@ -6,6 +6,37 @@ Unreleased.
 
 ## Unreleased
 
+- Runtime packages now contain only their applications, shared dependencies,
+  used resources and notices. SDK files, unused Clock artwork, sample disks and
+  extracted assets are excluded. Native packages omit the hosted viewer/backend.
+- CEF resources are stored once, only the configured UI locale is shipped, and
+  staged executables/libraries are stripped without changing development builds.
+  Added missing Gemscape toolbar artwork and dependency/Chromium notices.
+- Package/SDK exports remove stale generated files. Acceptance checks cover
+  exact runtime contents, relocated ELF closure, installed applications and
+  standalone sample builds against a relocated SDK.
+
+- Standardized Linux installation with GNUInstallDirs, `make package` and
+  `make install PREFIX=... DESTDIR=...`. Installed programs find their libraries,
+  resources and private CEF runtime without a build checkout.
+- Docker/F5 now share the host's XDG GEM settings, data, HTTP cache and logs;
+  runtime files use a private per-user tmpfs. Legacy checkout settings/profile
+  data are copied forward without overwriting existing user settings.
+
+- File Manager and Trash now share a right-click menu and file clipboard, with
+  rename, cut/copy/paste, folder creation, text/Markdown/HTML/CSV templates and
+  selection shortcuts. Trash supports multi-item restore and permanent delete;
+  cut out removes Trash metadata. Existing destination names are preserved.
+- Added File Manager and Gemscape quick-launch desktop icons using placeholder
+  artwork, while preserving configured locations and Trash placement.
+- Gemread now has File/View menus, document shortcuts and tabbed Display/Files
+  settings for fit mode, zoom, thumbnails, smoothing and remembered folders.
+  Settings apply immediately on Save and persist across launches.
+
+- Restored the line beneath Gemscape's address field and silenced routine
+  Chromium startup diagnostics. Set `GEMSCAPE_DEBUG=1` for detailed CEF logs;
+  fatal diagnostics and application errors remain available normally.
+
 - Gemscape now has address caret/selection editing, browser input and dropdowns,
   native website dialogs, history/loading controls, and native scrollbars that
   follow dynamic page dimensions and zoom.

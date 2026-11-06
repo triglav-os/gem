@@ -1,0 +1,5 @@
+add_executable(test_paths test_paths.c)
+target_link_libraries(test_paths PRIVATE platform_linux)
+target_compile_options(test_paths PRIVATE -Wall -Wextra -pedantic -UNDEBUG)
+add_test(NAME test_paths COMMAND test_paths)
+set_tests_properties(test_paths PROPERTIES LABELS unit)

@@ -76,12 +76,22 @@ images=true
 frame_rate=30
 ```
 
-Interactive Docker sessions keep configuration in
-`build/user-data/config/gem/gemscape.cfg` and the browser profile in
-`build/user-data/gemscape/`. `make stop` preserves both. `GEMSCAPE_PROFILE`
-selects another absolute profile directory when starting a new runtime.
-Outside that launcher the default is `$XDG_DATA_HOME/gemscape`, falling back to
-`$HOME/.local/share/gemscape`. CEF diagnostics are in the profile's `cef.log`.
+Configuration uses `$XDG_CONFIG_HOME/gem/gemscape.cfg` (default
+`~/.config/gem/gemscape.cfg`). Profiles use `$XDG_DATA_HOME/gem/gemscape`,
+falling back to `~/.local/share/gem/gemscape`; HTTP cache uses
+`$XDG_CACHE_HOME/gem/gemscape` and logs use `$XDG_STATE_HOME/gem/gemscape`.
+Docker shares these host directories and `make stop` preserves them.
+`GEMSCAPE_PROFILE` selects a separate absolute profile with its own cache/log.
+See [Linux paths](LINUX_PATHS.md) for migration and installation.
+Packaged CEF resources are stored once beside its private libraries. The UI
+locale defaults to `en-US`; `GEM_CEF_LOCALE` selects another at build time and
+the package includes that matching locale. See [packaging](PACKAGING.md).
+
+Normal launches log only fatal CEF diagnostics;
+Gemscape still reports startup and page-load errors. To enable detailed CEF
+diagnostics, start a new Docker runtime with `GEMSCAPE_DEBUG=1 make run`
+(use `make stop` first if one is already running). Detailed messages are written
+to the state directory's `cef.log` (or the explicit profile override) and Chromium may also print them to the terminal.
 `GEMSCAPE_URL` overrides the initial page for controlled launches/tests.
 
 One browser process owns each profile. An advisory lock prevents concurrent

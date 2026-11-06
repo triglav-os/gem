@@ -94,7 +94,7 @@ static void desktop_add_folder_icon(const char *path, const char *label)
 {
     desktop_icon_entry_t *entry;
 
-    if (g_desktop.icon_count >= DESKTOP_MAX_ICONS || path == NULL ||
+    if (g_desktop.icon_count >= DESKTOP_MAX_ICONS - 3 || path == NULL ||
         desktop_has_path(path, 1) != 0) {
         return;
     }
@@ -146,8 +146,8 @@ static void desktop_add_configured_locations(void)
     g_desktop.show_hidden =
         (GEM_RPC_LOCATION_LIST_OPTIONS(locations) &
          GEM_RPC_DESKTOP_SHOW_HIDDEN) != 0u;
-    for (i = 0; i < locations.count &&
-                g_desktop.icon_count < DESKTOP_MAX_ICONS;
+    for (i = 0;
+         i < locations.count && g_desktop.icon_count < DESKTOP_MAX_ICONS - 3;
          ++i) {
         gem_os_file_info_t info;
 
@@ -166,8 +166,8 @@ static void desktop_add_configured_locations(void)
         gemconf_get_bool(&g_desktop.config, "desktop", "show_hidden", 0) != 0;
     WORD maximum =
         gemconf_get_bool(&g_desktop.config, "desktop", "show_trash", 1)
-            ? (WORD)(DESKTOP_MAX_ICONS - 1)
-            : DESKTOP_MAX_ICONS;
+            ? (WORD)(DESKTOP_MAX_ICONS - 3)
+            : DESKTOP_MAX_ICONS - 3;
 
     for (i = 0u;
          i < gemconf_count(&g_desktop.config) && g_desktop.icon_count < maximum;
@@ -223,6 +223,7 @@ void desktop_refresh_locations(void)
     desktop_probe_disks();
     desktop_sort_icons_by_label();
     desktop_install_trash_icon();
+    desktop_install_launchers();
     desktop_refresh_icon_bindings();
     desktop_layout_icons();
     if (old_show_hidden != g_desktop.show_hidden) {

@@ -6,6 +6,7 @@
  * Copyright (C) 2026 tomaz stih
  */
 
+#include "reader_settings.h"
 #include <gem.h>
 #include <gem/gemctl.h>
 #include <gem/os.h>
@@ -22,9 +23,21 @@ enum {
     gemread_bar,
     gemread_titles,
     gemread_file_title,
+    gemread_view_title,
     gemread_popups,
     gemread_file_box,
     gemread_file_open,
+    gemread_file_close,
+    gemread_file_settings,
+    gemread_file_quit,
+    gemread_view_box,
+    gemread_view_zoom_in,
+    gemread_view_zoom_out,
+    gemread_view_fit_page,
+    gemread_view_fit_width,
+    gemread_view_thumbnails,
+    gemread_view_previous,
+    gemread_view_next,
     gemread_menu_count
 };
 enum {
@@ -58,6 +71,7 @@ typedef struct gemread_state {
     int zoom_percent, scroll_x, scroll_y;
     GRECT normal_rect;
     int full_open;
+    gemread_preferences_t preferences;
     char path[PATH_MAX];
 #if defined(GEMREAD_OVERLAY) && GEMREAD_OVERLAY
     gem_overlay_id_t overlay;
@@ -84,22 +98,43 @@ static void gemread_object(OBJECT *o, WORD next, WORD head, WORD tail,
 static void gemread_init_menu(gemread_state_t *state)
 {
     OBJECT *t = state->menu;
+    static const char *const files[] = {"  Open", "  Close Document",
+                                        "  Settings...", "  Quit"};
+    static const char *const views[] = {
+        "  Zoom In",    "  Zoom Out",      "  Fit Page", "  Fit Width",
+        "  Thumbnails", "  Previous Page", "  Next Page"};
     gemread_object(&t[gemread_root], NIL, gemread_bar, gemread_popups, G_IBOX,
                    NONE, NORMAL, 0, 0, 0, 0, 0);
     gemread_object(&t[gemread_bar], gemread_popups, gemread_titles,
                    gemread_titles, G_BOX, NONE, NORMAL, 0x1100L, 0, 0, 80, 1);
     gemread_object(&t[gemread_titles], gemread_bar, gemread_file_title,
-                   gemread_file_title, G_IBOX, NONE, NORMAL, 0, 0, 0, 80, 1);
-    gemread_object(&t[gemread_popups], gemread_root, gemread_file_box,
-                   gemread_file_box, G_IBOX, NONE, NORMAL, 0, 0, 0, 0, 0);
-    gemread_object(&t[gemread_file_title], gemread_titles, NIL, NIL, G_TITLE,
-                   NONE, NORMAL, (LONG)(intptr_t)" File ", 0, 0, 6, 1);
-    gemread_object(&t[gemread_file_box], gemread_popups, gemread_file_open,
-                   gemread_file_open, G_BOX, NONE, NORMAL, 0x1100L, 0, 0, 16,
+                   gemread_view_title, G_IBOX, NONE, NORMAL, 0, 0, 0, 80, 1);
+    gemread_object(&t[gemread_file_title], gemread_view_title, NIL, NIL,
+                   G_TITLE, NONE, NORMAL, (LONG)(intptr_t) " File ", 0, 0, 6,
                    1);
-    gemread_object(&t[gemread_file_open], gemread_file_box, NIL, NIL, G_STRING,
-                   LASTOB, NORMAL, (LONG)(intptr_t)"  Open", 0, 0, 16, 1);
-    (void)menu_bar(t, 1);
+    gemread_object(&t[gemread_view_title], gemread_titles, NIL, NIL, G_TITLE,
+                   NONE, NORMAL, (LONG)(intptr_t) " View ", 6, 0, 6, 1);
+    gemread_object(&t[gemread_popups], gemread_root, gemread_file_box,
+                   gemread_view_box, G_IBOX, NONE, NORMAL, 0, 0, 0, 0, 0);
+    gemread_object(&t[gemread_file_box], gemread_view_box, gemread_file_open,
+                   gemread_file_quit, G_BOX, NONE, NORMAL, 0x1100L, 0, 0, 22,
+                   4);
+    for (WORD i = gemread_file_open; i <= gemread_file_quit; ++i)
+        gemread_object(&t[i], i == gemread_file_quit ? gemread_file_box : i + 1,
+                       NIL, NIL, G_STRING, NONE, NORMAL,
+                       (LONG)(intptr_t)files[i - gemread_file_open], 0,
+                       i - gemread_file_open, 22, 1);
+    gemread_object(&t[gemread_view_box], gemread_popups, gemread_view_zoom_in,
+                   gemread_view_next, G_BOX, NONE, NORMAL, 0x1100L, 6, 0, 22,
+                   7);
+    for (WORD i = gemread_view_zoom_in; i <= gemread_view_next; ++i)
+        gemread_object(&t[i], i == gemread_view_next ? gemread_view_box : i + 1,
+                       NIL, NIL, G_STRING,
+                       i == gemread_view_next ? LASTOB : NONE, NORMAL,
+                       (LONG)(intptr_t)views[i - gemread_view_zoom_in], 0,
+                       i - gemread_view_zoom_in, 22, 1);
+    menu_click(1, 1);
+    menu_bar(t, 1);
 }
 
 static void gemread_layout(const gemread_state_t *state, const GRECT *work,
@@ -114,11 +149,14 @@ static void gemread_layout(const gemread_state_t *state, const GRECT *work,
         width = 72;
     if (width >= layout->chrome.content.g_w)
         width = (WORD)(layout->chrome.content.g_w / 3);
+    if (!state->preferences.thumbnails)
+        width = 0;
     layout->sidebar = layout->chrome.content;
     layout->sidebar.g_w = width;
     layout->viewport = layout->chrome.content;
-    layout->viewport.g_x = (WORD)(layout->sidebar.g_x + width + 1);
-    layout->viewport.g_w = (WORD)(layout->chrome.content.g_w - width - 1);
+    layout->viewport.g_x = (WORD)(layout->sidebar.g_x + width + (width > 0));
+    layout->viewport.g_w =
+        (WORD)(layout->chrome.content.g_w - width - (width > 0));
     if (layout->viewport.g_w < 0)
         layout->viewport.g_w = 0;
 }
@@ -184,7 +222,7 @@ static uint8_t *gemread_pixmap_bgra(const fz_pixmap *pixmap)
 
 static float gemread_page_scale(gemread_state_t *state, fz_page *page,
                                 int target_width, int target_height,
-                                int zoom_percent)
+                                int zoom_percent, int fit_width)
 {
     fz_rect b = fz_bound_page(state->context, page);
     float width = b.x1 - b.x0, height = b.y1 - b.y0;
@@ -193,7 +231,7 @@ static float gemread_page_scale(gemread_state_t *state, fz_page *page,
         return 1.0f;
     sx = (float)target_width / width;
     sy = (float)target_height / height;
-    scale = sx < sy ? sx : sy;
+    scale = fit_width || sx < sy ? sx : sy;
     if (scale <= 0.0f)
         scale = 1.0f;
     return scale * (float)zoom_percent / 100.0f;
@@ -227,7 +265,8 @@ static int gemread_render_current(gemread_state_t *state, const GRECT *viewport)
         state->page =
             fz_load_page(state->context, state->document, state->page_number);
         scale =
-            gemread_page_scale(state, state->page, tw, th, state->zoom_percent);
+            gemread_page_scale(state, state->page, tw, th, state->zoom_percent,
+                               state->preferences.fit_width);
         pixmap = fz_new_pixmap_from_page(state->context, state->page,
                                          fz_scale(scale, scale),
                                          fz_device_rgb(state->context), 0);
@@ -270,7 +309,7 @@ static uint8_t *gemread_render_thumbnail(gemread_state_t *state, int number,
     {
         float scale;
         page = fz_load_page(state->context, state->document, number);
-        scale = gemread_page_scale(state, page, max_width, max_height, 100);
+        scale = gemread_page_scale(state, page, max_width, max_height, 100, 0);
         pixmap = fz_new_pixmap_from_page(state->context, page,
                                          fz_scale(scale, scale),
                                          fz_device_rgb(state->context), 0);
@@ -387,7 +426,8 @@ static int gemread_rebuild_body(gemread_state_t *state,
         return 0;
     gemread_bgra_fill(pixels, bw, bh, 244u, 244u, 244u);
     gemread_bgra_rect(pixels, bw, bh, 0, 0, side, bh, 220u, 220u, 220u);
-    gemread_bgra_rect(pixels, bw, bh, side, 0, 1, bh, 64u, 64u, 64u);
+    if (side > 0)
+        gemread_bgra_rect(pixels, bw, bh, side, 0, 1, bh, 64u, 64u, 64u);
     if (state->page_bgra != NULL) {
         page_x = vx - state->scroll_x;
         page_y = -state->scroll_y;
@@ -403,7 +443,7 @@ static int gemread_rebuild_body(gemread_state_t *state,
     }
     gemread_adjust_thumbnail_top(state, layout);
     visible = gemread_visible_thumbnails(layout);
-    for (slot = 0; slot < visible; ++slot) {
+    for (slot = 0; side > 0 && slot < visible; ++slot) {
         int number = state->thumbnail_top + slot;
         int width, height, x,
             y = slot * gemread_thumb_slot_height + gemread_thumb_padding;
@@ -492,11 +532,23 @@ static int gemread_open_document(gemread_state_t *state, const char *path)
     gemread_close_document(state);
     state->document = document;
     state->page_count = fz_count_pages(state->context, document);
-    state->zoom_percent = 100;
+    state->zoom_percent = state->preferences.zoom;
     (void)snprintf(state->path, sizeof(state->path), "%s", path);
     if (!gemread_render_current(state, &layout.viewport)) {
         gemread_close_document(state);
         return 0;
+    }
+    if (state->preferences.remember_folder) {
+        snprintf(state->preferences.folder, sizeof(state->preferences.folder),
+                 "%.*s", (int)sizeof(state->preferences.folder) - 1, path);
+        char *slash = strrchr(state->preferences.folder, '/');
+        if (slash == state->preferences.folder)
+            slash[1] = '\0';
+        else if (slash != NULL)
+            *slash = '\0';
+        if (!gemread_preferences_save(&state->preferences))
+            form_alert(1, "[1][ Document opened, but folder preference|could "
+                          "not be saved. ][ OK ]");
     }
     return gemread_rebuild_body(state, &layout);
 }
@@ -624,6 +676,31 @@ static void gemread_draw(gemread_state_t *state, const GRECT *dirty)
                        state->zoom_percent);
     else
         (void)snprintf(status, sizeof(status), "Ready. Open a document.");
+    const WORD items[] = {gemread_view_fit_page,   gemread_view_fit_width,
+                          gemread_view_thumbnails, gemread_file_close,
+                          gemread_view_previous,   gemread_view_next};
+    const int values[] = {!state->preferences.fit_width,
+                          state->preferences.fit_width,
+                          state->preferences.thumbnails,
+                          state->document == NULL,
+                          state->document == NULL || state->page_number == 0,
+                          state->document == NULL ||
+                              state->page_number + 1 >= state->page_count};
+    int menu_changed = 0;
+    for (int i = 0; i < 6; ++i) {
+        UWORD bit = i < 3 ? CHECKED : DISABLED;
+        UWORD before = state->menu[items[i]].ob_state;
+        if (values[i])
+            state->menu[items[i]].ob_state |= bit;
+        else
+            state->menu[items[i]].ob_state &= (UWORD)~bit;
+        if (before != state->menu[items[i]].ob_state)
+            menu_changed = 1;
+    }
+    /* Republish only changed state: publishing on every WM_REDRAW queues
+     * another repaint and starves pointer events in the proxy renderer. */
+    if (menu_changed)
+        menu_bar(state->menu, 1);
     wind_update(BEG_UPDATE);
     wind_get(state->handle, WF_FIRSTXYWH, &visible.g_x, &visible.g_y,
              &visible.g_w, &visible.g_h);
@@ -662,6 +739,21 @@ static void gemread_draw(gemread_state_t *state, const GRECT *dirty)
             gemctl_toolbar_separator(state->vdi_handle,
                                      (WORD)(slot.g_x + slot.g_w - 1), slot.g_y,
                                      (WORD)(slot.g_y + slot.g_h - 1));
+            /* A matching three-line settings button at the toolbar right. */
+            slot.g_x = (WORD)(layout.chrome.toolbar.g_x +
+                              layout.chrome.toolbar.g_w - slot.g_w);
+            gemctl_toolbar_separator(state->vdi_handle, slot.g_x, slot.g_y,
+                                     (WORD)(slot.g_y + slot.g_h - 1));
+            vsl_color(state->vdi_handle, 1);
+            vsl_type(state->vdi_handle, 1);
+            vsl_width(state->vdi_handle, 1);
+            for (int line = -1; line <= 1; ++line) {
+                WORD points[4] = {(WORD)(slot.g_x + 5),
+                                  (WORD)(slot.g_y + slot.g_h / 2 + line * 4),
+                                  (WORD)(slot.g_x + slot.g_w - 6),
+                                  (WORD)(slot.g_y + slot.g_h / 2 + line * 4)};
+                v_pline(state->vdi_handle, 2, points);
+            }
             gemctl_status_draw(state->vdi_handle, &layout.chrome.status,
                                status);
 #if !defined(GEMREAD_OVERLAY) || !GEMREAD_OVERLAY
@@ -690,7 +782,10 @@ static void gemread_open(gemread_state_t *state)
     char *slash, *backslash;
     WORD button = 0;
     size_t length;
-    if (!gem_os_getcwd(directory, sizeof(directory)) ||
+    directory[0] = '\0';
+    if (state->preferences.remember_folder && state->preferences.folder[0])
+        snprintf(directory, sizeof(directory), "%s", state->preferences.folder);
+    if ((!directory[0] && !gem_os_getcwd(directory, sizeof(directory))) ||
         strlen(directory) + 4u >= sizeof(directory))
         strcpy(directory, "/*.*");
     else {
@@ -713,7 +808,9 @@ static void gemread_open(gemread_state_t *state)
     if (gemread_open_document(state, path)) {
         (void)wind_set_str(state->handle, WF_NAME, filename);
         gemread_draw(state, NULL);
-    }
+    } else
+        form_alert(1, "[1][ Unable to open this document.|It may be damaged or "
+                      "password protected. ][ OK ]");
 }
 
 static void gemread_rerender(gemread_state_t *state)
@@ -765,6 +862,62 @@ static void gemread_zoom(gemread_state_t *state, int direction)
     gemread_rerender(state);
 }
 
+static void gemread_settings(gemread_state_t *state)
+{
+    if (gemread_settings_dialog(&state->preferences)) {
+        state->zoom_percent = state->preferences.zoom;
+        fz_set_aa_level(state->context, state->preferences.antialias ? 8 : 0);
+        gemread_rerender(state);
+    } else
+        gemread_draw(state, NULL);
+}
+
+/* Return nonzero only for the explicit Quit command. */
+static int gemread_menu_command(gemread_state_t *state, WORD command)
+{
+    switch (command) {
+        case gemread_file_open:
+            gemread_open(state);
+            break;
+        case gemread_file_close:
+            gemread_close_document(state);
+            state->path[0] = '\0';
+            wind_set_str(state->handle, WF_NAME, "Gemread");
+            gemread_rerender(state);
+            break;
+        case gemread_file_settings:
+            gemread_settings(state);
+            break;
+        case gemread_file_quit:
+            return 1;
+        case gemread_view_zoom_in:
+            gemread_zoom(state, 1);
+            break;
+        case gemread_view_zoom_out:
+            gemread_zoom(state, -1);
+            break;
+        case gemread_view_fit_page:
+        case gemread_view_fit_width:
+            state->preferences.fit_width = command == gemread_view_fit_width;
+            state->zoom_percent = 100;
+            gemread_rerender(state);
+            break;
+        case gemread_view_thumbnails:
+            state->preferences.thumbnails = !state->preferences.thumbnails;
+            gemread_rerender(state);
+            break;
+        case gemread_view_previous:
+            gemread_select_page(state, state->page_number - 1);
+            break;
+        case gemread_view_next:
+            gemread_select_page(state, state->page_number + 1);
+            break;
+        default:
+            break;
+    }
+    return 0;
+}
+
 static void gemread_click(gemread_state_t *state, WORD x, WORD y)
 {
     GRECT work;
@@ -774,7 +927,10 @@ static void gemread_click(gemread_state_t *state, WORD x, WORD y)
     if (y >= layout.chrome.toolbar.g_y &&
         y < layout.chrome.toolbar.g_y + layout.chrome.toolbar.g_h) {
         int slot = (x - layout.chrome.toolbar.g_x) / layout.chrome.toolbar.g_h;
-        if (slot == 0)
+        if (x >= layout.chrome.toolbar.g_x + layout.chrome.toolbar.g_w -
+                     layout.chrome.toolbar.g_h)
+            gemread_settings(state);
+        else if (slot == 0)
             gemread_zoom(state, -1);
         else if (slot == 1)
             gemread_zoom(state, 1);
@@ -869,9 +1025,10 @@ static int gemread_main(int argc, char **argv)
     const UWORD kind = NAME | MOVER | CLOSER | FULLER | SIZER | UPARROW |
                        DNARROW | VSLIDE | LFARROW | RTARROW | HSLIDE;
     memset(&state, 0, sizeof(state));
-    state.zoom_percent = 100;
     if (!gem_os_init() || appl_init() < 0)
         return 1;
+    gemread_preferences_load(&state.preferences);
+    state.zoom_percent = state.preferences.zoom;
     state.vdi_handle =
         graf_handle(&state.char_w, &state.char_h, &state.box_w, &state.box_h);
     state.context = fz_new_context(NULL, NULL, FZ_STORE_UNLIMITED);
@@ -881,6 +1038,7 @@ static int gemread_main(int argc, char **argv)
         return 1;
     }
     fz_register_document_handlers(state.context);
+    fz_set_aa_level(state.context, state.preferences.antialias ? 8 : 0);
     state.handle = wind_create(kind, 0, 0, 640, 400);
     if (state.handle <= 0) {
         fz_drop_context(state.context);
@@ -936,9 +1094,10 @@ static int gemread_main(int argc, char **argv)
                        0, 0, 0, 0, 0, 0, 0, 0, msg, 100, 0, &mouse_x, &mouse_y,
                        &buttons, &key_state, &key_code, &button_return);
         if ((event_flags & MU_MESAG) != 0) {
-            if (msg[0] == MN_SELECTED && msg[4] == gemread_file_open) {
-                gemread_open(&state);
+            if (msg[0] == MN_SELECTED) {
                 menu_tnormal(state.menu, msg[3], 1);
+                if (gemread_menu_command(&state, msg[4]))
+                    break;
             } else if (msg[0] == WM_CLOSED || msg[0] == AP_TERM)
                 break;
             else if (msg[0] == WM_REDRAW) {
@@ -987,7 +1146,16 @@ static int gemread_main(int argc, char **argv)
         if ((event_flags & MU_KEYBD) != 0) {
             unsigned scan = ((unsigned)key_code >> 8) & 0xffu;
             unsigned ascii = (unsigned)key_code & 0xffu;
-            if (ascii == 27u)
+            if ((key_state & K_CTRL) &&
+                (ascii == 15 || ascii == 'o' || ascii == 'O'))
+                gemread_open(&state);
+            else if ((key_state & K_CTRL) &&
+                     (ascii == 23 || ascii == 'w' || ascii == 'W'))
+                gemread_menu_command(&state, gemread_file_close);
+            else if ((key_state & K_CTRL) &&
+                     (ascii == 17 || ascii == 'q' || ascii == 'Q'))
+                break;
+            else if (ascii == 27u)
                 break;
             if (scan == 75u || scan == 82u)
                 gemread_select_page(&state, state.page_number - 1);

@@ -76,6 +76,11 @@ int gem_trash_resolve_directory(const gem_trash_item_t *item,
 /* Restores item to its recorded original path, recreating parent folders. */
 int gem_trash_restore(const gem_trash_item_t *item);
 
+/* Copy or move a validated top-level Trash item to a new path, never replacing
+ * an existing entry. A successful move also removes its Trash metadata. */
+int gem_trash_export(const gem_trash_item_t *item, const char *destination,
+                     int move);
+
 /* Restores item beside its original path under a generated collision name. */
 int gem_trash_restore_renamed(const gem_trash_item_t *item);
 

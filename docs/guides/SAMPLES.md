@@ -43,7 +43,11 @@ The result is `bin/sdk/`, containing `LICENSE`, public headers, GEM libraries (i
 the static `libgemconf` configuration and `libgemctl` control libraries),
 runtime resources and
 `bin/resgen`. Sample resources are excluded from the SDK.
-Disk-library headers and libraries are included for the standalone MSA tool.
+FAT12/MSA headers and libraries are included for the standalone MSA tool.
+Stout/PRG internals and emulator archives are not part of the public SDK.
+The export replaces its generated tree, includes `lib/pkgconfig/gem.pc`, and
+contains only the selected direct-rendering backend plus the client OS library.
+See [package contents](PACKAGING.md).
 `gem_sdk_config.cmake` records the display backend so direct
 AES/VDI applications link the matching host library. This target builds the core and resource generators without
 needing the sample binaries. Both Debug and Release samples should use matching GEM

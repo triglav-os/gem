@@ -32,6 +32,8 @@ WORD sample_resource_load(const char *name)
         return 0;
     if (load_from(getenv("GEM_SAMPLE_DATA"), name))
         return 1;
+    if (rsrc_load((char *)name))
+        return 1;
     ssize_t length =
         readlink("/proc/self/exe", executable, sizeof(executable) - 1);
     if (length > 0 && (size_t)length < sizeof(executable) - 1) {

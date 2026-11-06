@@ -8,7 +8,7 @@ GEM_OUTPUT_ROOT ?= $(CURDIR)/bin
 JOBS ?= 4
 TEST_JOBS ?= 4
 BUILD_TYPE ?= RelWithDebInfo
-.PHONY: all configure rasta cef mupdf tests unit integration uat sdk clean audit standards
+.PHONY: all configure rasta cef mupdf tests unit integration uat sdk package install clean audit standards
 configure:
 	cmake -S . -B "$(BUILD_DIR)" -DCMAKE_C_COMPILER=gcc -DCMAKE_BUILD_TYPE=$(BUILD_TYPE) -DGEM_PLATFORM=rasta -DBUILD_TESTING=ON -DGEM_OUTPUT_ROOT="$(GEM_OUTPUT_ROOT)" $(CMAKE_FLAGS)
 all: configure
@@ -31,3 +31,8 @@ audit: all
 	python3 -B tools/scripts/audit.py --build "$(BUILD_DIR)"
 standards:
 	python3 -B tools/scripts/audit.py --build "$(BUILD_DIR)" --standards-only
+
+package: all
+	cmake --build "$(BUILD_DIR)" --target gemix_package
+install: all
+	DESTDIR="$(DESTDIR)" cmake --install "$(BUILD_DIR)" --prefix "$(PREFIX)" --strip

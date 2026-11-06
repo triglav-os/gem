@@ -620,10 +620,32 @@ static int gem_trash_restore_to(const gem_trash_item_t *item,
     }
     if (gem_trash_parent_path(destination, parent, sizeof(parent)) == 0 ||
         gem_os_mkdir_p(parent) == 0 ||
-        gem_os_rename(payload, destination) == 0) {
+        gem_os_move_path(payload, destination) == 0) {
         return GEM_TRASH_IO_ERROR;
     }
     if (gem_os_unlink(info) == 0) {
+        return GEM_TRASH_IO_ERROR;
+    }
+    return GEM_TRASH_OK;
+}
+
+int gem_trash_export(const gem_trash_item_t *item, const char *destination,
+                     int move)
+{
+    char payload[GEM_OS_PATH_MAX], info[GEM_OS_PATH_MAX];
+    if (!gem_trash_validate_item(item, payload, sizeof(payload), info,
+                                 sizeof(info)) ||
+        destination == NULL || destination[0] != '/')
+        return GEM_TRASH_INVALID;
+    if (gem_os_path_exists(destination))
+        return GEM_TRASH_EXISTS;
+    if (!(move ? gem_os_move_path(payload, destination)
+               : gem_os_copy_path(payload, destination)))
+        return GEM_TRASH_IO_ERROR;
+    if (move && !gem_os_unlink(info)) {
+        /* Preserve a usable Trash record when its metadata cannot be removed.
+         */
+        (void)gem_os_move_path(destination, payload);
         return GEM_TRASH_IO_ERROR;
     }
     return GEM_TRASH_OK;

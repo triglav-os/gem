@@ -146,8 +146,8 @@ static int desktop_browser_icon_rect(const desktop_browser_window_t *browser,
     return 1;
 }
 
-static WORD desktop_browser_entry_at(const desktop_browser_window_t *browser,
-                                     WORD x, WORD y)
+WORD desktop_browser_entry_at(const desktop_browser_window_t *browser, WORD x,
+                              WORD y)
 {
     WORD index;
 
@@ -904,7 +904,7 @@ void desktop_browser_handle_key(WORD key)
     if (browser == NULL) {
         return;
     }
-    if (character == 13) {
+    if (character == 13 || character == 10) {
         if (browser->selected_index != NIL) {
             desktop_browser_open_entry(browser, browser->selected_index);
         }
@@ -999,6 +999,7 @@ void desktop_browser_handle_click(WORD handle, WORD mx, WORD my,
         my >= browser->work.g_y + browser->work.g_h) {
         return;
     }
+    desktop_select_icon(NIL);
     if (my >= browser->work.g_y + browser->work.g_h -
                   desktop_browser_band_height()) {
         return;

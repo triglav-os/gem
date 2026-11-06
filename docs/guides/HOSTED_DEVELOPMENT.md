@@ -74,7 +74,7 @@ For another command in the same environment, use
 use `tools/scripts/container.sh exec <command>`; that path holds the checkout
 lock and uses a disposable headless container.
 
-Both client and server use `GEMD_SOCKET` (default `/tmp/gemd.sock`).
+Both client and server use `GEMD_SOCKET` (default `$XDG_RUNTIME_DIR/gem/gemd.sock`).
 The Rasta host and port are selected with `GEM_RASTA_HOST` and
 `GEM_RASTA_PORT`; the framebuffer path uses `GEM_RASTA_FRAMEBUFFER`.
 See [security and safety](../architecture/SECURITY.md) for private runtime
@@ -87,8 +87,8 @@ composited last so it remains visible over opaque overlays. Gemscape is the
 small browser application available from the desktop;
 Gemread uses the same overlay path for color document pages and thumbnails.
 See the [Gemscape guide](GEMSCAPE.md) for browser settings, persistent profiles
-and current limits. Interactive containers preserve XDG configuration under
-`build/user-data/config/` and Gemscape data under `build/user-data/gemscape/`.
+and current limits. Interactive containers share the host's XDG GEM config,
+data, cache and state directories; see [Linux paths](LINUX_PATHS.md).
 Gemscape uses Chromium's headless Ozone platform and software rendering for
 its off-screen CEF view; it does not require X, Wayland or GPU access. See the
 [Chromium Ozone platform documentation](https://chromium.googlesource.com/chromium/src/+/main/docs/ozone_overview.md).
@@ -134,8 +134,9 @@ separate test configurations.
 Set `RASTA_BIN` in the VS Code environment to select the viewer. The launcher
 otherwise uses the downloaded build at `bin/tools/rasta`. It uses
 a private socket, framebuffer and an available UDP port. Session data lives
-in `build/f5/`: `session.env`, `state.json`, per-process logs, `session.log`
-and `applications.pbm`. Windows may overlap; move or raise them to inspect each
+in the container's `/run/user/<uid>/gem/session-<checkout-id>/`: `session.env`,
+`state.json`, socket, framebuffer and captures. Logs persist under the host's
+`$XDG_STATE_HOME/gem/sessions/<checkout-id>/`. Windows may overlap; move or raise them to inspect each
 application. GDB breakpoints apply to gemd.
 
 The Stop button terminates the session supervisor, clients and viewer. Closing
@@ -166,6 +167,13 @@ command at 40 characters per second, checking its output file. Separate
 calculator checks verify all buttons and `7 + 2 = 9` against both backends.
 These session checks complement the individual
 [UAT scenarios](../tests/UAT.md).
+
+## Packages
+
+`make package` produces a stripped runtime tree with only required libraries
+and resources. `make sdk` produces a separate development export. Both replace
+stale generated contents. See [packaging](PACKAGING.md) for dependencies, CEF
+locale selection and relocation/contents checks.
 
 ## Native deployment
 
@@ -208,11 +216,11 @@ Gemscape is selected. CEF is never stored or generated under `include/` or
 Build and test Make targets use `tools/scripts/container.sh`, which invokes the
 internal recipes in `tools/scripts/build.mk` inside Docker without recursively
 starting another container. This includes `configure`, `rasta`, `cef`, `mupdf`,
-`sdk`, `clean`, `standards`, the suite targets and `audit`. `make container` is
+`sdk`, `package`, `install`, `clean`, `standards`, the suite targets and `audit`. `make container` is
 an alias for `make tests`. Only Docker is required when invoking the helper
 directly. It runs as your UID with dropped capabilities.
 Interactive containers use the same image and UID, with `SYS_PTRACE` added
-for GDB. They mount only this checkout and the selected display connection;
+for GDB. They mount this checkout, GEM's XDG directories and the selected display connection;
 they do not use host networking or a privileged container.
 
 The helper defaults are also available as environment overrides:
@@ -281,7 +289,7 @@ restart the running viewer. Use `--inverse off --bpp 32` with current GEM;
 the Desktop executable is `bin/apps/desktop`.
 
 The viewer initially defaults to `/tmp/rasta.framebuffer`, while GEM defaults
-to `/tmp/rasta.fb`. GEM's subscriber datagram sends its framebuffer path,
+to `$XDG_RUNTIME_DIR/gem/rasta.fb` (with a private per-user fallback). GEM's subscriber datagram sends its framebuffer path,
 dimensions, depth and inverse mode, and Rasta remaps to those settings. Its
 log should report `reconfigured framebuffer=...` with `bpp=32 inverse=off`.
 Matching the initial paths manually is unnecessary. `test_rasta_startup`
