@@ -1,6 +1,7 @@
 """Exercise real F5 windows over Rasta HID and check gemd responsiveness.
 
-MIT License (see LICENSE). Copyright (C) 2026 tomaz stih.
+SPDX-License-Identifier: GPL-2.0-or-later
+Copyright (C) 2026 tomaz stih.
 """
 from pathlib import Path
 import re

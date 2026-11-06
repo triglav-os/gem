@@ -2,7 +2,7 @@
  * Validates AES tree graphs and nonoverlapping arena regions before relocation.
  * This keeps nested text and bitmap descriptors inside connection-owned data.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 #include "gem/gemd.h"

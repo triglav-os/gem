@@ -3,7 +3,7 @@
  * paths, derives labels and free space, and builds the disk, folder and
  * sorted icon list.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

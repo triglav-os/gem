@@ -3,7 +3,7 @@
  * GEMix desktop. Linux environment, mount, metadata and file operations are
  * performed only through gem_os wrappers.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

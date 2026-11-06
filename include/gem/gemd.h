@@ -5,7 +5,7 @@
  * The marked AES and VDI sections are maintained by their generators in
  * src/gem/. Edit the corresponding schema and regenerate those sections.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 #ifndef GEM_GEMD_H

@@ -3,7 +3,7 @@
  * These stubs satisfy the raster, input, and OS abstractions without
  * touching the real hosted desktop runtime.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

@@ -4,6 +4,11 @@ GEM for Linux brings the classic GEM graphical environment to modern Linux. It
 provides the GEM Desktop, windows, menus and dialogs together with a file
 manager, terminal, document tools and the Stout Atari executable runner.
 
+Project-owned code is licensed under [GPL-2.0-or-later](LICENSE).
+Gemread retains [AGPL-3.0-or-later](src/apps/gemread/LICENSE); third-party
+dependencies, original manuals and historical sample assets retain their
+respective licenses and notices.
+
 GEM can run in a Rasta viewer on a hosted development machine, or directly on
 a Linux framebuffer with keyboard and mouse input from the Linux text console.
 
@@ -18,10 +23,10 @@ files described in the [configuration guide](docs/guides/CONFIGURATION.md).
 
 ## Build
 
-Requires Linux, GCC/G++, GNU Make, CMake 3.20+, Git, Python 3, pkg-config,
-SDL2 development files and ImageMagick. The build downloads and verifies
-pinned Rasta, Musashi, MuPDF and CEF archives into ignored `build/` storage.
-Subsequent builds reuse them; no separate checkouts are needed.
+Requires Linux, Docker and GNU Make. All build and test targets use the
+Wischner SDL Docker toolchain, including the Rasta viewer. The first build
+needs internet access; later builds reuse the image and verified dependencies
+cached under `build/container-sdl/`.
 From the repository root:
 
 ```sh
@@ -29,23 +34,22 @@ make
 make tests    # optional; results in docs/tests/LATEST.md
 ```
 
-Alternatively, `make container` builds and tests using Docker; the host needs
-Docker and GNU Make instead of the compiler dependencies. The first build
-needs internet access. See the [build guide](docs/guides/HOSTED_DEVELOPMENT.md).
+Executables and resources are written to `bin/`. Build, test and interactive
+launch helpers all use Docker. `make container` remains
+an alias for `make tests`. See the [build guide](docs/guides/HOSTED_DEVELOPMENT.md)
+for build options and display setup.
 
 ## Run with Rasta
 
-Start these commands in three separate terminals, in order. Wait for gemd
-to report that it is listening before starting the desktop:
+Start Rasta, gemd, Desktop and Terminal together in Docker:
 
 ```sh
-./bin/tools/rasta --inverse off --cursor off --bpp 32 --port 5000
-./bin/core/gemd
-./bin/apps/desktop
+make run
 ```
 
 Alternatively, press F5 with **GEM — Desktop and Terminal** in VS Code to
-start those two applications together. See the
+start those two applications together under the Docker debugger. Use `make stop`
+to remove this checkout's interactive container. See the
 [hosted development guide](docs/guides/HOSTED_DEVELOPMENT.md) for setup and the
 [samples guide](docs/guides/SAMPLES.md) for SDK builds.
 
@@ -55,8 +59,9 @@ For a text-console system with Linux framebuffer and evdev support, build the
 native package:
 
 ```sh
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DGEM_PLATFORM=linux
-cmake --build build --target gemix_package -j"$(nproc)"
+tools/scripts/container.sh exec cmake -S . -B build/linux \
+    -DCMAKE_BUILD_TYPE=Release -DGEM_PLATFORM=linux
+tools/scripts/container.sh exec cmake --build build/linux --target gemix_package --parallel 4
 ```
 
 Run it from a Linux virtual console. The account needs access to `/dev/fb0` and

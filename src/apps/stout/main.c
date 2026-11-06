@@ -4,7 +4,7 @@
  * with a return trap and drives the emulation loop. System traps live in
  * libstout.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

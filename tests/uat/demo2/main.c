@@ -4,7 +4,7 @@
  * queries the font list in order, and shows each sample in a compact
  * two-column sheet on the 640x400 monochrome screen.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

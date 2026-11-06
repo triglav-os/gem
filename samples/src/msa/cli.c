@@ -4,7 +4,7 @@
  * extract commands. Host file access and safe extraction live in
  * extract.c.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

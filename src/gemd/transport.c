@@ -2,7 +2,7 @@
  * Incremental RPC framing: a stalled reader/writer cannot stop other apps.
  * Each scheduling turn does bounded I/O with one in-flight reply per client.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 #include "transport.h"

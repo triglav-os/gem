@@ -3,7 +3,7 @@
  * wrappers. This layer marshals a practical subset of AES and VDI
  * calls over a Unix-domain socket to the hosted GEM server.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

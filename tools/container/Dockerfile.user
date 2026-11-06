@@ -1,0 +1,29 @@
+# Give unprivileged processes real passwd/group entries without mounting host accounts.
+# SPDX-License-Identifier: GPL-2.0-or-later
+ARG GEM_BASE_IMAGE=gem-build:sdl
+FROM ${GEM_BASE_IMAGE}
+USER root
+ARG GEM_UID
+ARG GEM_GID
+ARG GEM_USER
+ARG GEM_GROUP
+RUN set -eu; \
+    if ! getent group "$GEM_GID" >/dev/null; then \
+        group_name="$GEM_GROUP"; \
+        if getent group "$group_name" >/dev/null; then group_name="gem-$GEM_GID"; fi; \
+        groupadd --gid "$GEM_GID" "$group_name"; \
+    fi; \
+    if getent passwd "$GEM_UID" >/dev/null; then \
+        user_name="$(getent passwd "$GEM_UID" | cut -d: -f1)"; \
+        usermod --gid "$GEM_GID" --home /tmp/gem-home --shell /bin/bash "$user_name"; \
+    else \
+        user_name="$GEM_USER"; \
+        if getent passwd "$user_name" >/dev/null; then user_name="gem-$GEM_UID"; fi; \
+        useradd --uid "$GEM_UID" --gid "$GEM_GID" --home-dir /tmp/gem-home \
+            --shell /bin/bash --no-create-home --no-log-init "$user_name"; \
+    fi; \
+    mkdir -p /tmp/gem-home; \
+    chown "$GEM_UID:$GEM_GID" /tmp/gem-home; \
+    chmod 0700 /tmp/gem-home
+ENV HOME=/tmp/gem-home
+USER ${GEM_UID}:${GEM_GID}

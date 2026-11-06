@@ -2,7 +2,7 @@
  * Declares the Maestro sample's tree model and the painting helpers its
  * shell and drawing modules share. Private to the sample.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

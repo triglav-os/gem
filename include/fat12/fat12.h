@@ -6,7 +6,7 @@
  * as decoded `.MSA`, raw `.ST`, or future formats with the same logical
  * sector layout.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

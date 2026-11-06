@@ -4,7 +4,7 @@
  * programmer's guide while adapting it to the current hosted
  * workstation backend.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

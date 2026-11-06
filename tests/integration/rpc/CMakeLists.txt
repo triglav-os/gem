@@ -39,7 +39,7 @@ if(GEM_PLATFORM STREQUAL "rasta")
         $<$<CONFIG:Debug>:-fsanitize=address,undefined>)
     add_test(NAME test_gemd_host COMMAND test_gemd_host)
     set_tests_properties(test_gemd_host PROPERTIES TIMEOUT 10
-        ENVIRONMENT "ASAN_OPTIONS=detect_leaks=0")
+        ENVIRONMENT "GEM_RESOURCE_DIR=${GEM_RESOURCES_DIR};ASAN_OPTIONS=detect_leaks=0")
 endif()
 
 get_property(local_tests DIRECTORY PROPERTY TESTS)

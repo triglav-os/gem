@@ -3,7 +3,7 @@
  * `gem/` include namespace so applications can initialize the runtime
  * without depending on internal platform include paths.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

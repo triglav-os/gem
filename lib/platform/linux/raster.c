@@ -3,7 +3,7 @@
  * packed monochrome shadow surface and this backend converts it to the
  * fbdev device's native 1, 8, 16, 24, or 32-bit pixel representation.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

@@ -10,6 +10,8 @@ update this index when documents move or new essential guidance is added.
   details, architecture and implementation history in the appropriate `docs/`
   documents and link to them instead of expanding the README.
 - [Change log](CHANGELOG.md): current user-facing additions, changes and fixes.
+- [License](LICENSE): GPL-2.0-or-later for project-owned code; preserve the
+  separately licensed components and historical assets identified in README.
 - [Hosted development guide](docs/guides/HOSTED_DEVELOPMENT.md): Rasta setup,
   build options, test execution and VS Code debugging.
 - [Independent samples](docs/guides/SAMPLES.md): application layout, private

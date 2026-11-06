@@ -3,7 +3,7 @@
  * Guide. This keeps the original sample isolated so it can be debugged
  * without stepping through later scenes.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

@@ -2,6 +2,9 @@
 # Run the downloaded viewer in the foreground; never kill unrelated sessions.
 set -euo pipefail
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+if [[ "${GEM_IN_CONTAINER:-}" != 1 ]]; then
+    exec bash "$root/tools/scripts/runtime.sh" exec bash "$root/tools/scripts/start-rasta.sh" "$@"
+fi
 viewer="${RASTA_BIN:-$root/bin/tools/rasta}"
 if [[ ! -x "$viewer" ]]; then
     echo 'Run make to download and build Rasta.' >&2

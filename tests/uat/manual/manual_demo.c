@@ -3,7 +3,7 @@
  * Guide. The code keeps each manual example in one place so demo3 and
  * later wrappers can run a single scene without duplicating setup logic.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

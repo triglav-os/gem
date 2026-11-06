@@ -2,7 +2,7 @@
  * Exercises the modern open, save and directory chooser modes through their
  * public AES entry points while preserving the classic fsel_input buffers.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

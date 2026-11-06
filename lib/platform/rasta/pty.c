@@ -3,7 +3,7 @@
  * sample: spawning with a controlling tty and window size, nonblocking
  * reads and writes, liveness polling and bounded termination.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

@@ -3,7 +3,7 @@
  * solid replace/erase fast path, the built-in and user 16x16 patterns,
  * and transparent, XOR and erase write modes applied per byte.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

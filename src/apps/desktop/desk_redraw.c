@@ -2,7 +2,7 @@
  * Repaints the desktop background and icons for damaged regions and for
  * windows that moved, resized or closed, and keeps the status line.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

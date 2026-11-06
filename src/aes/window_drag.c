@@ -4,7 +4,7 @@
  * keeps a title strip reachable, and the move and size trackers that
  * commit the new frame and queue WM_MOVED or WM_SIZED.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

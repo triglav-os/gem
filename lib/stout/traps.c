@@ -3,7 +3,7 @@
  * BIOS and XBIOS compatibility handlers. Guest memory is validated before
  * every access.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

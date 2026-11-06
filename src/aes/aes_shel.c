@@ -2,7 +2,7 @@
  * Implements GEM AES shell services with a mutex-protected DESKTOP.INF view,
  * per-child launch records and host process work delegated to platform/os.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

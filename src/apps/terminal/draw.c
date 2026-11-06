@@ -3,7 +3,7 @@
  * the work area, scroll bar synchronization and the clipped repaint of
  * text rows and the cursor for a damaged rectangle.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

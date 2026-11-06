@@ -3,7 +3,7 @@
  * string, laying out the panel, painting its frame, icon and buttons, and
  * running the modal interaction behind form_alert and form_error.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

@@ -1,13 +1,26 @@
 # Test reports
 
-Run `make tests` at the repository root to build and execute all suites.
+Run `make tests` at the repository root to build and execute all suites in
+the Wischner SDL Docker toolchain, including the headless Rasta viewer.
 No AI or manual clicking is required. `tests/report.py` invokes CTest and
 writes `LATEST.md` and a UTC timestamped report here. Reports include per-test
 outcomes, durations, failure output, evidence links and proposed actions.
 A failing test keeps the make target unsuccessful even if reporting succeeds.
 
-Detailed logs (`build/tests.log`), JUnit XML (`build/test-results.xml`) and
-UAT framebuffers (`build/uat/`) are generated evidence. Later runs overwrite
+Nested test Makefiles and direct Python test entry points also dispatch into
+Docker. A checkout-wide lock serializes separate invocations, including runs
+with different build directories, because they can share `bin/` and reports.
+`test_container_lock` verifies waiting and lock release after command failure.
+`test_container_identity` checks passwd/group lookup, a writable owned home,
+and login-shell startup without missing-account diagnostics.
+CTest still runs independent tests in parallel inside each invocation; select
+the parallelism with `make tests TEST_JOBS=4`.
+
+Detailed logs (`<build-dir>/tests.log`), JUnit XML
+(`<build-dir>/test-results.xml`) and UAT framebuffers (`<build-dir>/uat/`)
+are generated evidence. The default build directory is `build/container-sdl/`;
+`make tests BUILD_DIR=...` can select another directory inside the checkout.
+Later runs overwrite
 these files; removing the build directory removes them. Timestamped Markdown
 preserves the outcomes recorded at that time, not the linked artifact contents.
 Never change a recorded failure into a pass by editing a report.
@@ -26,7 +39,7 @@ Terminal checks require median echo latency below 50 ms, every measured echo
 below 200 ms, and correct shell output from typing at 40 characters/second.
 `uat_calc_direct` and `uat_calc_proxy` check all 24 calculator buttons, digit
 entry, clearing and `7 + 2 = 9` using the shipped Calculator binaries.
-The session logs, state and interaction captures live in `build/sample_session_test/`.
+The session logs, state and interaction captures live in `<build-dir>/sample_session_test/`.
 See the [F5 interaction regression](F5_INTERACTION.md) for the reproduced
 failure, fix and before/after evidence.
 The [calculator and terminal report](SAMPLE_INPUT.md) records the button
@@ -42,7 +55,7 @@ bitmaps, double-click Workspace, enter a fixture directory, return to its
 parent and close the file manager. They also verify the Name, Date, Size and
 Type list header, centered rows without separator rules, fixed count/size
 status band and metadata fields. Captured screens and results are in
-`build/uat/desktop_direct/` and `build/uat/desktop_proxy/`.
+`<build-dir>/uat/desktop_direct/` and `<build-dir>/uat/desktop_proxy/`.
 See [desktop regression](DESKTOP.md) for the causes and repair.
 
 Desktop acceptance also checks menu sizing, Locations and File → Open. The
@@ -102,6 +115,13 @@ inverse-mode regression. It verifies black ink/white paper in decoded RGB,
 option parsing and preservation across subscriber reconfiguration. Full-session
 checks also require F5 to launch the viewer with `--inverse off --bpp 32`.
 
+`test_rasta_startup` launches a viewer with a different framebuffer path,
+80×60 1-bpp pixels and inverse enabled. A real GEM client must reconfigure it
+to 640×400 BGRA with inverse disabled, render the reviewed window, and respond
+to drag/close input. This catches incompatible viewer option syntax and proves
+that the differing default framebuffer names do not require manual setup.
+Evidence is under `<build-dir>/rasta_startup/demo17_proxy/`.
+
 
 `test_gemd_host` also checks scrollbar-free `SIZER` geometry: work/border
 round trips, compact frame widths, corner hit testing outside the client,
@@ -109,7 +129,7 @@ and unchanged frame geometry when any scroll-control flag is present.
 
 The compact-frame change updates the reviewed references for demos 20, 21,
 22, 23, 25 and 26: client origins and interactions are unchanged, while empty
-right/bottom scrollbar strips become thin resize borders. The complete rerun
-is 96/101, retaining the five previously recorded demo34, Gemread and Gemscape
+right/bottom scrollbar strips become thin resize borders. The earlier rerun
+recorded 96/101, retaining the then-unresolved demo34, Gemread and Gemscape
 failures. The geometry check also covers compact grips on tiny windows under
 ASan/UBSan. See the generated latest report for full-suite evidence.

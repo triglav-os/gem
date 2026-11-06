@@ -3,7 +3,7 @@
  * uses standard GEM geometry: toolbar buttons, an inset path, Locations,
  * file columns, filename field, scroll controls and modal action buttons.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 
@@ -44,12 +44,15 @@ static void aes_fsel_text(WORD x, WORD y, const char *text, WORD max_width)
     if (text == NULL || max_width <= 0) {
         return;
     }
-    count = (size_t)(max_width / 6);
+    count = strlen(text);
     if (count >= sizeof(visible)) {
         count = sizeof(visible) - 1u;
     }
-    strncpy(visible, text, count);
+    memcpy(visible, text, count);
     visible[count] = '\0';
+    while (count > 0u && vdi_string_width(visible) > max_width) {
+        visible[--count] = '\0';
+    }
     v_gtext(aes_state.vdi_handle, x, y, (CONST BYTE *)visible);
 }
 

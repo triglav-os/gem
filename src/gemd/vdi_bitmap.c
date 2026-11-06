@@ -2,7 +2,7 @@
  * Owns per-connection MFDB storage and dispatches pointer-free raster copies.
  * Uploads initialize storage and downloads cannot expose another connection.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 #include "gem/gemd.h"

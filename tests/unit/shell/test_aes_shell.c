@@ -2,7 +2,7 @@
  * Verifies direct AES shell invocation context, environment lookup, path
  * search and synchronized DESKTOP.INF/desktop.cfg compatibility.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

@@ -2,21 +2,22 @@
 
 ## Build
 
-The native build requires Linux framebuffer (`fbdev`) and evdev headers in
-addition to the GCC, Make, CMake and Python build tools.
+The native package is compiled in the same Wischner Docker toolchain as the
+hosted build; it supplies Linux framebuffer and evdev headers and build tools.
 
 Configure a release build so the deployment does not depend on the
 AddressSanitizer and UndefinedBehaviorSanitizer runtimes:
 
 ```sh
-cmake -S . -B build \
+tools/scripts/container.sh exec cmake -S . -B build/linux \
     -DCMAKE_BUILD_TYPE=Release \
     -DGEM_PLATFORM=linux
-cmake --build build --target gemix_package -j"$(nproc)"
+tools/scripts/container.sh exec cmake --build build/linux --target gemix_package --parallel 4
 ```
 
 `bin/gemix` is relocatable and contains:
 
+- `LICENSE`: the GNU GPL version 2 text for the GPL-2.0-or-later project code
 - `bin/`: `gemd`, desktop, terminal, calculator, and clock
 - `lib/`: AES, VDI, `libgem`, and the native Linux platform library
 - `include/`: the minimal public GEM application SDK
@@ -98,6 +99,7 @@ to gemd through `GEMD_SOCKET` (default `/tmp/gemd.sock`). See
 compatibility limits.
 
 For a separately exported SDK and standalone sample build, use the
-[samples guide](SAMPLES.md). `make sdk` restores the hosted Debug configuration;
+[samples guide](SAMPLES.md). `make sdk` uses the hosted RelWithDebInfo Docker
+configuration in `build/container-sdl/`;
 to export from an already configured native Release build, run
 `cmake --build build --target gem_sdk` directly.

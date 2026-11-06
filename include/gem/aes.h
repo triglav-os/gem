@@ -4,7 +4,7 @@
  * header includes the classic AES object and resource structures,
  * message and event constants, and the standard AES library calls.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

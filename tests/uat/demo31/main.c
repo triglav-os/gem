@@ -4,7 +4,7 @@
  * blinking block cursor, forwards keyboard input to the shell, and
  * maps the window scroll bars onto the terminal viewport.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

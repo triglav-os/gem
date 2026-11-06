@@ -3,7 +3,7 @@
  * and quit events without depending on a specific window system or
  * device API.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

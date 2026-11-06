@@ -3,7 +3,7 @@
  * view geometry, slider synchronization, scrolling, the work-area redraw
  * and the mouse and window-message handling for each open browser.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

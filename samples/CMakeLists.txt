@@ -1,5 +1,9 @@
 cmake_minimum_required(VERSION 3.20)
 
+if(NOT "$ENV{GEM_IN_CONTAINER}" STREQUAL "1")
+    message(FATAL_ERROR "Use the samples Makefile; builds require Docker")
+endif()
+
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
     project(gem_samples C)
     set(CMAKE_C_STANDARD 11)
@@ -11,7 +15,7 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
     set(GEM_SDK_ROOT "" CACHE PATH "GEM SDK containing include/ and lib/")
     include("${GEM_SDK_ROOT}/gem_sdk_config.cmake" OPTIONAL)
     find_path(GEM_SDK_INCLUDE_DIR gem.h HINTS ${GEM_SDK_ROOT}/include REQUIRED)
-    foreach(name platform_linux vdi aes gem)
+    foreach(name platform_linux vdi aes gem fat12 msa)
         find_library(GEM_${name}_LIBRARY NAMES ${name}
             HINTS ${GEM_SDK_ROOT}/lib REQUIRED)
         add_library(${name} SHARED IMPORTED)
@@ -26,6 +30,7 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
         IMPORTED_LOCATION "${GEM_gemconf_LIBRARY}"
         INTERFACE_INCLUDE_DIRECTORIES "${GEM_SDK_INCLUDE_DIR}")
     set_target_properties(gem PROPERTIES INTERFACE_LINK_LIBRARIES platform_linux)
+    set_target_properties(msa PROPERTIES INTERFACE_LINK_LIBRARIES platform_linux)
     set_target_properties(aes PROPERTIES INTERFACE_LINK_LIBRARIES vdi)
     if(GEM_SDK_PLATFORM STREQUAL "rasta")
         find_library(GEM_rasta_LIBRARY NAMES rasta HINTS ${GEM_SDK_ROOT}/lib REQUIRED)

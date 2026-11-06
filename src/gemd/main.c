@@ -4,7 +4,7 @@
  * transport and lock deadlines, and services requests, including the
  * cooperative servicing performed while a classic modal panel waits.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

@@ -4,7 +4,7 @@
  * reads, cluster chain following and file extraction. Directory walking
  * lives in fat12_dir.c.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

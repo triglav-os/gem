@@ -3,7 +3,7 @@
  * Devices may be discovered automatically or supplied explicitly, and all
  * descriptors are non-blocking so AES remains responsive without threads.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

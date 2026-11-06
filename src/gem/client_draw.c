@@ -4,7 +4,7 @@
  * clipping, polylines, bars, text and text extents. Arrays are copied into
  * bounded request structures; no application address crosses the socket.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

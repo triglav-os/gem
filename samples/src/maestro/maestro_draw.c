@@ -3,7 +3,7 @@
  * resource bitmaps, the tree pane with its expand/collapse icons, the
  * file pane, status line and window frame.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

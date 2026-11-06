@@ -2,7 +2,7 @@
  * Records the per-process AES shell command and TOS tail received by a child
  * launched through shel_write, using only GEM OS wrappers for file output.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

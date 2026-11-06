@@ -2,7 +2,7 @@
  * Demonstrates a basic AES window whose client area is drawn from one
  * GEM object tree. Uses built-in AES object types with manual click handling.
  *
- * MIT License
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

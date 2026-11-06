@@ -3,7 +3,7 @@
  * expand/collapse state, resource icon loading, layout, window lifecycle
  * and the event loop. Painting lives in maestro_draw.c.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

@@ -3,7 +3,7 @@
  * Directory, metadata and process operations are delegated to the portable
  * GEM OS and AES shell interfaces.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

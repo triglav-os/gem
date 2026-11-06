@@ -3,7 +3,7 @@
  * hosted port. This keeps text shaping, font selection, and attribute
  * queries separate from raster and primitive drawing code.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

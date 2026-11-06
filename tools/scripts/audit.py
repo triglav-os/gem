@@ -1,8 +1,14 @@
 #!/usr/bin/env python3
 """Check owned C conventions and analyze each configured C compilation variant.
 
-MIT License (see LICENSE). Copyright (C) 2026 tomaz stih.
+SPDX-License-Identifier: GPL-2.0-or-later
+Copyright (C) 2026 tomaz stih.
 """
+from pathlib import Path as _Path
+import sys as _sys
+_sys.path.insert(0, str(_Path(__file__).resolve().parents[2] / "tools/scripts"))
+from docker_context import ensure_container
+ensure_container()
 import argparse
 import concurrent.futures
 import json
@@ -41,7 +47,7 @@ def standards(files):
         name = str(path.relative_to(ROOT))
         header = text.split('*/')[0] if text.startswith('/*') else ''
         license_marker = ('AGPL' if name.startswith('src/apps/gemread/')
-                          else 'MIT License')
+                          else 'SPDX-License-Identifier: GPL-2.0-or-later')
         if not text.startswith('/*') or license_marker not in header:
             errors.append(name + ': missing license/file header')
         if not re.fullmatch(r'[a-z][a-z0-9_]*\.[ch]', path.name):

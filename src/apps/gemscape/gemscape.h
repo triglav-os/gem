@@ -3,7 +3,7 @@
  * implementation lives in `gemscape_ui.c`, while `gemscape_ui.c` provides
  * the process `main()` wrapper used by the build.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

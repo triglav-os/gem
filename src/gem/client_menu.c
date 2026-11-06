@@ -3,7 +3,7 @@
  * title and entry strings, and republishes mutations made to the active
  * tree. The reachable extent of the tree bounds what is serialized.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

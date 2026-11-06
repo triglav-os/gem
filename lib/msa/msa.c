@@ -4,7 +4,7 @@
  * simple E5-based RLE compression, and whole-image conversion to and
  * from raw ST-style disk image bytes.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

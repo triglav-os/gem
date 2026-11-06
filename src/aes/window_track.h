@@ -2,7 +2,7 @@
  * Declares the chrome-tracking context and the drag helpers shared by the
  * hosted AES window tracking and dragging modules. Private to libaes.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

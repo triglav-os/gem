@@ -3,7 +3,7 @@
  * shapes, and the standard set loaded from cursors.rsc with bounds-checked
  * ICONBLK parsing. Cursor drawing and presentation live in cursor.c.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

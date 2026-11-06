@@ -4,7 +4,7 @@
  * registered GEM services, a separator and Shutdown. It is gemd's own menu.
  * Service selections are delivered to their owner as AC_OPEN messages.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

@@ -3,7 +3,7 @@
  * object/form API. Controls keep their model and input behavior independent
  * of any particular dialog or renderer.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

@@ -4,7 +4,7 @@
  * object-part renderers. These are implementation details of libaes and are
  * not part of the public GEM interface.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

@@ -2,7 +2,7 @@
  * Drives hostile and well-behaved RPC peers concurrently against a real gemd.
  * All traffic is confined to the private socket created by the test runner.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 #define _POSIX_C_SOURCE 200809L

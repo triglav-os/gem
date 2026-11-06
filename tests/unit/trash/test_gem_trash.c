@@ -2,7 +2,7 @@
  * Verifies safe file/directory copies plus home Trash moves, metadata,
  * restore collisions, symlink-safe purge and emptying in isolated storage.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

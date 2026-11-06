@@ -2,7 +2,7 @@
  * Locates resources owned by sample applications without teaching GEM
  * libraries about sample directories or polluting the core resource tree.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 #ifndef SAMPLE_RESOURCES_H

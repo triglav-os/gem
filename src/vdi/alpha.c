@@ -3,7 +3,7 @@
  * routines emulate the text-console style API on top of the hosted
  * workstation without mixing it into the main drawing modules.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

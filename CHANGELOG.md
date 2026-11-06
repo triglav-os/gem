@@ -6,6 +6,39 @@ Unreleased.
 
 ## Unreleased
 
+- Docker sessions now provide account/group names for the invoking UID/GID
+  and a writable private home, fixing Terminal's missing-name prompt and
+  `groups: cannot find name` startup warning.
+- Read the runtime hostname directly from the kernel, avoiding the host
+  `hostname` command's AppProtection preload warning during Docker startup.
+
+- Nested test/sample Makefiles and direct test scripts now use Docker too.
+  A checkout-wide lock makes overlapping build/test invocations wait instead
+  of overwriting shared binaries, sockets, framebuffers and reports.
+- `make run` and VS Code F5 now run Rasta, gemd, applications and GDB in the
+  Wischner Docker runtime, with the current graphical display forwarded.
+  `make stop` removes this checkout's interactive container.
+- Fixed standalone MSA sample builds: the SDK now exports disk-library
+  headers and the samples import their matching libraries.
+
+- Added the complete GNU GPL version 2 license and licensed project-owned
+  code under GPL-2.0-or-later. SDK and native package exports include the
+  license. Gemread and third-party licensing remain unchanged.
+
+- Gemscape now renders its CEF browser with the headless software backend,
+  so page display and input work without an X/Wayland server or GPU.
+- File-selector paths and labels now fit the active font's measured width,
+  preventing long text from drawing through field borders.
+- Fixed full-suite prerequisites: generated PDF fixtures replace the optional
+  Atari manual, the window-host regression receives its font resources, and
+  reviewed chooser references exclude host-specific paths and mount listings.
+  Added startup coverage for Rasta's framebuffer and display negotiation.
+
+- All root Make build, test and audit targets now use the Wischner SDL Docker
+  toolchain by default, matching F5. Host compiler and SDL2 development packages
+  are no longer needed. Rasta and GEM executables remain in `bin/` for direct
+  host execution; cached build products live in `build/container-sdl/`.
+
 - Resizable windows without frame scroll controls use a thin right/bottom
   frame instead of empty scrollbar strips. Drag the L-shaped bottom-right
   grip to resize; client clicks stay inside the application. Windows with

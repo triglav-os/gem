@@ -3,7 +3,7 @@
  * compatibility calls in one place. The sample intentionally exposes
  * the return values in status text so hosted AES gaps stay visible.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

@@ -39,41 +39,44 @@ First export the SDK from a configured GEM checkout:
 make sdk
 ```
 
-The result is `bin/sdk/`, containing public headers, GEM libraries (including
+The result is `bin/sdk/`, containing `LICENSE`, public headers, GEM libraries (including
 the static `libgemconf` configuration and `libgemctl` control libraries),
 runtime resources and
 `bin/resgen`. Sample resources are excluded from the SDK.
+Disk-library headers and libraries are included for the standalone MSA tool.
 `gem_sdk_config.cmake` records the display backend so direct
 AES/VDI applications link the matching host library. This target builds the core and resource generators without
 needing the sample binaries. Both Debug and Release samples should use matching GEM
-library builds. The supplied Makefile defaults to GCC Debug with sanitizers.
+library builds. The supplied Makefile uses the Wischner SDL Docker toolchain
+and defaults to GCC RelWithDebInfo, matching the root build.
 
 ```sh
 make -C samples GEM_SDK_ROOT="$PWD/bin/sdk"
 ```
 
-This uses root `build/samples/` for artifacts; executables are in
-`build/samples/runtime/`, with sample libraries in its `lib/` subdirectory.
+This uses root `build/samples-docker/` for artifacts; executables are in
+`build/samples-docker/runtime/`, with sample libraries in its `lib/` subdirectory.
 For a copied samples tree, supply absolute SDK and build paths:
 
 ```sh
-cmake -S /path/to/samples -B /path/to/build/samples \
-    -DCMAKE_C_COMPILER=gcc -DCMAKE_BUILD_TYPE=Debug \
-    -DGEM_SDK_ROOT=/path/to/gem-sdk
-cmake --build /path/to/build/samples --parallel 4
+make -C /path/to/samples GEM_SDK_ROOT=/path/to/gem-sdk \
+    BUILD_DIR=/path/to/build/samples
 ```
 
 Copy the complete samples tree when relocating it. No root GEM source, Stout
-source or tests directory is needed for this build. `GEM_SDK_INCLUDE_DIR`
-and the `GEM_<name>_LIBRARY` cache entries also permit explicit SDK locations.
+source or tests directory is needed for this build.
+The copied Makefile mounts the SDK read-only and runs its compiler and
+resource generator inside Docker too.
+`GEM_SDK_INCLUDE_DIR` and the `GEM_<name>_LIBRARY` cache entries also permit
+explicit SDK locations.
 
 The integrated root build writes these examples to `bin/samples/` and their
 private libraries to `bin/samples/lib/`. Bundled applications are in
 `bin/apps/`, and core libraries remain in `bin/lib/`.
 Gemscape and Gemread are bundled applications; Gemread accepts supported
 PDF, XPS/OpenXPS, EPUB, MOBI, FB2, CBZ and CBT documents from its File/Open
-menu and uses cached MuPDF sources from `build/deps`. Gemread and its own UAT
-driver are AGPL-3.0-or-later; they are not covered by the core's MIT license.
+menu and uses cached MuPDF sources from `<build-dir>/deps`. Gemread and its own UAT
+driver are AGPL-3.0-or-later; the core is GPL-2.0-or-later.
 Build paths supply runtime library lookup; when relocating binaries, retain
 sample libraries and configure lookup for the installed GEM libraries.
 

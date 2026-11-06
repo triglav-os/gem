@@ -2,7 +2,7 @@
  * Implements pointer-local AES shell lookups for libgem clients while routing
  * every environment and filesystem operation through the portable OS layer.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

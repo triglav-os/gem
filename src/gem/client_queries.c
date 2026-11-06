@@ -2,7 +2,7 @@
  * Marshals mouse state, font metrics, scrap paths and file selectors.
  * Pointer outputs are copied back to client memory, never sent as addresses.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

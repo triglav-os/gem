@@ -3,7 +3,7 @@
  * placement, viewport calculations and dirty-rectangle bookkeeping. DEC
  * control-sequence parsing and screen editing live in vt100.c.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

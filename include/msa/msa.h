@@ -5,7 +5,7 @@
  * images once and then layer FAT12, emulation, or other analysis on top
  * without reimplementing the MSA container format.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

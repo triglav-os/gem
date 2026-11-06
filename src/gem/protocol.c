@@ -2,7 +2,7 @@
  * Validates the private hosted RPC envelope and menu pointer reconstruction.
  * No AES/VDI declarations or application-visible structures are changed.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

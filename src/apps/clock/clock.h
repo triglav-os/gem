@@ -3,7 +3,7 @@
  * implementation lives in `clock_ui.c`, while `clock.c` provides the
  * process `main()` wrapper used by the build.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

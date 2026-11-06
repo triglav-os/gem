@@ -5,7 +5,7 @@
  * to draw into a packed monochrome shadow; the viewer never observes an
  * intermediate clear while a window is being repainted.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

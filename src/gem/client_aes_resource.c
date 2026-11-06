@@ -3,7 +3,7 @@
  * there. Resource addresses returned to applications never refer to gemd.
  * Bounds checks reject truncated tables before any pointer is constructed.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 #include "gem_protocol.h"

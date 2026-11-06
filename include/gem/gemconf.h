@@ -3,7 +3,7 @@
  * INI-style files from the XDG configuration hierarchy and can atomically
  * save a user override without exposing parser or filesystem details.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

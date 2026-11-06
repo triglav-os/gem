@@ -2,7 +2,7 @@
  * Parses and writes the bounded line-oriented DRI GEM/3 DESKTOP.INF format,
  * including FreeGEM trash and extended-environment records.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

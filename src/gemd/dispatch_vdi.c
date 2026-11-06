@@ -3,7 +3,7 @@
  * workstation: attributes, primitives, text, bitmaps and the extended VDI
  * packet, with raster output confined to the session's visible areas.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

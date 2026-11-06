@@ -2,7 +2,7 @@
  * Declares the private hosted AES runtime state and helper routines
  * shared by the public AES entry points and the internal utility layer.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

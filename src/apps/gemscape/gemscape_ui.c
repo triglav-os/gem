@@ -4,7 +4,7 @@
  * band, content pane, and status bar sized from native GEM metrics so
  * it fits visually with titles, menu rows, and scroll controls.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

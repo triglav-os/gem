@@ -2,7 +2,7 @@
  * Declares the Terminal application's screen model and helpers shared by
  * its grid, drawing and shell modules. Private to the sample.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

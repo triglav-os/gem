@@ -2,7 +2,7 @@
  * Exercises real libgem/gemd round trips, fragmented frames, bad lengths,
  * menu relocation, output arrays and persistent state across connections.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

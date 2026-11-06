@@ -3,7 +3,7 @@
  * its editable-field implementation. These are libaes implementation
  * details, not public GEM interfaces.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

@@ -14,7 +14,7 @@
  * hosted AES engine's own tree (menus, alerts), not a client's
  * private window content.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

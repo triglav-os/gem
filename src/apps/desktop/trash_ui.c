@@ -2,7 +2,7 @@
  * Connects File Manager selections and confirmation alerts to the GEM Trash
  * backend, then refreshes affected browser windows after each operation.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

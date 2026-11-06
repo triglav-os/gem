@@ -3,7 +3,7 @@
  * browser, disk, icon, repaint and shell modules exchange. Private to the
  * desktop executable.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

@@ -4,7 +4,7 @@
  * application exits or disconnects, the shared server workstation and the
  * ownership checks that authorize each request.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

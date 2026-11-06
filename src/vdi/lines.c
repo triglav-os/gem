@@ -4,7 +4,7 @@
  * byte at a time under the current write mode, vertical runs and the
  * Bresenham general case.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

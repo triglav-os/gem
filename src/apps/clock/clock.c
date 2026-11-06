@@ -2,7 +2,7 @@
  * Provides the hosted GEM clock process entry point. The actual clock
  * UI and behavior live in `clock_ui.c`.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

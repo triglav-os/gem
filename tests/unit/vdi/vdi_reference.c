@@ -3,7 +3,7 @@
  * hosted VDI tests. These routines favor clarity over speed so the test
  * suite can compare VDI output against an independently written model.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

@@ -3,7 +3,7 @@
  * field queries and updates, hit testing, update locking and border/work
  * conversion. String-valued fields travel through the copied-string form.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

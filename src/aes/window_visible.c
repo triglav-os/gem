@@ -4,7 +4,7 @@
  * client WF_FIRSTXYWH/WF_NEXTXYWH enumeration and AES painting, and the
  * scroll bar delta repaint after slider changes.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

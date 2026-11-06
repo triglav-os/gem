@@ -2,7 +2,7 @@
  * Provides the hosted GEM Gemscape process entry point. The actual
  * browser-frame UI and event handling live in `gemscape_ui.c`.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

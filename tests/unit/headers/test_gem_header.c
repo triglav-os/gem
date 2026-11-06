@@ -2,7 +2,7 @@
  * Verifies that the traditional top-level GEM compatibility header is
  * self-contained and exposes the expected public types and aliases.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

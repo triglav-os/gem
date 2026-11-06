@@ -4,7 +4,7 @@
  * lookup, parent search, spec resolution, menu text helpers and the
  * saved-region pixel copies used by popups and alerts.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

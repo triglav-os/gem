@@ -3,7 +3,7 @@
  * this header when a translation unit needs both AES and VDI
  * declarations without managing the subsystem headers separately.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

@@ -7,7 +7,7 @@
  * utilities can inspect or execute. Unknown private symbol layouts are
  * skipped because symbols are not required for execution.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

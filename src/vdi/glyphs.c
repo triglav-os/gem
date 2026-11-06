@@ -4,7 +4,7 @@
  * glyph painting with opaque or transparent background, and the scancode
  * fallback used by the console input path.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

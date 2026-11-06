@@ -4,7 +4,7 @@
  * MFDB pixel reads and writes, and the MFDB horizontal run writer used by
  * raster copies. Lines and fills live in lines.c and fill.c.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

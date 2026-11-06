@@ -4,7 +4,7 @@
  * window, a custom user draw callback, and a small keypad-like cluster
  * of boxchar buttons.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

@@ -4,7 +4,7 @@
  * It is gemd's own menu (not any application's), presents registered GEM
  * services above a separator, and keeps Shutdown as its final command.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

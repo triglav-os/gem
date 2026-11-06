@@ -1,8 +1,14 @@
 #!/usr/bin/env python3
 """Verify that a failing CTest run still publishes truthful report evidence.
 
-MIT License (see LICENSE). Copyright (C) 2026 tomaz stih.
+SPDX-License-Identifier: GPL-2.0-or-later
+Copyright (C) 2026 tomaz stih.
 """
+from pathlib import Path as _Path
+import sys as _sys
+_sys.path.insert(0, str(_Path(__file__).resolve().parents[2] / "tools/scripts"))
+from docker_context import ensure_container
+ensure_container()
 import importlib.util
 from pathlib import Path
 import sys

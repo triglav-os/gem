@@ -1,5 +1,9 @@
 cmake_minimum_required(VERSION 3.20)
 
+if(NOT "$ENV{GEM_IN_CONTAINER}" STREQUAL "1")
+    message(FATAL_ERROR "Use make or tools/scripts/container.sh exec cmake; builds require Docker")
+endif()
+
 project(gem C)
 
 include(CTest)
@@ -105,6 +109,8 @@ add_custom_target(gemix_package
     COMMAND ${CMAKE_COMMAND} -E make_directory ${GEMIX_LIB}
     COMMAND ${CMAKE_COMMAND} -E make_directory ${GEMIX_INCLUDE}
     COMMAND ${CMAKE_COMMAND} -E make_directory ${GEMIX_SHARE}/fonts ${GEMIX_ROOT}/bin/data
+    COMMAND ${CMAKE_COMMAND} -E copy
+        ${PROJECT_SOURCE_DIR}/LICENSE ${GEMIX_ROOT}/LICENSE
     COMMAND ${CMAKE_COMMAND} -E copy
         $<TARGET_FILE:gemd> ${GEMIX_BIN}/
     COMMAND ${CMAKE_COMMAND} -E copy

@@ -3,7 +3,7 @@
  * Trash layout behind virtual trash items while leaving all host filesystem
  * access to the GEM operating-system abstraction.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

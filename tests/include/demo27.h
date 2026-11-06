@@ -2,7 +2,7 @@
  * Declares the specific tree and object identifiers used by the
  * external `demo27.rsc` resource sample.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

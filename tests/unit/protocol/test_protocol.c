@@ -2,7 +2,7 @@
  * Rejects malformed extended RPC arrays, tree graphs and bitmap geometry.
  * Runs without a display so transport validation failures stay deterministic.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 #include "gem/gemd.h"

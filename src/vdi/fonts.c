@@ -4,7 +4,7 @@
  * allocation for bundled and dynamically loaded fonts, selection and the
  * name/id queries. Glyph metrics and rendering live in glyphs.c.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

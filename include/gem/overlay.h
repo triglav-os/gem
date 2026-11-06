@@ -2,7 +2,7 @@
  * Presenter-only BGRA overlay API. Overlay pixels are copied to gemd and
  * composited by the display backend; they are not part of GEM/VDI memory.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 #ifndef GEM_OVERLAY_H

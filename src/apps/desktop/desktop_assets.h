@@ -4,7 +4,7 @@
  * and black-pixel bitmap so the portable desktop can render them
  * through hosted GEM AES/VDI callbacks without legacy desktop glue.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

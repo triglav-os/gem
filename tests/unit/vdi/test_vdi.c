@@ -4,7 +4,7 @@
  * raster cases in test_vdi_raster.c, against memory-backed reference
  * renderers so framebuffer regressions surface before AES bugs do.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

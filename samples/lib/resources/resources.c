@@ -4,7 +4,7 @@
  * application-owned memory so they outlive rsrc_free(). Only the public
  * GEM API is used.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 #define _POSIX_C_SOURCE 200809L

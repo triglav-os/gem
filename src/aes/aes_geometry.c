@@ -3,7 +3,7 @@
  * construction, point containment, intersection and the subtraction that
  * yields up to four uncovered fragments.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

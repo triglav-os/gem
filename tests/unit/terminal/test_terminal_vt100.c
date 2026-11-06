@@ -2,7 +2,7 @@
  * Verifies DEC VT100 parsing, editing, attributes, character sets and the
  * alternate-screen round trip used by full-screen terminal applications.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

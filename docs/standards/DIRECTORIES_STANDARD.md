@@ -49,8 +49,13 @@ Only normal top-level project metadata, such as `LICENSE`, `README.md`,
 - Use nested makefiles. The top-level `Makefile` defines the main entry points;
   subdirectories such as `src/`, `lib/`, `lib/dbf/` and `tests/` should have
   their own makefiles when needed.
+- Root and nested Make targets run through the Wischner SDL Docker toolchain; the internal
+  recipes are in `tools/scripts/build.mk`. Build intermediates default to
+  `build/container-sdl/`, and programs and Rasta go into `bin/`.
+  Interactive launchers and F5 run those programs in the same Docker image.
+  Build/test entry points hold the shared checkout lock before running tools.
 - `make` builds the project, including tests; `make tests` runs all suites
-  and generates the test report.
+  in Docker and generates the test report.
 
 ## Tests and data
 

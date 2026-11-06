@@ -4,10 +4,14 @@
 AGPL-3.0-or-later License (see ../../../src/apps/gemread/LICENSE).
 Copyright (C) 2026 tomaz stih.
 """
+from pathlib import Path as _Path
+import sys as _sys
+_sys.path.insert(0, str(_Path(__file__).resolve().parents[3] / "tools/scripts"))
+from docker_context import ensure_container
+ensure_container()
 import argparse
 import json
 from pathlib import Path
-import shutil
 import struct
 import sys
 import time
@@ -293,8 +297,9 @@ def main():
         scenario = Path(args.document).suffix.lstrip('.').lower()
     else:
         scenario = 'empty'
-    session.path = (Path(args.artifacts).resolve() /
-                    f'gemread_{scenario}_{args.mode}')
+    artifact_name = (f'gemread_{args.mode}' if scenario == 'empty' else
+                     f'gemread_{scenario}_{args.mode}')
+    session.path = Path(args.artifacts).resolve() / artifact_name
     session.path.mkdir(parents=True, exist_ok=True)
     session.env['GEM_RASTA_FRAMEBUFFER'] = str(session.path/'framebuffer')
     session.env['GEMD_SOCKET'] = str(session.path/'socket')
@@ -318,9 +323,7 @@ def main():
     selector_document = None
     if document is None:
         selector_document = session.path/'y-reader.pdf'
-        source = (Path(__file__).resolve().parents[3]/'docs'/'manuals'/
-                  'The_Atari_Compendium.pdf')
-        shutil.copyfile(source, selector_document)
+        create_color_pdf(selector_document)
         (session.path/'.hidden-system.pdf').write_bytes(b'hidden fixture')
     args.binary_args = [str(document)] if document else []
     result = {'passed': False}

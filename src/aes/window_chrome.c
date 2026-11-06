@@ -3,7 +3,7 @@
  * icons and text, scroll arrows, slider slots and thumbs and the sizer
  * glyph, plus clearing a frame that closes.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

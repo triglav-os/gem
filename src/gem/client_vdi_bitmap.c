@@ -3,7 +3,7 @@
  * Same-buffer copies preserve aliasing; screen MFDBs contain no process
  * pointer.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 #include "gem_protocol.h"

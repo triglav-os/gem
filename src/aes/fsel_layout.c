@@ -2,7 +2,7 @@
  * Computes modern file-chooser geometry and hit testing. Keeping layout in
  * one module makes painting and input share the same responsive rectangles.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

@@ -2,7 +2,7 @@
  * Embeds CEF as Gemscape's off-screen browser, forwards browser input and
  * navigation, reports page scroll metrics and manages CEF process lifetime.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 
@@ -162,13 +162,23 @@ static void gem_command_switch(cef_command_line_t *command_line,
     cef_string_clear(&value);
 }
 
-static void CEF_CALLBACK gem_app_before_command_line(
-    cef_app_t *self, const cef_string_t *process_type,
-    cef_command_line_t *command_line)
+static void CEF_CALLBACK
+gem_app_before_command_line(cef_app_t *self, const cef_string_t *process_type,
+                            cef_command_line_t *command_line)
 {
+    cef_string_t name = {0};
+    cef_string_t value = {0};
+
     (void)self;
     (void)process_type;
     gem_command_switch(command_line, "no-zygote");
+    gem_command_switch(command_line, "disable-gpu");
+    /* CEF paints into GEM's overlay, including on hosts without X/Wayland. */
+    gem_string(&name, "ozone-platform");
+    gem_string(&value, "headless");
+    command_line->append_switch_with_value(command_line, &name, &value);
+    cef_string_clear(&name);
+    cef_string_clear(&value);
 }
 
 static void gem_app_init(void)

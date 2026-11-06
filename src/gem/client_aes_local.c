@@ -2,7 +2,7 @@
  * Implements pointer-local AES utilities and cooperative event convenience
  * wrappers. Menu mutations republish the active tree to its owning server.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 #include "gem_protocol.h"

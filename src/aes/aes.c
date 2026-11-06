@@ -2,7 +2,7 @@
  * Exposes the core hosted AES application and scrap entry points while
  * leaving shell, windowing and object logic in focused companion modules.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

@@ -2,7 +2,7 @@
  * Implements hosted AES resource loading and pointer fixups
  * for external or built-in resource images.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

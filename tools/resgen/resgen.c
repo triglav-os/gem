@@ -5,7 +5,7 @@
  * (rsc_writer.c). ImageMagick's `convert` performs the pixel decoding so
  * the generated `.rsc` files stay plain GEM data.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

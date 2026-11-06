@@ -3,7 +3,7 @@
  * filled areas and cell arrays, arcs and ellipses, contour fills and raster
  * copies, write modes, and the WORD-limit coordinate and scroll cases.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

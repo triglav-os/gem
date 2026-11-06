@@ -3,7 +3,7 @@
  * session table and the request dispatchers: the per-connection state,
  * the process-wide server state and the helpers each module exports.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

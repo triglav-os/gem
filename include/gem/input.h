@@ -2,7 +2,7 @@
  * Optional hosted physical-key events for evnt_multi. The standard AES
  * signatures, MU_KEYBD encoding and behavior are unchanged.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 #ifndef GEM_INPUT_H

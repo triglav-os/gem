@@ -4,7 +4,7 @@
  * client-visible object tree calls objc_add, objc_delete, objc_draw,
  * objc_find, objc_offset, objc_order and objc_change.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

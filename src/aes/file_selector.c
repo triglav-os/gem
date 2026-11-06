@@ -3,7 +3,7 @@
  * share a modern GEM interface while fsel_input() retains its classic path,
  * selection and button calling convention.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

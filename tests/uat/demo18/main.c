@@ -6,7 +6,7 @@
  * should switch the shared top menu bar to whichever instance's
  * window is on top, while both windows stay visible throughout.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 #include <gem.h>

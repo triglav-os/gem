@@ -5,7 +5,7 @@
  * so AES compatibility issues surface in the runtime layer instead of
  * being hidden in sample-side hosted glue.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

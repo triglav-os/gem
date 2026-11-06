@@ -3,7 +3,7 @@
  * modification dates, compact byte sizes and file types for display. Column
  * headings also map pointer positions to the matching sort mode.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

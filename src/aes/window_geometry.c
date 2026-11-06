@@ -4,7 +4,7 @@
  * slider slots and thumbs), title/info text storage and hit testing.
  * Painting and redraw scheduling live in separate modules.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

@@ -3,7 +3,7 @@
  * of keys and display, redraw and button flashing, and the event loop that
  * feeds clicks and keystrokes to the arithmetic engine in calc_engine.c.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

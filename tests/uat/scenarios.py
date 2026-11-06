@@ -1,6 +1,7 @@
 """Acceptance actions and reviewed framebuffer checkpoints for every demo.
 
-MIT License (see LICENSE). Copyright (C) 2026 tomaz stih.
+SPDX-License-Identifier: GPL-2.0-or-later
+Copyright (C) 2026 tomaz stih.
 """
 from pathlib import Path
 import time
@@ -15,12 +16,15 @@ def normalized(data, demo=None):
         data[y*80:y*80+3] = b'\0'*3
     for y in range(376,400):
         data[y*80+77:y*80+80] = b'\0'*3
-    # Demo 34 uses a checked-in fixture, but its absolute checkout prefix is
-    # intentionally excluded so references remain portable between clones.
+    # Demo 34's file rows are fixed. Only the editable path text and the
+    # host's discovered locations vary between checkouts and containers;
+    # retain the toolbar buttons, path border and Locations header/frame.
     if demo == 34:
-        for y in range(35, 59):
-            for x in range(76, 601):
-                data[y * 80 + x // 8] &= ~(0x80 >> (x % 8))
+        for left, top, right, bottom in ((108, 36, 600, 58),
+                                         (20, 112, 144, 350)):
+            for y in range(top, bottom):
+                for x in range(left, right):
+                    data[y * 80 + x // 8] &= ~(0x80 >> (x % 8))
     return bytes(data)
 
 

@@ -4,7 +4,7 @@
  * loop that routes messages to browsers and icons, and startup/shutdown.
  * Browsers, disks, icons and repainting live in their own modules.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

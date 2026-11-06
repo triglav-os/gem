@@ -11,7 +11,7 @@
             "stopAtEntry": false,
             "externalConsole": false,
             "MIMode": "gdb",
-            "miDebuggerPath": "${workspaceFolder}/tools/scripts/sample_debugger.py",
+            "miDebuggerPath": "${workspaceFolder}/tools/scripts/sample-debugger.sh",
             "miDebuggerArgs": "-iex \"set debuginfod enabled off\"",
             "preLaunchTask": "Start GEM sample session",
             "postDebugTask": "Stop GEM sample session",

@@ -1,7 +1,9 @@
 # C standard
 
 These rules apply to C development for the GEM UI port to Linux.
-All development and debugging happens locally on Linux with GCC.
+Development and debugging use GCC on Linux inside the Wischner Docker
+toolchain. Use the supplied Makefiles and launch helpers for builds, tests
+and interactive sessions.
 Use full warnings and sanitizers while debugging.
 
 ## Naming Conventions
@@ -49,7 +51,7 @@ style:
  * Be specific about the module purpose, important design choices,
  * and any hardware assumptions that matter.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 ```
@@ -59,6 +61,8 @@ Rules:
 - Replace the placeholder text with a real description.
 - The comment must describe the file, not just list its symbols.
 - Keep lines readable on an 80-column terminal where practical.
+- Use `SPDX-License-Identifier: GPL-2.0-or-later` for project-owned code.
+  Preserve Gemread's AGPL notices and all third-party licensing exceptions.
 
 ## Function Documentation
 

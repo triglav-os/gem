@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Own one F5 Rasta/gemd session and launch selected GEM applications.
 
-MIT License (see LICENSE). Copyright (C) 2026 tomaz stih.
+SPDX-License-Identifier: GPL-2.0-or-later
+Copyright (C) 2026 tomaz stih.
 """
 import argparse
 import json
@@ -15,6 +16,14 @@ import struct
 import subprocess
 import sys
 import time
+
+if os.environ.get('GEM_IN_CONTAINER') != '1':
+    if len(sys.argv) > 1 and sys.argv[1] == 'check':
+        from docker_context import ensure_container
+        ensure_container()
+    else:
+        script = Path(__file__).resolve().with_name('runtime.sh')
+        os.execv('/bin/bash', ['bash', str(script), 'session', *sys.argv[1:]])
 
 ROOT = Path(__file__).resolve().parents[2]
 RUNTIME = Path(os.environ.get('GEM_RUNTIME_ROOT', str(ROOT/'bin'))).resolve()
@@ -354,7 +363,7 @@ class Session:
 def main():
     global SESSION, STATE
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('action', choices=('start', 'stop', 'supervise', 'check'))
+    parser.add_argument('action', choices=('start', 'stop', 'supervise', 'check', 'run'))
     parser.add_argument('--directory', type=Path, default=SESSION)
     parser.add_argument('--apps', default=None,
                         help='comma-separated applications to launch')
@@ -394,7 +403,7 @@ def main():
         unknown = set(apps) - set(ALL_APPS)
         if unknown or 'desktop' not in apps:
             parser.error('apps must include desktop and use known application names')
-    session = Session(own_server=args.action == 'check',
+    session = Session(own_server=args.action in ('check', 'run'),
                       duration=3 if args.action == 'check' else None,
                       apps=apps)
     try:

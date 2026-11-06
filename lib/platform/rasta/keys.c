@@ -2,7 +2,7 @@
  * Translates Rasta's USB HID usage codes into GEM keyboard codes: modifier
  * tracking and the scan/ASCII composition that AES applications receive.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

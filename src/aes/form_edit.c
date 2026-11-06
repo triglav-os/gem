@@ -3,7 +3,7 @@
  * caret placement from clicks, insertion and deletion against the template
  * and validation strings, and the objc_edit entry point.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

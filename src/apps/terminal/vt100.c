@@ -3,7 +3,7 @@
  * editing model. It handles cursor motion, erasure, insertion, scroll margins,
  * SGR attributes, DEC character sets, reports and alternate-screen modes.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

@@ -4,7 +4,7 @@
  * hosted AES coordinates menu tracking, redraw clipping, and top-window
  * changes in one old-style application.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

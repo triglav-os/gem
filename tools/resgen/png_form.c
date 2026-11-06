@@ -4,7 +4,7 @@
  * transparent from their RGBA text values and packed into mask and data
  * word planes.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

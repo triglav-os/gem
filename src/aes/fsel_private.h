@@ -3,7 +3,7 @@
  * navigation helpers. Open, save and directory modes share this state while
  * retaining the public AES buffer conventions.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

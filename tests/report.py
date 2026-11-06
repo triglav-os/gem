@@ -1,8 +1,14 @@
 #!/usr/bin/env python3
 """Run CTest and publish an evidence-based Markdown acceptance report.
 
-MIT License (see LICENSE). Copyright (C) 2026 tomaz stih.
+SPDX-License-Identifier: GPL-2.0-or-later
+Copyright (C) 2026 tomaz stih.
 """
+from pathlib import Path as _Path
+import sys as _sys
+_sys.path.insert(0, str(_Path(__file__).resolve().parents[1] / "tools/scripts"))
+from docker_context import ensure_container
+ensure_container()
 import argparse
 import os
 from datetime import datetime, timezone
@@ -15,7 +21,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--build', type=Path, default=ROOT/'build')
+    parser.add_argument('--build', type=Path, default=ROOT/'build/container-sdl')
     parser.add_argument('--jobs', default='4')
     args = parser.parse_args()
     build = args.build.resolve()
@@ -91,6 +97,8 @@ def main():
              'and verifies that the Shutdown alert preserves all windows and client '
              'connections through a seven-second alert wait. '
              'All 34 demos run through Rasta in direct and proxy modes. '
+             'A separate startup regression verifies Rasta adopts GEM\'s framebuffer '
+             'path, geometry, BGRA depth and inverse mode before window input. '
              'UAT checks framebuffer references and scripted input; terminal cases verify a '
              'real shell command by reading its output file. The SDL viewer uses its dummy '
              'video driver unless UAT_SDL_DRIVER is set.', '',

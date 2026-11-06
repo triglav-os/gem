@@ -4,7 +4,7 @@
  * the pixels under the pointer, and the screen presentation that overlays
  * it on the monochrome framebuffer. Forms are loaded in cursor_forms.c.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

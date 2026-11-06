@@ -5,7 +5,7 @@
  * one place while the larger primitive, raster, and text surfaces live
  * in smaller translation units.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

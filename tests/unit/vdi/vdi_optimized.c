@@ -4,7 +4,7 @@
  * these routines against the simpler reference implementations so the
  * harness does not depend on only one model.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

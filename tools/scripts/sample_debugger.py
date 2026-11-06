@@ -1,11 +1,17 @@
 #!/usr/bin/env python3
 """Load the prepared F5 environment when GDB starts, after prelaunch tasks.
 
-MIT License (see LICENSE). Copyright (C) 2026 tomaz stih.
+SPDX-License-Identifier: GPL-2.0-or-later
+Copyright (C) 2026 tomaz stih.
 """
 import os
 from pathlib import Path
 import sys
+
+if os.environ.get('GEM_IN_CONTAINER') != '1':
+    script = Path(__file__).resolve().with_name('runtime.sh')
+    os.execv('/bin/bash', ['bash', str(script), 'exec', 'python3', '-B',
+                          str(Path(__file__).resolve()), *sys.argv[1:]])
 
 root = Path(__file__).resolve().parents[2]
 directory = Path(os.environ.get('GEM_SESSION_DIRECTORY', root/'build/f5'))

@@ -3,7 +3,7 @@
  * These helpers manage workstation state, screen pixel access, simple
  * font rendering, and MFDB copy support behind the public VDI API.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

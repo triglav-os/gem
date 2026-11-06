@@ -1,35 +1,18 @@
 .DEFAULT_GOAL := all
-BUILD_DIR ?= $(CURDIR)/build
+BUILD_DIR ?= $(if $(GEM_CONTAINER_BUILD_DIR),$(GEM_CONTAINER_BUILD_DIR),$(CURDIR)/build/container-sdl)
+GEM_OUTPUT_ROOT ?= $(if $(GEM_CONTAINER_OUTPUT_ROOT),$(GEM_CONTAINER_OUTPUT_ROOT),$(CURDIR)/bin)
 JOBS ?= 4
+TEST_JOBS ?= 4
 BUILD_TYPE ?= RelWithDebInfo
-.PHONY: all configure rasta cef mupdf tests unit integration uat sdk clean
-configure:
-	cmake -S . -B $(BUILD_DIR) -DCMAKE_C_COMPILER=gcc -DCMAKE_BUILD_TYPE=$(BUILD_TYPE) -DGEM_PLATFORM=rasta -DBUILD_TESTING=ON $(CMAKE_FLAGS)
-all: configure
-	cmake --build $(BUILD_DIR) --parallel $(JOBS)
-rasta: configure
-	cmake --build $(BUILD_DIR) --target rasta_viewer --parallel $(JOBS)
-
-mupdf: configure
-	cmake --build $(BUILD_DIR) --target gemread_mupdf --parallel $(JOBS)
-
-cef: configure
-	cmake --build $(BUILD_DIR) --target gemscape_cef --parallel $(JOBS)
-tests: all
-	$(MAKE) -C tests run BUILD_DIR=$(BUILD_DIR)
-unit integration uat: all
-	$(MAKE) -C tests $@ BUILD_DIR=$(BUILD_DIR)
-sdk: configure
-	cmake --build $(BUILD_DIR) --target gem_sdk --parallel $(JOBS)
-clean:
-	cmake --build $(BUILD_DIR) --target clean
-
-.PHONY: container
-container:
-	tools/scripts/container.sh tests
-
-.PHONY: audit standards
-audit: all
-	python3 -B tools/scripts/audit.py --build $(BUILD_DIR)
-standards:
-	python3 -B tools/scripts/audit.py --build $(BUILD_DIR) --standards-only
+export BUILD_DIR GEM_OUTPUT_ROOT JOBS TEST_JOBS BUILD_TYPE CMAKE_FLAGS
+TARGETS := all configure rasta cef mupdf tests unit integration uat sdk clean audit standards
+.PHONY: $(TARGETS) container run stop
+# Keep simultaneous top-level goals from sharing a CMake tree across containers.
+.NOTPARALLEL:
+$(TARGETS):
+	tools/scripts/container.sh $@
+container: tests
+run: all
+	GEM_RUNTIME_ROOT="$(GEM_OUTPUT_ROOT)" bash tools/scripts/runtime.sh run
+stop:
+	bash tools/scripts/runtime.sh stop

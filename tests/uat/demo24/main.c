@@ -4,7 +4,7 @@
  * object tree and uses explicit classic event handling so it stays a
  * useful compatibility probe while `form_do()` is still incomplete.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

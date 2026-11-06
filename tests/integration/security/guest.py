@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
 """Exercise Stout's Atari trap vectors through the Musashi guest boundary."""
+from pathlib import Path as _Path
+import sys as _sys
+_sys.path.insert(0, str(_Path(__file__).resolve().parents[3] / "tools/scripts"))
+from docker_context import ensure_container
+ensure_container()
 import pathlib
 import struct
 import subprocess

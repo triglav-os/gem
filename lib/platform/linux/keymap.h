@@ -3,7 +3,7 @@
  * backend: modifier bits in the GEM layout, and the scan code and ASCII
  * lookups for a key code under a given modifier state.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

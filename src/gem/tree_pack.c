@@ -2,7 +2,7 @@
  * Serializes AES objects, TEDINFO, icons and bitmap data without process
  * pointers. The bounded arena rejects oversized or unsupported trees.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 #include "gem/gemd.h"

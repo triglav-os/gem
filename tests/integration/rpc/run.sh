@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+if [[ "${GEM_IN_CONTAINER:-}" != 1 ]]; then
+    exec "$root/tools/scripts/container.sh" exec bash "$root/tests/integration/rpc/run.sh" "$@"
+fi
 rpc_dir=$(mktemp -d /tmp/gem-rpc-test.XXXXXXXX)
 export GEMD_SOCKET="$rpc_dir/socket"
 export GEM_RASTA_FRAMEBUFFER="$rpc_dir/framebuffer"

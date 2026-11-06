@@ -3,7 +3,7 @@
  * windows, menus, standard panels, extended AES packets and copied object
  * trees, whose USERDEF callbacks round-trip to the owning client.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

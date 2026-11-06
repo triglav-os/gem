@@ -4,6 +4,27 @@ Reviewed 2026-09-06. This report distinguishes confirmed fixes, executable
 verification and remaining diagnostics. It does not certify the absence of
 vulnerabilities or complete Atari semantic compatibility.
 
+## Docker entry-point update (2026-11-05)
+
+Build/test dispatch now includes nested Makefiles and direct Python tools.
+Commands serialize on a checkout-wide `flock`; the integration regression
+checks exclusion, waiting and release after a failed command. Two overlapping
+full-suite invocations were used to check the actual Docker entry point.
+The latest generated outcomes are in [LATEST.md](LATEST.md).
+The account regression additionally checks passwd/group resolution for the
+unprivileged UID/GID, an owned writable home, and login-shell startup without
+missing-account diagnostics. Account metadata is created in a cached image
+layer; host account databases and home directories are not mounted.
+
+The interactive launcher uses a separate checkout-specific Docker container
+for Rasta, gemd, applications and GDB. A headless F5 startup check verified
+that GDB launches gemd and Desktop/Terminal reach `applications-ready`, and
+that stopping the session removes the container. Graphical display forwarding
+requires an authorized X11 or Wayland connection from the user's login and
+was not visually verified in this headless check. Build/test containers drop
+all capabilities; the interactive container adds only `SYS_PTRACE` for GDB
+and retains `no-new-privileges` and separate PID/network namespaces.
+
 ## Coverage and tools
 
 - GCC Debug with `-Wall -Wextra -pedantic`, AddressSanitizer and

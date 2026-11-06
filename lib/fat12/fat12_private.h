@@ -3,7 +3,7 @@
  * the sector, cluster and error helpers shared by its image and directory
  * modules. Not part of the public fat12.h interface.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

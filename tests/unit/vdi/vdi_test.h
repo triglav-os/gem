@@ -3,7 +3,7 @@
  * harness uses a memory-backed raster surface so framebuffer results can
  * be compared byte-for-byte against reference renderers.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

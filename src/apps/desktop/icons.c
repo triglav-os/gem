@@ -3,7 +3,7 @@
  * VDI, USERDEF rendering of icon objects, layout in a grid, selection
  * state, status text and click handling including double-click opening.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

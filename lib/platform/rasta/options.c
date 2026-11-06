@@ -4,7 +4,7 @@
  * window scale, cursor and inverse modes, each with a GEM_RASTA_* name
  * and the older RASTA_* fallback.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

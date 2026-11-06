@@ -3,7 +3,7 @@
  * selector discovers only existing directories through the host abstraction
  * and keeps navigation changes local until the caller accepts a result.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

@@ -9,6 +9,18 @@ same-host ABI protocol; it is not suitable for exposure as a network service.
 
 ## Deployment boundary
 
+Build/test containers run as the invoking UID with all capabilities dropped
+and `no-new-privileges`. The interactive Docker launcher uses the same limits
+but adds `SYS_PTRACE` for GDB, and forwards the current graphical display
+socket and Xauthority file when applicable. It mounts the source checkout
+read/write, uses its own PID/network namespaces, and never mounts the Docker
+socket. The checkout lock prevents accidental concurrent build/test writes;
+it is not a security boundary against processes with the same UID.
+The cached account layer supplies names for the invoking UID/GID and an owned
+mode-0700 container home. It does not mount host passwd/group databases or the
+host home directory; account creation happens during image build, and launched
+processes retain the invoking UID/GID and existing capability limits.
+
 Run gemd as an ordinary user, never as a privileged service. Use a private
 directory owned by that user (mode 0700) for `GEMD_SOCKET` and
 `GEM_RASTA_FRAMEBUFFER`. Keep resource directories and the Rasta viewer

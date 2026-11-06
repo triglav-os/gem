@@ -2,7 +2,7 @@
  * Exercises VDI attributes, inquiries and large bidirectional MFDB transfers
  * against a real gemd. Pixel assertions catch successful but ineffective RPCs.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 #include <gem.h>

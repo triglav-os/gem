@@ -2,7 +2,7 @@
  * Verifies client-owned AES trees, editable text, resources, shell state and
  * USERDEF callbacks against a real server, including pointer preservation.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 #include <gem.h>

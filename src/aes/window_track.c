@@ -4,7 +4,7 @@
  * the move and size drags in window_drag.c, and queues the resulting WM_*
  * messages for the owning application.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 

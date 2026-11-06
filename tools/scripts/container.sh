@@ -3,20 +3,24 @@
 set -euo pipefail
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 action="${1:-tests}"
-case "$action" in all|tests|unit|integration|uat|sdk|audit) ;; *) echo 'Unknown build action' >&2; exit 2;; esac
-image="${GEM_CONTAINER_IMAGE:-gem-build:local}"
-build_dir="${GEM_CONTAINER_BUILD_DIR:-$root/build/container}"
-output_root="${GEM_CONTAINER_OUTPUT_ROOT:-$build_dir/runtime}"
-if [[ "$image" == gem-build:local ]]; then
-    docker build -t "$image" -f "$root/tools/container/Dockerfile" "$root/tools/container"
-elif [[ "$image" == wischner/gcc-x86_64-linux-sdl:* ]]; then
-    docker build -t gem-build:sdl --build-arg "GEM_TOOLCHAIN_IMAGE=$image" \
-        -f "$root/tools/container/Dockerfile.sdl" "$root/tools/container"
-    image=gem-build:sdl
+if [[ $# -gt 0 ]]; then shift; fi
+case "$action" in all|configure|rasta|cef|mupdf|tests|unit|integration|uat|sdk|clean|audit|standards|exec) ;; *) echo 'Unknown build action' >&2; exit 2;; esac
+source "$root/tools/scripts/container-common.sh"
+build_dir="${BUILD_DIR:-${GEM_CONTAINER_BUILD_DIR:-$root/build/container-sdl}}"
+output_root="${GEM_OUTPUT_ROOT:-${GEM_CONTAINER_OUTPUT_ROOT:-$root/bin}}"
+command=(make -f tools/scripts/build.mk "$action"
+    "BUILD_DIR=$build_dir" "GEM_OUTPUT_ROOT=$output_root"
+    "JOBS=${JOBS:-4}" "TEST_JOBS=${TEST_JOBS:-4}"
+    "BUILD_TYPE=${BUILD_TYPE:-RelWithDebInfo}" "CMAKE_FLAGS=${CMAKE_FLAGS:-}")
+if [[ "$action" == exec ]]; then
+    [[ $# -gt 0 ]] || { echo 'exec requires a command' >&2; exit 2; }
+    command=("$@")
+else
+    command+=("$@")
 fi
-docker run --rm --user "$(id -u):$(id -g)" --cap-drop ALL \
+docker run --rm --init --user "$(id -u):$(id -g)" --cap-drop ALL \
     --security-opt no-new-privileges \
+    "${container_env[@]}" \
     --mount "type=bind,source=$root,target=$root" \
-    --workdir "$root" \
-    "$image" make "$action" BUILD_DIR="$build_dir" \
-    "CMAKE_FLAGS=-DGEM_OUTPUT_ROOT=$output_root"
+    --workdir "${GEM_EXEC_WORKDIR:-$root}" \
+    "$image" bash "$root/tools/scripts/container-entry.sh" "${command[@]}"

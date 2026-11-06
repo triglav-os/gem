@@ -2,7 +2,7 @@
  * Checks disk-sector arithmetic and the local SoftFloat boundary-shift
  * patch with values that previously wrapped or invoked undefined behavior.
  *
- * MIT License (see: LICENSE)
+ * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
  */
 #include "fat12/fat12.h"
