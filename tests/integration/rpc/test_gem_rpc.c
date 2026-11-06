@@ -228,6 +228,8 @@ int main(int argc, char **argv)
     window = wind_create(NAME | CLOSER | MOVER, 30, 40, 200, 150);
     assert(window > 0 && wind_set_str(window, WF_NAME, "RPC title"));
     assert(wind_open(window, 30, 40, 200, 150));
+    assert(wind_get(0, WF_TOP, &x, &y, &w, &h));
+    assert(x == window && y > 0 && w == 0 && h == 0);
     assert(wind_get(window, WF_WXYWH, &x, &y, &w, &h));
     assert(x == 30 && y == 40 && w == 200 && h == 150);
     assert(wind_set(window, WF_WXYWH, 40, 50, 210, 160));

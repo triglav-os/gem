@@ -228,6 +228,8 @@ class Session:
             'STOUT_MAX_CYCLES': '0',
             'ASAN_OPTIONS': 'detect_leaks=0:abort_on_error=1',
             'UBSAN_OPTIONS': 'halt_on_error=1:print_stacktrace=1'}
+        if self.duration is not None:
+            overrides['GEMSCAPE_PROFILE'] = str(SESSION/'browser-profile')
         self.env = dict(os.environ, **overrides)
         (SESSION/'session.env').write_text(''.join(f'{key}={value}\n' for key, value in overrides.items()))
         self.publish()

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# VS Code debugger entry point; Python and GDB both run inside Docker.
+# Manual debugger entry point; VS Code uses pipeTransport instead.
 # SPDX-License-Identifier: GPL-2.0-or-later
 set -euo pipefail
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"

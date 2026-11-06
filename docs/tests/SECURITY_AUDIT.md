@@ -4,6 +4,25 @@ Reviewed 2026-09-06. This report distinguishes confirmed fixes, executable
 verification and remaining diagnostics. It does not certify the absence of
 vulnerabilities or complete Atari semantic compatibility.
 
+## Gemscape interaction and profile review (2026-11-06)
+
+- CEF reference ownership is now explicit for browser hosts, frames, command
+  dictionaries, clients and observers. Real scrolling and normal shutdown
+  regressions cover the crashes found during this work.
+- Scroll metrics use browser DevTools results instead of trusting page console
+  text. Site-data removal validates the current HTTP/HTTPS origin, confirms the
+  operation in GEM and waits for CEF's completion result.
+- A profile lock prevents concurrent Gemscape writers; only owned stale
+  Chromium singleton symlinks are removed after acquiring it. Tests isolate
+  profiles and configuration from the interactive runtime.
+- HTTP acceptance checks verify persistence, explicit memory contexts, cookie
+  blocking, session-cookie opt-in and cookie/cache/site-data clearing. Native
+  page dialogs bound their text and treat Escape as cancellation.
+- CEF's existing unsandboxed hosted mode remains a deployment limitation.
+  Docker's writable checkout mount does not isolate hostile web content. No
+  full security certification or new static-analyzer disposition is implied;
+  see [browser limits](../guides/GEMSCAPE.md) and the latest execution report.
+
 ## Docker entry-point update (2026-11-05)
 
 Build/test dispatch now includes nested Makefiles and direct Python tools.

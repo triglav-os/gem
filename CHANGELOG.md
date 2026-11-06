@@ -6,6 +6,22 @@ Unreleased.
 
 ## Unreleased
 
+- Gemscape now has address caret/selection editing, browser input and dropdowns,
+  native website dialogs, history/loading controls, and native scrollbars that
+  follow dynamic page dimensions and zoom.
+- Added Gemscape's General, Privacy and Advanced settings, persistent profiles,
+  cookie controls, memory-only browsing and confirmed cookie/cache/site-data
+  clearing. Profiles and preferences survive `make stop`.
+- Fixed GEM's `WF_TOP` query so focused windows receive keyboard input, and
+  corrected CEF object ownership during scrolling and shutdown.
+
+- Fixed F5 closing Rasta immediately: VS Code now uses its remote pipe
+  transport, so container GDB no longer receives an inaccessible host terminal.
+  The Make startup/shutdown tasks remain in place.
+
+- F5 now uses `make run DEBUG=1` for build/session preparation and `make stop`
+  when debugging ends, sharing the command-line lifecycle while GDB launches gemd.
+
 - Docker sessions now provide account/group names for the invoking UID/GID
   and a writable private home, fixing Terminal's missing-name prompt and
   `groups: cannot find name` startup warning.

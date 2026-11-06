@@ -1,6 +1,6 @@
 # Proposed work
 
-Updated 2026-09-06. These are follow-up proposals, not claims that untested GEM
+Updated 2026-11-06. These are follow-up proposals, not claims that untested GEM
 behavior is implemented. See the [audit](../tests/SECURITY_AUDIT.md) and
 [latest execution report](../tests/LATEST.md) for measured results.
 
@@ -21,11 +21,17 @@ behavior is implemented. See the [audit](../tests/SECURITY_AUDIT.md) and
 - Add native framebuffer/input acceptance on supported hardware. The Linux
   backend can be compiled and analyzed in CI, but dummy SDL tests cannot verify
   framebuffer ioctls, device permissions or physical keyboard mappings.
-- Add focused acceptance for Clock numerals, Gemscape toolbar and Maestro tree
+- Add focused acceptance for Clock numerals and Maestro tree
   resource rendering. Their startup is covered in the combined session; it is
   not exhaustive visual coverage. Clock's proxy path still uses text numerals.
-- Every owned source now sits near the 500-line guidance except the
-  public API headers, whose per-function documentation defines the SDK, and
+- Extend Gemscape beyond its tested embedded-browser controls with native
+  file-picker/download management, per-site permissions, a reviewed CEF sandbox,
+  host clipboard integration and Unicode input. Current profile and privacy
+  behavior is documented in the [browser guide](../guides/GEMSCAPE.md).
+- Most owned sources sit near the 500-line guidance. Split Gemscape's CEF
+  adapter and application event loop into smaller private modules as further
+  browser services are added. Other exceptions include the public API headers,
+  whose per-function documentation defines the SDK, and
   `tests/uat/demo31/main.c`, a deliberately self-contained acceptance demo
   that diverged from the Terminal application. Fold demo31 onto the Terminal
   modules only if its distinct timings become part of a scenario.

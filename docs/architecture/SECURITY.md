@@ -270,6 +270,31 @@ avoids unsigned-underflow disconnects of healthy background applications.
 
 ## September 2026 audit additions
 
+### Gemscape browser profiles and page input (November 2026)
+
+Gemscape keeps a private profile directory and holds an exclusive advisory lock
+through CEF shutdown. It removes only owned Chromium singleton symlinks, and only
+after acquiring that lock, to recover profiles left by killed Docker namespaces.
+Interactive profiles and settings persist under `build/user-data/`; acceptance
+tests override both paths. Cookie/cache/site-data removal uses CEF/DevTools APIs,
+requires a native confirmation and reports asynchronous completion. Memory mode
+uses an explicit incognito request context, not the global disk-backed context.
+
+Page scroll metrics come from the browser's DevTools layout metrics, not from
+page-supplied console messages. Site-data clearing parses the current URL with
+CEF and accepts only HTTP/HTTPS origins. Native page dialogs use bounded text
+objects so website text cannot inject GEM alert syntax. Certificate errors are
+not bypassed by this integration.
+
+CEF currently runs with `no_sandbox`, as in the existing hosted backend. The
+development Docker environment has a writable checkout mount and is not a
+security boundary for hostile web content. This work does not establish a
+hardened browser sandbox, secure password store or per-site permission UI.
+Profiles contain sensitive browsing data; do not publish them with test artifacts.
+See the [browser guide](../guides/GEMSCAPE.md) for supported controls and limits.
+
+### Dependency and disk audit
+
 The build obtains Rasta and CEF over verified TLS from pinned archives with
 checked SHA-256 hashes. Their downloaded and extracted files remain in ignored
 build storage. Default launchers use the downloaded Rasta binary and never kill

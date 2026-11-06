@@ -1,5 +1,6 @@
 add_library(gemctl STATIC
     gemctl.c
+    text_edit.c
 )
 
 set_target_properties(gemctl PROPERTIES POSITION_INDEPENDENT_CODE ON)

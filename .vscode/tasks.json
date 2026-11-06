@@ -22,13 +22,11 @@
         {
             "label": "Start GEM sample session",
             "type": "process",
-            "command": "bash",
+            "command": "make",
             "args": [
-                "${workspaceFolder}/tools/scripts/runtime.sh",
-                "session",
-                "start"
+                "run",
+                "DEBUG=1"
             ],
-            "dependsOn": "Build GEM and samples",
             "options": {
                 "cwd": "${workspaceFolder}"
             },
@@ -42,10 +40,8 @@
         {
             "label": "Stop GEM sample session",
             "type": "process",
-            "command": "bash",
+            "command": "make",
             "args": [
-                "${workspaceFolder}/tools/scripts/runtime.sh",
-                "session",
                 "stop"
             ],
             "options": {

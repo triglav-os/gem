@@ -1,0 +1,51 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: GPL-2.0-or-later
+     Copyright (C) 2026 tomaz stih. -->
+<meta charset="utf-8">
+<title>Browser controls</title>
+<style>
+  html,body { margin:0; background:white; color:black; font:16px sans-serif; }
+  body { width:1200px; height:1600px; }
+  form { position:absolute; left:10px; top:10px; margin:0; }
+  input[type=text] { width:140px; height:25px; }
+  button,select { height:30px; }
+  #check { position:absolute; left:10px; top:60px; width:24px; height:24px; }
+  #choice { position:absolute; left:60px; top:60px; width:130px; }
+  #range { position:absolute; left:10px; top:110px; width:200px; }
+  #popup { position:absolute; left:10px; top:155px; }
+  #store { position:absolute; left:10px; top:195px; }
+  #grow { position:absolute; left:220px; top:195px; }
+  #dialog { position:absolute; left:220px; top:155px; }
+  #read { position:absolute; left:350px; top:195px; }
+  #prompt { position:absolute; left:400px; top:155px; }
+</style>
+<form><input id="entry" type="text" aria-label="Text"><button>Submit</button></form>
+<input id="check" type="checkbox" aria-label="Check">
+<select id="choice" aria-label="Choice"><option>First</option><option>Second</option><option>Third</option></select>
+<input id="range" type="range" aria-label="Range" min="0" max="100" value="0">
+<a id="popup" href="/second" target="_blank">Open link</a>
+<button id="store">Store cookie and data</button>
+<button id="grow">Grow page</button>
+<button id="dialog">Confirm</button>
+<button id="read">Read data</button>
+<button id="prompt">Prompt</button>
+<img src="/pixel" alt="Image preference probe" style="position:absolute;left:700px;top:10px">
+<script>
+  const report = (name, value) => fetch('/event?name=' + name + '&value=' + encodeURIComponent(value));
+  const read = () => report('data', JSON.stringify({cookie:document.cookie, local:localStorage.getItem('probe')}));
+  document.querySelector('form').onsubmit = event => { event.preventDefault(); report('submit', entry.value); };
+  entry.oninput = () => report('input', entry.value);
+  entry.onkeydown = event => report('key', event.key);
+  check.onchange = () => report('check', check.checked);
+  choice.onchange = () => report('choice', choice.value);
+  range.onchange = () => report('range', range.value);
+  store.onclick = () => { document.cookie='probe=kept;max-age=3600;path=/;SameSite=Lax'; document.cookie='session=kept;path=/;SameSite=Lax'; localStorage.setItem('probe','kept'); read(); };
+  document.getElementById('read').onclick = read;
+  grow.onclick = () => { document.body.style.height='2400px'; report('grown', 1); };
+  dialog.onclick = () => report('confirm', confirm('Continue browser test?'));
+  document.getElementById('prompt').onclick = () => report('prompt', prompt('Enter browser test text:', 'default'));
+  addEventListener('scroll', () => report('scroll', JSON.stringify({x:scrollX,y:scrollY,w:innerWidth,h:innerHeight,total:document.documentElement.scrollHeight})));
+  report('loaded', location.pathname + location.search);
+  read();
+  fetch('/cacheable').then(r=>r.text()).then(v=>report('cache',v));
+</script>

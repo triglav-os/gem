@@ -39,86 +39,6 @@ static void gemctl_line(VDI_HANDLE handle, WORD x0, WORD y0, WORD x1, WORD y1)
     v_pline(handle, 2, pxy);
 }
 
-void gemctl_text_edit_init(gemctl_text_edit_t *control, char *text,
-                           size_t capacity)
-{
-    if (control == NULL) {
-        return;
-    }
-    control->text = text;
-    control->capacity = capacity;
-    control->active = 0;
-    control->replace_pending = 0;
-    if (text != NULL && capacity > 0u) {
-        text[capacity - 1u] = '\0';
-    }
-}
-
-void gemctl_text_edit_focus(gemctl_text_edit_t *control, int replace)
-{
-    if (control == NULL || control->text == NULL || control->capacity == 0u) {
-        return;
-    }
-    control->active = 1;
-    control->replace_pending = replace != 0;
-}
-
-void gemctl_text_edit_blur(gemctl_text_edit_t *control)
-{
-    if (control == NULL) {
-        return;
-    }
-    control->active = 0;
-    control->replace_pending = 0;
-}
-
-int gemctl_text_edit_active(const gemctl_text_edit_t *control)
-{
-    return control != NULL && control->active != 0;
-}
-
-gemctl_text_edit_result_t gemctl_text_edit_key(gemctl_text_edit_t *control,
-                                               uint16_t key)
-{
-    unsigned char ascii = (unsigned char)(key & 0xffu);
-    unsigned char scan = (unsigned char)((key >> 8) & 0xffu);
-    size_t length;
-
-    if (!gemctl_text_edit_active(control)) {
-        return GEMCTL_TEXT_EDIT_IGNORED;
-    }
-    if (ascii == 27u) {
-        return GEMCTL_TEXT_EDIT_CANCEL;
-    }
-    if (ascii == '\r' || ascii == '\n' ||
-        (ascii == 0u && (scan == 28u || scan == 40u))) {
-        return GEMCTL_TEXT_EDIT_ACCEPT;
-    }
-    if (ascii == '\b' || (ascii == 0u && (scan == 14u || scan == 42u))) {
-        length = strlen(control->text);
-        if (length > 0u) {
-            control->text[length - 1u] = '\0';
-            control->replace_pending = 0;
-            return GEMCTL_TEXT_EDIT_CHANGED;
-        }
-        return GEMCTL_TEXT_EDIT_IGNORED;
-    }
-    if (ascii < 32u || ascii >= 127u) {
-        return GEMCTL_TEXT_EDIT_IGNORED;
-    }
-    if (control->replace_pending != 0) {
-        control->text[0] = '\0';
-        control->replace_pending = 0;
-    }
-    length = strlen(control->text);
-    if (length + 1u >= control->capacity) {
-        return GEMCTL_TEXT_EDIT_IGNORED;
-    }
-    control->text[length] = (char)ascii;
-    control->text[length + 1u] = '\0';
-    return GEMCTL_TEXT_EDIT_CHANGED;
-}
-
 void gemctl_chrome_layout(const GRECT *work, WORD char_height, WORD box_height,
                           gemctl_chrome_t *chrome)
 {
@@ -240,4 +160,111 @@ void gemctl_toolbar_zoom_icon(VDI_HANDLE handle, const GRECT *slot, int zoom_in)
     if (zoom_in != 0)
         gemctl_line(handle, cx, (WORD)(cy - radius + 2), cx,
                     (WORD)(cy + radius - 2));
+}
+
+static WORD gemctl_character_width(VDI_HANDLE handle, char character)
+{
+    WORD extent[8];
+    char text[2] = {character, '\0'};
+    vqt_extent(handle, text, extent);
+    return (WORD)(extent[2] - extent[0] + 1);
+}
+
+void gemctl_text_edit_click(gemctl_text_edit_t *control, VDI_HANDLE handle,
+                            const GRECT *rect, WORD x, int extend)
+{
+    size_t position, length;
+    WORD current;
+    if (control == NULL || control->text == NULL || rect == NULL)
+        return;
+    length = strlen(control->text);
+    if (control->offset > length)
+        control->offset = length;
+    if (extend && x < rect->g_x + gemctl_text_margin && control->offset > 0)
+        --control->offset;
+    position = control->offset;
+    current = (WORD)(rect->g_x + gemctl_text_margin);
+    while (position < length) {
+        WORD width = gemctl_character_width(handle, control->text[position]);
+        if (x < current + width / 2)
+            break;
+        current = (WORD)(current + width);
+        ++position;
+    }
+    gemctl_text_edit_position(control, position, extend);
+}
+
+void gemctl_text_edit_draw(gemctl_text_edit_t *control, VDI_HANDLE handle,
+                           const GRECT *rect, const GRECT *clip)
+{
+    WORD bounds[4], restore[4], distances[5] = {0};
+    WORD x, width, baseline;
+    size_t length, first, last;
+    if (control == NULL || control->text == NULL || rect == NULL ||
+        clip == NULL || rect->g_w < 2)
+        return;
+    bounds[0] = rect->g_x > clip->g_x ? rect->g_x : clip->g_x;
+    bounds[1] = rect->g_y > clip->g_y ? rect->g_y : clip->g_y;
+    bounds[2] = rect->g_x + rect->g_w < clip->g_x + clip->g_w
+                    ? rect->g_x + rect->g_w - 1
+                    : clip->g_x + clip->g_w - 1;
+    bounds[3] = rect->g_y + rect->g_h < clip->g_y + clip->g_h
+                    ? rect->g_y + rect->g_h - 1
+                    : clip->g_y + clip->g_h - 1;
+    if (bounds[0] > bounds[2] || bounds[1] > bounds[3])
+        return;
+    vs_clip(handle, 1, bounds);
+    length = strlen(control->text);
+    if (!control->active)
+        control->offset = 0;
+    if (control->offset > control->cursor)
+        control->offset = control->cursor;
+    if (control->offset > length)
+        control->offset = length;
+    if (control->active) {
+        width = 0;
+        for (size_t i = control->offset; i < control->cursor && i < length; ++i)
+            width = (WORD)(width +
+                           gemctl_character_width(handle, control->text[i]));
+        while (width >= rect->g_w - 2 * gemctl_text_margin &&
+               control->offset < control->cursor) {
+            width = (WORD)(width - gemctl_character_width(
+                                       handle, control->text[control->offset]));
+            ++control->offset;
+        }
+    }
+    gemctl_fill(handle, rect);
+    vqt_fontinfo(handle, NULL, NULL, distances, NULL, NULL);
+    baseline =
+        (WORD)(rect->g_y + (rect->g_h - (distances[0] + distances[4] + 1)) / 2 +
+               distances[1] + 2);
+    first =
+        control->cursor < control->anchor ? control->cursor : control->anchor;
+    last =
+        control->cursor > control->anchor ? control->cursor : control->anchor;
+    x = (WORD)(rect->g_x + gemctl_text_margin);
+    for (size_t i = control->offset;
+         i <= length && x < rect->g_x + rect->g_w - 2; ++i) {
+        char text[2] = {control->text[i], '\0'};
+        int selected = control->active && i >= first && i < last;
+        if (i == control->cursor && control->active && first == last)
+            gemctl_line(handle, x, rect->g_y + 2, x, rect->g_y + rect->g_h - 3);
+        if (i == length)
+            break;
+        width = gemctl_character_width(handle, text[0]);
+        if (selected) {
+            WORD pxy[4] = {x, (WORD)(rect->g_y + 1), (WORD)(x + width - 1),
+                           (WORD)(rect->g_y + rect->g_h - 2)};
+            vsf_color(handle, WHITE);
+            v_bar(handle, pxy);
+        }
+        vst_color(handle, selected ? BLACK : WHITE);
+        v_gtext(handle, x, baseline, (const BYTE *)text);
+        x = (WORD)(x + width);
+    }
+    restore[0] = clip->g_x;
+    restore[1] = clip->g_y;
+    restore[2] = (WORD)(clip->g_x + clip->g_w - 1);
+    restore[3] = (WORD)(clip->g_y + clip->g_h - 1);
+    vs_clip(handle, 1, restore);
 }

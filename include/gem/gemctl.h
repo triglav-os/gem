@@ -21,6 +21,9 @@ typedef struct gemctl_text_edit {
     size_t capacity;
     uint8_t active;
     uint8_t replace_pending;
+    size_t cursor;
+    size_t anchor;
+    size_t offset;
 } gemctl_text_edit_t;
 
 typedef enum gemctl_text_edit_result {
@@ -42,6 +45,24 @@ int gemctl_text_edit_active(const gemctl_text_edit_t *control);
 /* Applies one GEM key and reports whether text or edit state changed. */
 gemctl_text_edit_result_t gemctl_text_edit_key(gemctl_text_edit_t *control,
                                                uint16_t key);
+
+/* Applies a key with GEM shift/control modifiers, including range selection. */
+gemctl_text_edit_result_t gemctl_text_edit_key_mod(gemctl_text_edit_t *control,
+                                                   uint16_t key,
+                                                   uint16_t modifiers);
+/* Places or extends the caret at a byte position in the ASCII edit buffer. */
+void gemctl_text_edit_position(gemctl_text_edit_t *control, size_t position,
+                               int extend);
+/* Replaces the selection with printable single-line text if it fits entirely.
+ */
+gemctl_text_edit_result_t gemctl_text_edit_insert(gemctl_text_edit_t *control,
+                                                  const char *text);
+/* Maps a pointer position to the visible text and updates its selection. */
+void gemctl_text_edit_click(gemctl_text_edit_t *control, VDI_HANDLE handle,
+                            const GRECT *rect, WORD x, int extend);
+/* Draws clipped text, selection and caret; scrolls long edits into view. */
+void gemctl_text_edit_draw(gemctl_text_edit_t *control, VDI_HANDLE handle,
+                           const GRECT *rect, const GRECT *clip);
 
 typedef struct gemctl_chrome {
     GRECT toolbar;

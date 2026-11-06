@@ -49,6 +49,8 @@ class Session:
                         GEM_RASTA_PORT=str(self.relay.getsockname()[1]),
                         GEM_RASTA_CURSOR='off', GEM_RASTA_SCALE='1',
                         GEMD_SOCKET=str(self.path / 'socket'),
+                        GEMSCAPE_PROFILE=str(self.path / 'browser-profile'),
+                        XDG_CONFIG_HOME=str(self.path / 'config'),
                         GEM_RESOURCE_DIR=str(Path(args.resources).resolve()),
                         ASAN_OPTIONS='detect_leaks=0:abort_on_error=1',
                         UBSAN_OPTIONS='halt_on_error=1:print_stacktrace=1',

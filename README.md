@@ -20,6 +20,7 @@ AGPL-3.0-or-later. It uses MuPDF for PDF, XPS/OpenXPS, EPUB, MOBI, FB2, CBZ and
 CBT documents.
 Per-component settings and persistent Desktop locations use ordinary text
 files described in the [configuration guide](docs/guides/CONFIGURATION.md).
+The [Gemscape guide](docs/guides/GEMSCAPE.md) covers browser controls and profiles.
 
 ## Build
 

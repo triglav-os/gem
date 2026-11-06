@@ -4,6 +4,7 @@ GEM_OUTPUT_ROOT ?= $(if $(GEM_CONTAINER_OUTPUT_ROOT),$(GEM_CONTAINER_OUTPUT_ROOT
 JOBS ?= 4
 TEST_JOBS ?= 4
 BUILD_TYPE ?= RelWithDebInfo
+DEBUG ?= 0
 export BUILD_DIR GEM_OUTPUT_ROOT JOBS TEST_JOBS BUILD_TYPE CMAKE_FLAGS
 TARGETS := all configure rasta cef mupdf tests unit integration uat sdk clean audit standards
 .PHONY: $(TARGETS) container run stop
@@ -13,6 +14,10 @@ $(TARGETS):
 	tools/scripts/container.sh $@
 container: tests
 run: all
+ifeq ($(DEBUG),1)
+	GEM_RUNTIME_ROOT="$(GEM_OUTPUT_ROOT)" bash tools/scripts/runtime.sh session start
+else
 	GEM_RUNTIME_ROOT="$(GEM_OUTPUT_ROOT)" bash tools/scripts/runtime.sh run
+endif
 stop:
 	bash tools/scripts/runtime.sh stop

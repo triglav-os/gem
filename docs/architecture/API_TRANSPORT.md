@@ -34,6 +34,8 @@ The private protocol is version 2 and remains a same-host ABI, with matching
 builds required. Editing state uses session-scoped opaque tree identifiers.
 
 Each extended scalar request holds at most 16384 WORDs of aggregate array data.
+`wind_get(0, WF_TOP)` returns the top window, owning application and next window
+below it, allowing applications with multiple windows to route keyboard input.
 Strings are bounded and terminated before dispatch. Invalid counts and sizes
 are rejected. Mono MFDBs use 4096-byte chunks and connection-owned storage,
 up to 8 MiB per bitmap. Source/destination aliasing and destination downloads

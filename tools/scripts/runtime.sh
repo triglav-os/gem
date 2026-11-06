@@ -23,6 +23,8 @@ fi
 if [[ "$(docker inspect --format '{{.State.Running}}' "$name" 2>/dev/null || true)" != true ]]; then
     docker rm "$name" >/dev/null 2>&1 || true
     source "$root/tools/scripts/container-common.sh"
+    container_env+=(--env "GEMSCAPE_PROFILE=${GEMSCAPE_PROFILE:-$root/build/user-data/gemscape}")
+    container_env+=(--env "XDG_CONFIG_HOME=$root/build/user-data/config")
     display_args=()
     if [[ -n "${DISPLAY:-}" ]]; then
         display_args+=(--env DISPLAY)

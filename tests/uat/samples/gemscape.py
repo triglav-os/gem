@@ -27,7 +27,7 @@ def crop(frame, x, y, w, h):
 
 def field(session, handle, number):
     status, data = session.rpc(33, struct.pack('=hh', handle, number))
-    assert status == 1
+    assert status == 1, f'wind_get({handle}, {number}) returned {status}; browser exit={session.demo.poll()}'
     return struct.unpack('=4h', data)
 
 

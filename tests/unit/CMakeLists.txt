@@ -5,6 +5,7 @@ add_subdirectory(shell)
 add_subdirectory(trash)
 add_subdirectory(terminal)
 add_subdirectory(gemconf)
+add_subdirectory(gemscape)
 add_subdirectory(prg)
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 add_test(NAME test_report COMMAND ${Python3_EXECUTABLE} -B

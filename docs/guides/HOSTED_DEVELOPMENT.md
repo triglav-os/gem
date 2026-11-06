@@ -86,6 +86,9 @@ application-owned BGRA overlays over that shadow. The GEM software cursor is
 composited last so it remains visible over opaque overlays. Gemscape is the
 small browser application available from the desktop;
 Gemread uses the same overlay path for color document pages and thumbnails.
+See the [Gemscape guide](GEMSCAPE.md) for browser settings, persistent profiles
+and current limits. Interactive containers preserve XDG configuration under
+`build/user-data/config/` and Gemscape data under `build/user-data/gemscape/`.
 Gemscape uses Chromium's headless Ozone platform and software rendering for
 its off-screen CEF view; it does not require X, Wayland or GPU access. See the
 [Chromium Ozone platform documentation](https://chromium.googlesource.com/chromium/src/+/main/docs/ozone_overview.md).
@@ -93,16 +96,22 @@ its off-screen CEF view; it does not require X, Wayland or GPU access. See the
 ## VS Code: one F5 session
 
 Select **GEM — Desktop and Terminal** and press F5. This is the only launch
-configuration. Its build task runs `make all`, using the same Wischner Docker
-defaults as the command line in GCC RelWithDebInfo/Rasta mode, starts Rasta,
-then launches gemd under GDB. Once gemd is listening, the supervisor starts the
+configuration. Its prelaunch task runs `make run DEBUG=1`, which builds with
+the same Wischner Docker defaults as the command line in GCC
+RelWithDebInfo/Rasta mode and prepares Rasta for GDB to launch gemd.
+The debug option lets the prelaunch task finish before the debugger starts;
+plain `make run` launches gemd itself and stays attached to the session.
+The post-debug task runs `make stop` to remove the session container.
+Once gemd is listening, the supervisor starts the
 desktop and waits for its first rendered scene before launching the other apps.
 Docker must be available to your VS Code user. F5 build intermediates live in
 `build/container-sdl/`; executables and resources go into `bin/`. The source
 is mounted at its host path so container GDB resolves source locations directly.
 The viewer, supervisor, server, clients and GDB all run in one checkout-specific
-Docker container. The debugger dispatcher connects with `docker exec`; it
+Docker container. VS Code's `pipeTransport` connects through `docker exec`; it
 loads the session environment inside that same PID and network namespace.
+This prevents the local debugger launcher from passing a host `/dev/pts/*`
+terminal to GDB inside Docker. Debuggee output appears in the Debug Console.
 An additional cached image layer provides passwd/group entries matching the
 invoking UID/GID and a private writable `/tmp/gem-home`. Terminal can therefore
 resolve user/group names without mounting host account databases or your home.
@@ -133,8 +142,8 @@ The Stop button terminates the session supervisor, clients and viewer. Closing
 the desktop or Rasta also ends the session. Cleanup checks process identity
 and the owned socket inode; it does not kill unrelated GEM or Rasta sessions.
 
-The supervisor is `tools/scripts/sample_session.py`; `sample-debugger.sh`
-enters Docker and `sample_debugger.py`
+The supervisor is `tools/scripts/sample_session.py`; the pipe transport uses
+`runtime.sh exec` to enter Docker and `sample_debugger.py`
 loads its environment when GDB starts, after the prelaunch task has prepared
 the session. For a headless
 startup, interaction and cleanup check independent of your interactive session:

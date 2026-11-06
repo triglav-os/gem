@@ -14,11 +14,22 @@
 
 #include "gemscape.h"
 #include "cef_browser.h"
+#include "browser_settings.h"
+#include <ctype.h>
+#include <signal.h>
 #include <gem/os.h>
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+static volatile sig_atomic_t gemscape_quit_requested;
+
+static void gemscape_signal(int signal_number)
+{
+    (void)signal_number;
+    gemscape_quit_requested = 1;
+}
 
 enum {
     gemscape_work_width = 560,
@@ -49,7 +60,21 @@ typedef struct gemscape_state {
     WORD last_mouse_y;
     int have_mouse_position;
     int browser_focused;
-    char address_text[512];
+    char address_text[2048];
+    gemscape_preferences_t preferences;
+    gemscape_settings_dialog_t settings;
+    unsigned int browser_revision;
+    int mouse_buttons;
+    int browser_buttons;
+    int address_drag;
+    size_t address_anchor;
+    WORD drag_x;
+    uint32_t last_click_tick;
+    WORD last_click_x;
+    WORD last_click_y;
+    int click_count;
+    int browser_hover;
+    char status_text[256];
     gemctl_text_edit_t address_edit;
 #if defined(GEMSCAPE_OVERLAY) && GEMSCAPE_OVERLAY
     gem_overlay_id_t overlay;
@@ -66,13 +91,6 @@ typedef struct gemscape_state {
 
 static void gemscape_layout(const gemscape_state_t *state, const GRECT *work,
                             GRECT *address, GRECT *content, GRECT *status);
-
-static int gemscape_trace_enabled(void)
-{
-    const char *value = gem_os_getenv_ref("GEMSCAPE_TRACE");
-
-    return value != NULL && value[0] != '\0';
-}
 
 static void gemscape_free_toolbar_icons(gemscape_state_t *state)
 {
@@ -134,24 +152,6 @@ static void gemscape_intersect_rect(const GRECT *a, const GRECT *b, GRECT *out)
     out->g_h = (WORD)(y1 - y0 + 1);
 }
 
-static void gemscape_draw_vline(WORD handle, WORD x, WORD y0, WORD y1)
-{
-    WORD pxy[4];
-
-    if (y1 < y0) {
-        return;
-    }
-
-    (void)vsl_type(handle, 1);
-    (void)vsl_width(handle, 1);
-    vsl_color(handle, gemscape_ink);
-    pxy[0] = x;
-    pxy[1] = y0;
-    pxy[2] = x;
-    pxy[3] = y1;
-    v_pline(handle, 2, pxy);
-}
-
 static void gemscape_draw_toolbar_icon(const gemscape_state_t *state,
                                        WORD slot_x, WORD slot_y, WORD slot_size,
                                        WORD icon_index)
@@ -174,87 +174,50 @@ static void gemscape_draw_toolbar_icon(const gemscape_state_t *state,
     slot.g_y = slot_y;
     slot.g_w = slot_size;
     slot.g_h = slot_size;
+#if defined(GEMSCAPE_CEF) && GEMSCAPE_CEF
+    const gemscape_browser_info_t *info = gemscape_cef_info();
+    if (icon_index == 2 && info->loading) {
+        WORD pxy[4] = {(WORD)(slot_x + 6), (WORD)(slot_y + 6),
+                       (WORD)(slot_x + slot_size - 7),
+                       (WORD)(slot_y + slot_size - 7)};
+        vsl_color(state->vdi_handle, WHITE);
+        vsl_type(state->vdi_handle, 1);
+        vsl_width(state->vdi_handle, 1);
+        v_pline(state->vdi_handle, 2, pxy);
+        WORD swap = pxy[1];
+        pxy[1] = pxy[3];
+        pxy[3] = swap;
+        v_pline(state->vdi_handle, 2, pxy);
+        return;
+    }
+    if ((icon_index == 0 && !info->can_back) ||
+        (icon_index == 1 && !info->can_forward)) {
+        uint8_t pixels[256];
+        size_t size = (size_t)bitblk->bi_wb * (size_t)bitblk->bi_hl;
+        if (size <= sizeof(pixels)) {
+            BITBLK disabled = *bitblk;
+            memcpy(pixels, (const void *)(intptr_t)bitblk->bi_pdata, size);
+            for (size_t i = 0; i < size; ++i)
+                pixels[i] &= (i / (size_t)bitblk->bi_wb) % 2 ? 0x55 : 0xaa;
+            disabled.bi_pdata = (intptr_t)pixels;
+            gemctl_toolbar_bitmap(state->vdi_handle, &disabled, &slot);
+            return;
+        }
+    }
+#endif
     gemctl_toolbar_bitmap(state->vdi_handle, bitblk, &slot);
-}
-
-static void gemscape_draw_text(const gemscape_state_t *state, const GRECT *rect,
-                               const char *text, int centered)
-{
-    WORD distances[5];
-    WORD extent[8];
-    WORD text_height;
-    WORD text_width;
-    WORD ascent;
-    WORD top_y;
-    WORD x;
-    WORD y;
-
-    if (state == NULL || rect == NULL || text == NULL) {
-        return;
-    }
-
-    memset(distances, 0, sizeof(distances));
-    (void)vqt_fontinfo(state->vdi_handle, NULL, NULL, distances, NULL, NULL);
-    (void)vqt_extent(state->vdi_handle, (char *)text, extent);
-    text_height = (WORD)(extent[5] - extent[1] + 1);
-    text_width = (WORD)(extent[2] - extent[0] + 1);
-    ascent = (WORD)(distances[1] + 2);
-
-    if (centered != 0) {
-        x = (WORD)(rect->g_x + (rect->g_w - text_width) / 2);
-    } else {
-        x = (WORD)(rect->g_x + gemscape_margin);
-    }
-    top_y = (WORD)(rect->g_y + (rect->g_h - text_height) / 2);
-    y = (WORD)(top_y + ascent);
-
-    vst_color(state->vdi_handle, gemscape_ink);
-    v_gtext(state->vdi_handle, x, y, (const BYTE *)text);
-}
-
-static void gemscape_draw_address_caret(const gemscape_state_t *state,
-                                        const GRECT *rect)
-{
-    WORD extent[8];
-    WORD x;
-
-    if (state == NULL || rect == NULL ||
-        !gemctl_text_edit_active(&state->address_edit))
-        return;
-    (void)vqt_extent(state->vdi_handle, (char *)state->address_text, extent);
-    x = (WORD)(rect->g_x + gemscape_margin + extent[2] - extent[0] + 1);
-    if (x < rect->g_x + rect->g_w - 2)
-        gemscape_draw_vline(state->vdi_handle, x, rect->g_y + 2,
-                            rect->g_y + rect->g_h - 3);
 }
 
 static void gemscape_draw_content(const gemscape_state_t *state,
                                   const GRECT *rect)
 {
-#ifndef GEMSCAPE_OVERLAY
-    GRECT note;
-
-    if (state == NULL || rect == NULL) {
-        return;
-    }
-
-    gemscape_fill_rect(state->vdi_handle, gemscape_content_paper, rect);
-
-    note = *rect;
-    gemscape_draw_text(state, &note, "Gemscape viewport", 0);
-    note.g_y = (WORD)(note.g_y + rect->g_h / 10);
-    gemscape_draw_text(
-        state, &note, "Address controls and viewport frame under construction.",
-        0);
-#else
     (void)state;
     (void)rect;
-#endif
 }
 
 #if defined(GEMSCAPE_OVERLAY) && GEMSCAPE_OVERLAY
-static void gemscape_update_overlay(gemscape_state_t *state,
-                                    const GRECT *work, const GRECT *content)
+static void gemscape_update_overlay(gemscape_state_t *state, const GRECT *work,
+                                    const GRECT *content)
 {
     size_t bytes;
     uint8_t *pixels;
@@ -262,10 +225,6 @@ static void gemscape_update_overlay(gemscape_state_t *state,
     if (state == NULL || work == NULL || content == NULL || work->g_w <= 0 ||
         work->g_h <= 0 || content->g_w <= 0 || content->g_h <= 0 ||
         state->overlay == 0)
-        return;
-    bytes = (size_t)content->g_w * content->g_h * 4u;
-    pixels = malloc(bytes);
-    if (pixels == NULL)
         return;
 #if defined(GEMSCAPE_CEF) && GEMSCAPE_CEF
     if (state->cef_started != 0) {
@@ -283,38 +242,41 @@ static void gemscape_update_overlay(gemscape_state_t *state,
             frame_size == (uint32_t)content->g_w * content->g_h * 4u) {
             (void)gem_overlay_update(
                 state->overlay, (uint16_t)(content->g_x - work->g_x),
-                (uint16_t)(content->g_y - work->g_y), frame_width,
-                frame_height, frame, (uint16_t)(frame_width * 4u));
+                (uint16_t)(content->g_y - work->g_y), frame_width, frame_height,
+                frame, (uint16_t)(frame_width * 4u));
             received = 1;
         }
-        free(pixels);
         /* CEF paints asynchronously. Keep polling until its first frame and
          * thereafter let navigation/invalidations deliver new frames. */
         state->overlay_upload_pending = received == 0 ? 1 : 0;
         return;
     }
 #endif
+    bytes = (size_t)content->g_w * content->g_h * 4u;
+    pixels = malloc(bytes);
+    if (pixels == NULL)
+        return;
     for (WORD y = 0; y < content->g_h; ++y) {
         for (WORD x = 0; x < content->g_w; ++x) {
             uint8_t *pixel = pixels + ((size_t)y * content->g_w + x) * 4u;
             pixel[0] = (uint8_t)(32u + ((unsigned)x * 160u) /
-                                         (unsigned)(content->g_w > 1
-                                                        ? content->g_w - 1
-                                                        : 1));
+                                           (unsigned)(content->g_w > 1
+                                                          ? content->g_w - 1
+                                                          : 1));
             pixel[1] = (uint8_t)(40u + ((unsigned)y * 160u) /
-                                         (unsigned)(content->g_h > 1
-                                                        ? content->g_h - 1
-                                                        : 1));
-            pixel[2] = (uint8_t)(180u + ((unsigned)(x + y) * 60u) /
-                                         (unsigned)(content->g_w + content->g_h));
+                                           (unsigned)(content->g_h > 1
+                                                          ? content->g_h - 1
+                                                          : 1));
+            pixel[2] =
+                (uint8_t)(180u + ((unsigned)(x + y) * 60u) /
+                                     (unsigned)(content->g_w + content->g_h));
             pixel[3] = 255u;
         }
     }
     (void)gem_overlay_update(
         state->overlay, (uint16_t)(content->g_x - work->g_x),
         (uint16_t)(content->g_y - work->g_y), (uint16_t)content->g_w,
-        (uint16_t)content->g_h, pixels,
-                             (uint16_t)(content->g_w * 4));
+        (uint16_t)content->g_h, pixels, (uint16_t)(content->g_w * 4));
     free(pixels);
     state->overlay_upload_pending = 0;
 }
@@ -418,25 +380,42 @@ static void gemscape_scroll_browser(gemscape_state_t *state, WORD message,
         return;
     (void)gemscape_cef_get_scroll(&x, &y, &viewport_width, &viewport_height,
                                   &content_width, &content_height);
-    x_limit = content_width > viewport_width ? content_width - viewport_width : 0;
-    y_limit = content_height > viewport_height
-                  ? content_height - viewport_height
-                  : 0;
+    x_limit =
+        content_width > viewport_width ? content_width - viewport_width : 0;
+    y_limit =
+        content_height > viewport_height ? content_height - viewport_height : 0;
     if (message == WM_VSLID) {
         y = (int)((LONG)value * y_limit / 1000L);
     } else if (message == WM_HSLID) {
         x = (int)((LONG)value * x_limit / 1000L);
     } else {
         switch (value) {
-            case WA_UPLINE: y -= 40; break;
-            case WA_DNLINE: y += 40; break;
-            case WA_UPPAGE: y -= viewport_height; break;
-            case WA_DNPAGE: y += viewport_height; break;
-            case WA_LFLINE: x -= 40; break;
-            case WA_RTLINE: x += 40; break;
-            case WA_LFPAGE: x -= viewport_width; break;
-            case WA_RTPAGE: x += viewport_width; break;
-            default: break;
+            case WA_UPLINE:
+                y -= 40;
+                break;
+            case WA_DNLINE:
+                y += 40;
+                break;
+            case WA_UPPAGE:
+                y -= viewport_height;
+                break;
+            case WA_DNPAGE:
+                y += viewport_height;
+                break;
+            case WA_LFLINE:
+                x -= 40;
+                break;
+            case WA_RTLINE:
+                x += 40;
+                break;
+            case WA_LFPAGE:
+                x -= viewport_width;
+                break;
+            case WA_RTPAGE:
+                x += viewport_width;
+                break;
+            default:
+                break;
         }
     }
     if (x < 0)
@@ -534,9 +513,9 @@ static void gemscape_draw_frame(gemscape_state_t *state, const GRECT *dirty)
             }
             right_button_left = (WORD)(address.g_x + address.g_w - button_size);
             if (right_button_left > address.g_x) {
-                gemctl_toolbar_separator(
-                    state->vdi_handle, right_button_left, address.g_y,
-                    (WORD)(address.g_y + address.g_h - 1));
+                gemctl_toolbar_separator(state->vdi_handle, right_button_left,
+                                         address.g_y,
+                                         (WORD)(address.g_y + address.g_h - 1));
                 gemscape_draw_toolbar_icon(state, right_button_left,
                                            address.g_y, button_size, 3);
             }
@@ -546,11 +525,10 @@ static void gemscape_draw_frame(gemscape_state_t *state, const GRECT *dirty)
             if (address_text.g_w < 0) {
                 address_text.g_w = 0;
             }
-            gemscape_draw_text(state, &address_text, state->address_text, 0);
-            gemscape_draw_address_caret(state, &address_text);
+            gemctl_text_edit_draw(&state->address_edit, state->vdi_handle,
+                                  &address_text, &clip);
             gemscape_draw_content(state, &content);
-            gemctl_status_draw(state->vdi_handle, &status,
-                               "Ready. Gemscape frame initialized.");
+            gemctl_status_draw(state->vdi_handle, &status, state->status_text);
 
             vs_clip(state->vdi_handle, 0, clip_xy);
         }
@@ -597,9 +575,284 @@ static void gemscape_toggle_full(gemscape_state_t *state)
     }
 }
 
+static void gemscape_address_rect(const GRECT *bar, GRECT *field)
+{
+    *field = *bar;
+    field->g_x = (WORD)(bar->g_x + 3 * bar->g_h);
+    field->g_w = (WORD)(bar->g_w - 4 * bar->g_h);
+}
+
+#if defined(GEMSCAPE_CEF) && GEMSCAPE_CEF
+static void gemscape_sync_browser(gemscape_state_t *state)
+{
+#if defined(GEMSCAPE_CEF) && GEMSCAPE_CEF
+    const gemscape_browser_info_t *info = gemscape_cef_info();
+    char title[300];
+    if (info->revision == state->browser_revision)
+        return;
+    state->browser_revision = info->revision;
+    if (!gemctl_text_edit_active(&state->address_edit) && info->url[0])
+        snprintf(state->address_text, sizeof(state->address_text), "%s",
+                 info->url);
+    snprintf(state->status_text, sizeof(state->status_text), "%s",
+             info->status);
+    snprintf(title, sizeof(title), "Gemscape - %.240s",
+             info->title[0] ? info->title : "Browser");
+    wind_set_str(state->handle, WF_NAME, title);
+    gemscape_draw_frame(state, NULL);
+    if (state->settings.handle > 0 && state->settings.tab == 1) {
+        snprintf(state->settings.message, sizeof(state->settings.message),
+                 "%.120s", info->status);
+        gemscape_settings_draw(&state->settings);
+    }
+#else
+    (void)state;
+#endif
+}
+
+#endif
+
+static void gemscape_settings_action(gemscape_state_t *state, int action)
+{
+#if defined(GEMSCAPE_CEF) && GEMSCAPE_CEF
+    if (action == gemscape_settings_saved) {
+        gemscape_cef_zoom(state->preferences.zoom);
+        snprintf(state->status_text, sizeof(state->status_text),
+                 "Settings saved. Other changes apply next launch.");
+        gemscape_draw_frame(state, NULL);
+    } else if (action >= gemscape_settings_cookies &&
+               action <= gemscape_settings_site) {
+        char *questions[] = {"[2][Clear all browser cookies?|This signs you "
+                             "out of websites.][Cancel|Clear]",
+                             "[2][Clear the HTTP browser cache?][Cancel|Clear]",
+                             "[2][Clear cookies and stored data|for the "
+                             "current website?][Cancel|Clear]"};
+        if (form_alert(1, questions[action - gemscape_settings_cookies]) == 2)
+            gemscape_cef_clear_data(action - gemscape_settings_cookies);
+    }
+#else
+    (void)state;
+    (void)action;
+#endif
+}
+
+static void gemscape_navigate(gemscape_state_t *state)
+{
+    char url[sizeof(state->address_text)];
+    const char *text = state->address_text;
+    size_t length;
+    while (*text == ' ')
+        ++text;
+    length = strlen(text);
+    while (length > 0 && text[length - 1] == ' ')
+        --length;
+    if (length == 0)
+        return;
+    for (size_t i = 0; i < length; ++i) {
+        if ((unsigned char)text[i] <= 32u) {
+            snprintf(state->status_text, sizeof(state->status_text),
+                     "Address contains a space or control character.");
+            return;
+        }
+    }
+    int written;
+    if (strstr(text, "://") != NULL || strncmp(text, "about:", 6) == 0) {
+        if (strncmp(text, "http://", 7) && strncmp(text, "https://", 8) &&
+            strncmp(text, "file://", 7) && strcmp(text, "about:blank")) {
+            snprintf(state->status_text, sizeof(state->status_text),
+                     "Unsupported address scheme.");
+            return;
+        }
+        written = snprintf(url, sizeof(url), "%.*s", (int)length, text);
+    } else
+        written = snprintf(url, sizeof(url), "%s%.*s",
+                           strncmp(text, "localhost", 9) == 0 ||
+                                   strncmp(text, "127.", 4) == 0
+                               ? "http://"
+                               : "https://",
+                           (int)length, text);
+    if (written < 0 || (size_t)written >= sizeof(url))
+        return;
+    snprintf(state->address_text, sizeof(state->address_text), "%s", url);
+    gemctl_text_edit_blur(&state->address_edit);
+    state->browser_focused = 1;
+#if defined(GEMSCAPE_CEF) && GEMSCAPE_CEF
+    if (state->cef_started) {
+        gemscape_cef_load_url(url);
+        gemscape_cef_focus(1);
+    }
+#endif
+}
+
+static gemctl_text_edit_result_t gemscape_address_key(gemscape_state_t *state,
+                                                      WORD key, WORD modifiers)
+{
+#if defined(GEMSCAPE_CEF) && GEMSCAPE_CEF
+    if (modifiers & K_CTRL) {
+        unsigned int scan = (uint16_t)key >> 8;
+        gemctl_text_edit_t *edit = &state->address_edit;
+        if (scan == 6u || scan == 27u) {
+            char text[sizeof(state->address_text)];
+            size_t first =
+                edit->cursor < edit->anchor ? edit->cursor : edit->anchor;
+            size_t last =
+                edit->cursor > edit->anchor ? edit->cursor : edit->anchor;
+            if (last > first && last <= strlen(edit->text)) {
+                memcpy(text, edit->text + first, last - first);
+                text[last - first] = '\0';
+                gemscape_cef_set_clipboard(text);
+                if (scan == 27u)
+                    return gemctl_text_edit_insert(edit, "");
+            }
+            return GEMCTL_TEXT_EDIT_IGNORED;
+        }
+        if (scan == 25u)
+            return gemctl_text_edit_insert(edit, gemscape_cef_clipboard());
+    }
+#endif
+    return gemctl_text_edit_key_mod(&state->address_edit, (uint16_t)key,
+                                    (uint16_t)modifiers);
+}
+
+static void gemscape_resize_browser(gemscape_state_t *state)
+{
+#if defined(GEMSCAPE_OVERLAY) && GEMSCAPE_OVERLAY
+    GRECT work, bar, content, status;
+    wind_get(state->handle, WF_WORKXYWH, &work.g_x, &work.g_y, &work.g_w,
+             &work.g_h);
+    gemscape_layout(state, &work, &bar, &content, &status);
+    if (work.g_w < 1 || work.g_h < 1 || content.g_w < 1 || content.g_h < 1)
+        return;
+    gem_overlay_resize(state->overlay, (uint16_t)work.g_w, (uint16_t)work.g_h);
+#if defined(GEMSCAPE_CEF) && GEMSCAPE_CEF
+    if (state->cef_started)
+        gemscape_cef_resize((uint16_t)content.g_w, (uint16_t)content.g_h);
+#endif
+    state->overlay_resize_tick = gem_os_ticks_ms();
+    state->overlay_upload_pending = 1;
+#else
+    (void)state;
+#endif
+}
+
+static void gemscape_pointer(gemscape_state_t *state, WORD x, WORD y,
+                             WORD buttons, WORD modifiers)
+{
+    GRECT work, bar, content, status, field;
+    int pressed = buttons & ~state->mouse_buttons;
+    int released = state->mouse_buttons & ~buttons;
+    WORD owner = wind_find(x, y);
+    wind_get(state->handle, WF_WORKXYWH, &work.g_x, &work.g_y, &work.g_w,
+             &work.g_h);
+    gemscape_layout(state, &work, &bar, &content, &status);
+    gemscape_address_rect(&bar, &field);
+    int content_hit = owner == state->handle && x >= content.g_x &&
+                      x < content.g_x + content.g_w && y >= content.g_y &&
+                      y < content.g_y + content.g_h;
+    if (pressed & 1) {
+        uint32_t now = gem_os_ticks_ms();
+        if (now - state->last_click_tick < 400 &&
+            abs(x - state->last_click_x) < 5 &&
+            abs(y - state->last_click_y) < 5)
+            state->click_count = state->click_count == 2 ? 1 : 2;
+        else
+            state->click_count = 1;
+        state->last_click_tick = now;
+        state->last_click_x = x;
+        state->last_click_y = y;
+        if (state->settings.handle > 0 && owner == state->settings.handle) {
+            gemscape_settings_action(
+                state, gemscape_settings_click(&state->settings, x, y,
+                                               &state->preferences));
+        } else if (owner == state->handle && y >= bar.g_y &&
+                   y < bar.g_y + bar.g_h) {
+            state->browser_focused = 0;
+#if defined(GEMSCAPE_CEF) && GEMSCAPE_CEF
+            gemscape_cef_focus(0);
+#endif
+            if (x >= bar.g_x + bar.g_w - bar.g_h) {
+                gemctl_text_edit_blur(&state->address_edit);
+                gemscape_settings_open(&state->settings, state->vdi_handle,
+                                       &state->preferences);
+            } else if (x < field.g_x) {
+                int slot = (x - bar.g_x) / bar.g_h;
+                gemctl_text_edit_blur(&state->address_edit);
+#if defined(GEMSCAPE_CEF) && GEMSCAPE_CEF
+                if (slot == 0)
+                    gemscape_cef_back();
+                if (slot == 1)
+                    gemscape_cef_forward();
+                if (slot == 2) {
+                    if (gemscape_cef_info()->loading)
+                        gemscape_cef_cancel_load();
+                    else
+                        gemscape_cef_reload();
+                }
+#else
+                (void)slot;
+#endif
+            } else {
+                gemctl_text_edit_t position = state->address_edit;
+                gemctl_text_edit_click(&position, state->vdi_handle, &field, x,
+                                       0);
+                state->address_anchor = position.cursor;
+                state->drag_x = x;
+                state->address_drag = 1;
+                if (!gemctl_text_edit_active(&state->address_edit) ||
+                    state->click_count == 2)
+                    gemctl_text_edit_focus(&state->address_edit, 1);
+                else
+                    gemctl_text_edit_click(
+                        &state->address_edit, state->vdi_handle, &field, x,
+                        (modifiers & (K_LSHIFT | K_RSHIFT)) != 0);
+            }
+            gemscape_draw_frame(state, NULL);
+        } else if (owner == state->handle) {
+            gemctl_text_edit_blur(&state->address_edit);
+            state->browser_focused = content_hit;
+            gemscape_draw_frame(state, NULL);
+        }
+    }
+    if (state->address_drag && (buttons & 1) && abs(x - state->drag_x) > 3) {
+        state->address_edit.anchor = state->address_anchor;
+        gemctl_text_edit_click(&state->address_edit, state->vdi_handle, &field,
+                               x, 1);
+        gemscape_draw_frame(state, NULL);
+    }
+    if (released & 1)
+        state->address_drag = 0;
+#if defined(GEMSCAPE_CEF) && GEMSCAPE_CEF
+    if (state->cef_started) {
+        for (int button = 1; button <= 2; button *= 2) {
+            if ((pressed & button) && content_hit) {
+                state->browser_buttons |= button;
+                state->browser_focused = 1;
+                gemscape_cef_mouse_click(
+                    x - content.g_x, y - content.g_y, button, 0,
+                    button == 1 ? state->click_count : 1, (uint16_t)modifiers);
+            }
+            if ((released & button) && (state->browser_buttons & button)) {
+                gemscape_cef_mouse_click(
+                    x - content.g_x, y - content.g_y, button, 1,
+                    button == 1 ? state->click_count : 1, (uint16_t)modifiers);
+                state->browser_buttons &= ~button;
+            }
+        }
+        if (content_hit || state->browser_buttons || state->browser_hover) {
+            gemscape_cef_mouse_move(x - content.g_x, y - content.g_y,
+                                    !content_hit && !state->browser_buttons,
+                                    (uint16_t)modifiers);
+            state->browser_hover = content_hit;
+        }
+    }
+#endif
+    state->mouse_buttons = buttons;
+}
+
 int gemscape_main(int argc, char **argv)
 {
     gemscape_state_t state;
+    int exit_status = 0;
     WORD appl_id;
     WORD event_flags;
     WORD mouse_x;
@@ -627,6 +880,9 @@ int gemscape_main(int argc, char **argv)
     }
 #endif
 
+    signal(SIGTERM, gemscape_signal);
+    signal(SIGINT, gemscape_signal);
+
     if (!gem_os_init()) {
         fprintf(stderr, "gem_os_init() failed\n");
         return 1;
@@ -639,13 +895,15 @@ int gemscape_main(int argc, char **argv)
     }
 
     memset(&state, 0, sizeof(state));
+    gemscape_preferences_load(&state.preferences);
+    snprintf(state.status_text, sizeof(state.status_text), "Ready.");
     {
         const char *initial_url = gem_os_getenv_ref("GEMSCAPE_URL");
 
         if (initial_url == NULL || initial_url[0] == '\0')
-            initial_url = "https://www.youtube.com/";
+            initial_url = state.preferences.homepage;
         strncpy(state.address_text, initial_url,
-            sizeof(state.address_text) - 1u);
+                sizeof(state.address_text) - 1u);
     }
     gemctl_text_edit_init(&state.address_edit, state.address_text,
                           sizeof(state.address_text));
@@ -677,6 +935,19 @@ int gemscape_main(int argc, char **argv)
     (void)wind_calc(WC_BORDER, window_kind, 72, 48, gemscape_work_width,
                     gemscape_work_height, &outer_x, &outer_y, &outer_w,
                     &outer_h);
+    {
+        GRECT desktop;
+        wind_get(0, WF_WORKXYWH, &desktop.g_x, &desktop.g_y, &desktop.g_w,
+                 &desktop.g_h);
+        if (outer_x < desktop.g_x)
+            outer_x = desktop.g_x;
+        if (outer_y < desktop.g_y)
+            outer_y = desktop.g_y;
+        if (outer_x + outer_w > desktop.g_x + desktop.g_w)
+            outer_w = (WORD)(desktop.g_x + desktop.g_w - outer_x);
+        if (outer_y + outer_h > desktop.g_y + desktop.g_h)
+            outer_h = (WORD)(desktop.g_y + desktop.g_h - outer_y);
+    }
     state.normal_rect.g_x = outer_x;
     state.normal_rect.g_y = outer_y;
     state.normal_rect.g_w = outer_w;
@@ -689,39 +960,49 @@ int gemscape_main(int argc, char **argv)
         GRECT content;
         GRECT status;
 
-        if (wind_get(state.handle, WF_WORKXYWH, &work.g_x, &work.g_y,
-                     &work.g_w, &work.g_h) != 0) {
+        if (wind_get(state.handle, WF_WORKXYWH, &work.g_x, &work.g_y, &work.g_w,
+                     &work.g_h) != 0) {
             gemscape_layout(&state, &work, &address, &content, &status);
-            state.overlay = gem_overlay_create(state.handle,
-                                               (uint16_t)work.g_w,
+            state.overlay = gem_overlay_create(state.handle, (uint16_t)work.g_w,
                                                (uint16_t)work.g_h);
             state.overlay_upload_pending = 1;
             state.overlay_resize_tick = 0;
 #if defined(GEMSCAPE_CEF) && GEMSCAPE_CEF
             state.cef_started = gemscape_cef_start(
                 argc, argv, (uint16_t)content.g_w, (uint16_t)content.g_h,
-                state.address_text);
+                state.address_text, &state.preferences);
 #endif
         }
     }
 #endif
+#if defined(GEMSCAPE_CEF) && GEMSCAPE_CEF
+    if (!state.cef_started) {
+        form_alert(1, "[1][Browser startup failed.|Profile may already be in "
+                      "use.|See the browser profile log.][OK]");
+        gemscape_quit_requested = 1;
+        exit_status = 1;
+    }
+#endif
     (void)graf_mouse(M_ON, NULL);
 
-    FOREVER
-    {
+    while (!gemscape_quit_requested) {
         event_flags =
             evnt_multi((UWORD)(MU_MESAG | MU_BUTTON | MU_KEYBD | MU_TIMER), 1,
-                       1, 1, 0,
-                       0, 0, 0, 0, 0, 0, 0, 0, 0, msg, 100, 0, &mouse_x,
-                       &mouse_y,
+                       1, (state.mouse_buttons & 1) ? 0 : 1, 0, 0, 0, 0, 0, 0,
+                       0, 0, 0, 0, msg, 20, 0, &mouse_x, &mouse_y,
                        &mouse_buttons, &key_state, &key_code, &button_return);
 
 #if defined(GEMSCAPE_OVERLAY) && GEMSCAPE_OVERLAY
         if ((event_flags & MU_TIMER) != 0 && state.cef_started != 0) {
             gemscape_refresh_overlay(&state);
             gemscape_update_scrollbars(&state);
+            gemscape_sync_browser(&state);
         }
 #endif
+
+        if ((event_flags & MU_MESAG) != 0 && state.settings.handle > 0 &&
+            msg[3] == state.settings.handle)
+            gemscape_settings_message(&state.settings, msg);
 
         if ((event_flags & MU_MESAG) != 0 && msg[3] == state.handle) {
             if (msg[0] == WM_CLOSED) {
@@ -773,6 +1054,7 @@ int gemscape_main(int argc, char **argv)
 #endif
             } else if (msg[0] == WM_FULLED) {
                 gemscape_toggle_full(&state);
+                gemscape_resize_browser(&state);
             } else if (msg[0] == WM_TOPPED) {
                 (void)wind_set(state.handle, WF_TOP, 0, 0, 0, 0);
             } else if (msg[0] == WM_ARROWED || msg[0] == WM_VSLID ||
@@ -792,123 +1074,68 @@ int gemscape_main(int argc, char **argv)
             }
         }
 
-        if ((event_flags & (MU_TIMER | MU_BUTTON)) != 0 &&
-            (state.have_mouse_position == 0 ||
-             state.last_mouse_x != mouse_x || state.last_mouse_y != mouse_y)) {
-            GRECT work;
-            GRECT address;
-            GRECT content;
-            GRECT status;
-
-            state.last_mouse_x = mouse_x;
-            state.last_mouse_y = mouse_y;
-            state.have_mouse_position = 1;
-            if (wind_get(state.handle, WF_WORKXYWH, &work.g_x, &work.g_y,
-                         &work.g_w, &work.g_h) != 0) {
-                gemscape_layout(&state, &work, &address, &content, &status);
-#if defined(GEMSCAPE_CEF) && GEMSCAPE_CEF
-                if (state.cef_started != 0 && mouse_x >= content.g_x &&
-                    mouse_x < content.g_x + content.g_w &&
-                    mouse_y >= content.g_y && mouse_y < content.g_y + content.g_h)
-                    gemscape_cef_mouse_move(mouse_x - content.g_x,
-                                            mouse_y - content.g_y, 0);
-#endif
-            }
-        }
-
-        if ((event_flags & MU_BUTTON) != 0) {
-            GRECT work;
-            GRECT address;
-            GRECT content;
-            GRECT status;
-
-            if (wind_get(state.handle, WF_WORKXYWH, &work.g_x, &work.g_y,
-                         &work.g_w, &work.g_h) != 0) {
-                gemscape_layout(&state, &work, &address, &content, &status);
-                if (gemscape_trace_enabled())
-                    fprintf(stderr, "gemscape: click %d,%d content=%d,%d %dx%d\n",
-                            mouse_x, mouse_y, content.g_x, content.g_y,
-                            content.g_w, content.g_h);
-                if (mouse_x >= address.g_x && mouse_x < address.g_x + address.g_w &&
-                    mouse_y >= address.g_y && mouse_y < address.g_y + address.g_h) {
-                    WORD button_size = address.g_h;
-                    WORD slot = (WORD)((mouse_x - address.g_x) / button_size);
-                    state.browser_focused = 0;
-#if defined(GEMSCAPE_CEF) && GEMSCAPE_CEF
-                    if (state.cef_started != 0)
-                        gemscape_cef_focus(0);
-#endif
-                    if (slot == 0) {
-#if defined(GEMSCAPE_CEF) && GEMSCAPE_CEF
-                        gemscape_cef_back();
-#endif
-                    } else if (slot == 1) {
-#if defined(GEMSCAPE_CEF) && GEMSCAPE_CEF
-                        gemscape_cef_forward();
-#endif
-                    } else if (slot == 2) {
-#if defined(GEMSCAPE_CEF) && GEMSCAPE_CEF
-                        gemscape_cef_reload();
-#endif
-                    } else {
-                        gemctl_text_edit_focus(&state.address_edit, 1);
-                    }
-                    gemscape_draw_frame(&state, NULL);
-                } else {
-                    int content_hit =
-                        mouse_x >= content.g_x &&
-                        mouse_x < content.g_x + content.g_w &&
-                        mouse_y >= content.g_y &&
-                        mouse_y < content.g_y + content.g_h;
-
-                    gemctl_text_edit_blur(&state.address_edit);
-                    state.browser_focused = content_hit;
-#if defined(GEMSCAPE_CEF) && GEMSCAPE_CEF
-                    if (state.cef_started != 0) {
-                        gemscape_cef_focus(content_hit);
-                    }
-                    if (state.cef_started != 0 && content_hit != 0) {
-                        gemscape_cef_mouse_click(
-                            mouse_x - content.g_x, mouse_y - content.g_y,
-                            1, 0);
-                        gemscape_cef_mouse_click(
-                            mouse_x - content.g_x, mouse_y - content.g_y,
-                            1, 1);
-                    }
-#endif
-                }
-            }
-        }
+        if ((event_flags & (MU_TIMER | MU_BUTTON)) != 0)
+            gemscape_pointer(&state, mouse_x, mouse_y, mouse_buttons,
+                             key_state);
 
         if ((event_flags & MU_KEYBD) != 0) {
-            if (gemctl_text_edit_active(&state.address_edit)) {
-                gemctl_text_edit_result_t result = gemctl_text_edit_key(
-                    &state.address_edit, (uint16_t)key_code);
-
-                if (result == GEMCTL_TEXT_EDIT_CHANGED) {
-                    gemscape_draw_frame(&state, NULL);
-                } else if (result == GEMCTL_TEXT_EDIT_ACCEPT) {
-                    gemctl_text_edit_blur(&state.address_edit);
+            WORD top = 0, unused = 0;
+            wind_get(0, WF_TOP, &top, &unused, &unused, &unused);
+            if (state.settings.handle > 0 && top == state.settings.handle) {
+                gemscape_settings_action(
+                    &state,
+                    gemscape_settings_key(&state.settings, key_code, key_state,
+                                          &state.preferences));
+            } else if (top == state.handle) {
+                if ((key_state & K_CTRL) &&
+                    ((key_code >> 8) == 15 || (key_code & 255) == 12)) {
+                    state.browser_focused = 0;
 #if defined(GEMSCAPE_CEF) && GEMSCAPE_CEF
-                    if (state.cef_started != 0)
-                        gemscape_cef_load_url(state.address_text);
+                    gemscape_cef_focus(0);
 #endif
+                    gemctl_text_edit_focus(&state.address_edit, 1);
                     gemscape_draw_frame(&state, NULL);
-                } else if (result == GEMCTL_TEXT_EDIT_CANCEL) {
-                    gemctl_text_edit_blur(&state.address_edit);
+                } else if (gemctl_text_edit_active(&state.address_edit)) {
+                    gemctl_text_edit_result_t result =
+                        gemscape_address_key(&state, key_code, key_state);
+                    if (result == GEMCTL_TEXT_EDIT_ACCEPT) {
+                        gemscape_navigate(&state);
+                    } else if (result == GEMCTL_TEXT_EDIT_CANCEL) {
+                        gemctl_text_edit_blur(&state.address_edit);
+                        state.browser_focused = 1;
+#if defined(GEMSCAPE_CEF) && GEMSCAPE_CEF
+                        gemscape_cef_focus(1);
+                        snprintf(state.address_text, sizeof(state.address_text),
+                                 "%s", gemscape_cef_info()->url);
+#endif
+                    }
                     gemscape_draw_frame(&state, NULL);
+#if defined(GEMSCAPE_CEF) && GEMSCAPE_CEF
+                } else if (state.cef_started) {
+                    if ((key_code & 255) == 27) {
+                        gemscape_cef_cancel_load();
+                        if (state.browser_focused)
+                            gemscape_cef_key((uint16_t)key_code,
+                                             (uint16_t)key_state);
+                    } else if ((key_code >> 8) == 62 ||
+                               ((key_state & K_CTRL) && (key_code >> 8) == 21))
+                        gemscape_cef_reload();
+                    else if ((key_state & K_ALT) && (key_code >> 8) == 80)
+                        gemscape_cef_back();
+                    else if ((key_state & K_ALT) && (key_code >> 8) == 79)
+                        gemscape_cef_forward();
+                    else if ((key_state & K_ALT) && (key_code >> 8) == 74)
+                        gemscape_cef_load_url(state.preferences.homepage);
+                    else if (state.browser_focused)
+                        gemscape_cef_key((uint16_t)key_code,
+                                         (uint16_t)key_state);
+#endif
                 }
-#if defined(GEMSCAPE_CEF) && GEMSCAPE_CEF
-            } else if (state.browser_focused != 0 &&
-                       state.cef_started != 0) {
-                gemscape_cef_key((uint16_t)key_code, (uint16_t)key_state);
-#endif
-            } else if ((key_code & 0x00ff) == 27) {
-                break;
             }
         }
     }
 
+    gemscape_settings_close(&state.settings);
     if (state.handle > 0) {
         (void)wind_close(state.handle);
         (void)wind_delete(state.handle);
@@ -924,5 +1151,5 @@ int gemscape_main(int argc, char **argv)
     gemscape_free_toolbar_icons(&state);
     appl_exit();
     gem_os_shutdown();
-    return 0;
+    return exit_status;
 }

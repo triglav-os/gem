@@ -5,6 +5,11 @@ so global settings can live in `gem.cfg`, Desktop settings in `desktop.cfg`,
 Clock settings in `clock.cfg`, and another application can choose its own
 component name without sharing a parser or schema.
 
+Gemscape's `gemscape.cfg` stores its home page, zoom, privacy and CEF preferences;
+see the [browser guide](GEMSCAPE.md) for the schema and restart behavior.
+Interactive Docker sessions persist XDG configuration under
+`build/user-data/config/` rather than the disposable container home.
+
 ## Standard locations
 
 System files are read from each absolute directory in `XDG_CONFIG_DIRS`, or

@@ -158,6 +158,14 @@ if(TARGET gemscape)
     set_tests_properties(uat_gemscape_proxy PROPERTIES
         ENVIRONMENT "RASTA_BIN=${GEM_TOOLS_DIR}/rasta"
         LABELS "uat;proxy" TIMEOUT 75)
+    add_test(NAME uat_gemscape_browser
+        COMMAND ${Python3_EXECUTABLE} -B
+            ${CMAKE_CURRENT_SOURCE_DIR}/samples/gemscape_browser.py
+            --binary $<TARGET_FILE:gemscape> --gemd $<TARGET_FILE:gemd>
+            --artifacts ${CMAKE_BINARY_DIR}/uat --resources ${GEM_RESOURCES_DIR})
+    set_tests_properties(uat_gemscape_browser PROPERTIES
+        ENVIRONMENT "RASTA_BIN=${GEM_TOOLS_DIR}/rasta"
+        LABELS "uat;proxy" TIMEOUT 240)
 endif()
 
 # Desktop icons and file manager navigation through the shipped binaries.

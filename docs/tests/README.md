@@ -75,6 +75,29 @@ with a fresh post-I/O timestamp.
 
 ## Security and build verification
 
+The optional IDE-level check uses the installed VS Code C++ debug adapter on
+the host, as F5 does; all GEM programs and GDB run in Docker. Close an existing
+session with `make stop`, then run:
+
+```sh
+python3 -B tests/integration/session/debug_adapter.py \
+    --adapter /path/to/ms-vscode.cpptools/debugAdapters/bin/OpenDebugAD7
+```
+
+It reads the checked-in launch/tasks configuration, hits and continues a
+breakpoint at `main`, keeps Desktop and Terminal ready for ten seconds, then
+checks that the post-debug Make task removes the container. Its evidence lives
+in `build/f5-adapter/`. This check is separate from CTest because the IDE adapter
+is installed on the host. A direct GDB batch check does not cover VS Code's
+terminal allocation: the previous local launch passed `/dev/pts/0` into Docker,
+and GDB failed with `During startup program exited with code 1`.
+
+Gemscape's deterministic HTTP acceptance records DOM events,
+screenshots and restart evidence in `uat/gemscape_browser/`; each run uses its
+own profile and configuration. `test_browser_preferences` covers selection and
+bounded paste behavior plus preference validation. See the
+[UAT catalog](UAT.md) for the browser scenarios.
+
 `security_disk` extracts generated hostile FAT/MSA fixtures through the real
 MSA sample. `security_guest` runs malformed VDI traps through Stout/Musashi and
 executes GEMDOS, BIOS and XBIOS calls through their real 68000 trap vectors. It

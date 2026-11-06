@@ -144,6 +144,20 @@ visible GEM pointer at its new position and erase it from the old one. The test
 closes Gemscape normally and rejects sanitizer,
 undefined-behavior and stack-smashing diagnostics.
 
+`uat_gemscape_browser` runs a loopback HTTP server with deterministic pages.
+It observes actual form submissions, checkboxes, dropdowns, pointer dragging,
+website confirmation/prompt replies, history and reload, address clicks and drag
+selection, and plain-text clipboard transfer. It compares GEM scrollbar positions
+with page-reported CSS coordinates at both endpoints and after dynamic growth.
+Settings checks cover all three tabs, Save and Cancel, zoom and frame rate.
+Fresh browser processes verify persistent cookies/local storage, session-cookie
+opt-in, memory-only profiles, blocked cookies, and confirmed cookie/cache/site-data
+clearing. The site-data case seeds two distinct HTTP origins and verifies that
+clearing one preserves the other's cookies and local storage. A framebuffer
+assertion requires native website dialog text to remain visible above CEF.
+Profiles, config, event logs and screenshots stay under
+`<build-dir>/uat/gemscape_browser/`, independent of interactive data.
+
 ## Reference maintenance
 
 Ordinary tests never create or update references. To intentionally regenerate

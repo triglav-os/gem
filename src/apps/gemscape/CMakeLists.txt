@@ -51,7 +51,7 @@ set_target_properties(gemscape_cef_runtime PROPERTIES
     INTERFACE_INCLUDE_DIRECTORIES ${GEMSCAPE_CEF_ROOT})
 add_dependencies(gemscape_cef_runtime gemscape_cef)
 
-add_executable(gemscape gemscape.c gemscape_ui.c)
+add_executable(gemscape gemscape.c gemscape_ui.c browser_settings.c preferences.c)
 target_compile_definitions(gemscape PRIVATE GEMSCAPE_OVERLAY=1)
 target_sources(gemscape PRIVATE cef_browser.c)
 target_compile_definitions(gemscape PRIVATE GEMSCAPE_CEF=1
@@ -74,7 +74,7 @@ target_include_directories(gemscape
         ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
-target_link_libraries(gemscape PRIVATE gem gemctl)
+target_link_libraries(gemscape PRIVATE gem gemctl gemconf m)
 
 set_target_properties(gemscape PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${GEM_APPS_DIR}
@@ -110,9 +110,9 @@ target_link_options(gemscape PRIVATE -fno-sanitize=address,undefined
     $<$<CONFIG:Debug>:-Wl,--no-as-needed;-lasan;-lubsan>)
 
 # The direct variant remains available for isolated display sessions.
-add_executable(gemscape_hosted gemscape.c gemscape_ui.c)
+add_executable(gemscape_hosted gemscape.c gemscape_ui.c browser_settings.c preferences.c)
 target_compile_definitions(gemscape_hosted PRIVATE GEMSCAPE_OVERLAY=0)
-target_link_libraries(gemscape_hosted PRIVATE aes vdi gemctl)
+target_link_libraries(gemscape_hosted PRIVATE aes vdi gemctl gemconf)
 target_include_directories(gemscape_hosted PRIVATE
     ${PROJECT_SOURCE_DIR}/samples/include
     ${CMAKE_CURRENT_SOURCE_DIR})

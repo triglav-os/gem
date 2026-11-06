@@ -116,6 +116,26 @@ WORD wind_get(WORD handle, WORD field, WORD *w1, WORD *w2, WORD *w3, WORD *w4)
     const GRECT *rect;
     GRECT rect_value;
 
+    if (field == WF_TOP) {
+        aes_window_t *top = aes_find_top_window();
+        aes_window_t *below = NULL;
+        for (size_t i = 0; top != NULL && i < AES_MAX_WINDOWS; ++i) {
+            aes_window_t *candidate = &aes_state.windows[i];
+            if (candidate->used && candidate->open && candidate != top &&
+                (below == NULL || candidate->z_order > below->z_order))
+                below = candidate;
+        }
+        if (w1 != NULL)
+            *w1 = top != NULL ? top->handle : 0;
+        if (w2 != NULL)
+            *w2 = top != NULL ? top->owner : 0;
+        if (w3 != NULL)
+            *w3 = below != NULL ? below->handle : 0;
+        if (w4 != NULL)
+            *w4 = 0;
+        return 1;
+    }
+
     if (handle == 0) {
         WORD menu_height;
 
