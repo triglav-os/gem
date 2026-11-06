@@ -8,7 +8,8 @@ Unreleased.
 
 - File Manager context menus retain all four borders. Naming prompts, alerts,
   browser/reader settings and website dialogs use titled movable windows,
-  parent-relative placement and the classic `11010` enclosure.
+  parent-relative placement and standard window borders. Classic untitled forms
+  retain their double enclosure; titled dialogs have no additional inner frame.
 - Animated browser overlays respect dialog coverage and window shadows;
   moving settings preserves its contents while the page continues repainting.
 - PDF and supported document extensions default to Gemread; `.text`, `.txt`,

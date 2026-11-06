@@ -173,8 +173,8 @@ python3 -B tests/uat/record.py 21 26
 ```
 
 The November 2026 dialog review updates demos 24, 27 and 33 for the `11010`
-enclosure, demo 32 for titled parent-centered alerts, and demo 34 for the
-file chooser enclosure.
+enclosure on untitled forms. Titled alerts in demos 32/33 and the file chooser
+in demo 34 use only standard window borders.
 
 Inspect the PBMs in `tests/data/uat/` and compare them with the demo's source and
 catalog requirements before retaining them. Run `make tests` afterwards: proxy
@@ -289,8 +289,9 @@ framebuffer/input acceptance still requires hardware.
 
 ## Dialog, document and editor regressions
 
-File-command scenarios assert the context menu's top/left enclosure, the `11010`
-modal frame, parent-relative placement, title dragging and successful submission
+File-command scenarios assert the context menu's top/left enclosure, standard
+modal window borders without an extra inner frame, parent-relative placement,
+title dragging and successful submission
 from the moved prompt. Desktop cases check the Terminal shortcut and quoted,
 case-insensitive PDF/Ted file associations. Gemread verifies the visible menu
 icon and Ctrl+G page navigation through a movable prompt. The browser control

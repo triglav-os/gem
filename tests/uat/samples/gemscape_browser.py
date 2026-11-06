@@ -17,6 +17,7 @@ import shutil
 import threading
 from urllib.parse import parse_qs, urlsplit
 from gemscape import Session, crop, field, type_text
+from dialog_checks import check_standard_border
 
 
 class BrowserSession(Session):
@@ -248,7 +249,7 @@ def controls(session, base):
     assert abs(2*outer[1]+outer[3] - (2*parent[1]+parent[3])) <= 1
     before = session.frame('settings_animation_before')
     expected = crop(before, x, y, 520, 250)
-    assert list(crop(before, x+50, y, 1, 5)) == [1, 1, 0, 1, 0], 'Dialog frame is not 11010'
+    check_standard_border(before, (x, y, 520, 250), outer)
     sx, sy = outer[0]+100, outer[1]+10
     session.event(3, sx, sy)
     session.event(10, sx, sy)

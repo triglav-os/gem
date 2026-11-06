@@ -8,7 +8,6 @@
  */
 
 #include "fsel_private.h"
-#include "window_internal.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -323,7 +322,6 @@ void aes_fsel_draw(const aes_fsel_state_t *state, const GRECT *dirty)
             aes_fsel_draw_locations(state);
             aes_fsel_draw_files(state);
             aes_fsel_draw_actions(state);
-            aes_draw_dialog_frame(fill);
             vs_clip(aes_state.vdi_handle, 0, clip);
         }
         wind_get(state->handle, WF_NEXTXYWH, &visible.g_x, &visible.g_y,

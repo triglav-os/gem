@@ -299,7 +299,8 @@ and the complete acceptance suite. Latest per-test outcomes remain in
 ## Titled modal dialogs and bounded text editing
 
 The modal RPC regression now inspects the live alert work rectangle and checks
-all four `11010` enclosure edges while a separate client remains responsive.
+all four standard window borders and blank inner padding while a separate
+client remains responsive.
 Alerts are real movable windows; parent placement and title dragging are also
 covered by the File Manager and Gemread acceptance cases. Browser acceptance
 keeps a canvas repainting beneath moved settings and compares the dialog pixels.

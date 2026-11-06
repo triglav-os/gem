@@ -95,7 +95,8 @@ WORD gemctl_dialog_open(WORD parent, const char *title, WORD width, WORD height,
 /* Apply dialog move/top messages and refresh work; return -1 for
  * close/termination. */
 int gemctl_dialog_message(WORD handle, const WORD *message, GRECT *work);
-/* Draw the classic 11010 enclosure inside the current VDI clip. */
+/* Draw a classic enclosure for untitled forms inside the current VDI clip.
+ * Titled dialogs use their window border and do not call this helper. */
 void gemctl_dialog_frame(VDI_HANDLE vdi, const GRECT *work);
 /* Draw visible dialog regions, optionally including one single-line editor. */
 void gemctl_dialog_draw(WORD handle, VDI_HANDLE vdi, OBJECT *tree,

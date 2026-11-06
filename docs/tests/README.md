@@ -20,7 +20,8 @@ checks exact contents, strips/dependency closure, removes stale files and
 launches relocated installed applications without checkout resource overrides.
 `uat_ted_proxy` edits and saves real text; the document unit test checks bounded
 replacement and undo. Dialog cases verify centered, movable windows and the
-classic enclosure, including browser settings over animation.
+standard border without an extra inner enclosure, including browser settings
+over animation.
 `test_sdk_layout` exports a clean SDK and builds independent samples after
 relocation; see [Linux paths](../guides/LINUX_PATHS.md).
 CTest still runs independent tests in parallel inside each invocation; select

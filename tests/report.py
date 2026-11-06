@@ -83,7 +83,7 @@ def main():
              'file manager, navigate into a fixture directory and back, and close it. '
              'They check the global Locations command and directory chooser, compact '
              'Desk menus, File Open and PDF/Ted associations. File command scenarios check popup borders, '
-             'centered movable dialogs, classic enclosures, right-click menus, '
+             'centered movable dialogs, standard window borders without extra inner frames, right-click menus, '
              'creation templates, rename, clipboard transfers and Trash metadata. Ted checks real-file '
              'editing, selection, copy/paste, undo, save and cancellation of an unsaved close. Separate '
              'Gemread scenarios verify its shared toolbar/status chrome, color BGRA '

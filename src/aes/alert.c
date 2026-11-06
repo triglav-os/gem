@@ -242,7 +242,7 @@ static void aes_alert_draw_text(WORD x, WORD y, const char *text)
     v_gtext(aes_state.vdi_handle, x, y, (CONST BYTE *)text);
 }
 
-static void aes_alert_draw_frame(const GRECT *rect)
+static void aes_alert_draw_frame(const GRECT *rect, int classic_frame)
 {
     WORD fill[4];
     WORD border[10];
@@ -258,7 +258,11 @@ static void aes_alert_draw_frame(const GRECT *rect)
     vsf_color(aes_state.vdi_handle, BLACK);
     vr_recfl(aes_state.vdi_handle, fill);
 
-    /* Classic 11010 enclosure, from the outside inward. */
+    /* Titled windows already supply their standard enclosure. */
+    if (!classic_frame)
+        return;
+
+    /* Classic 11010 enclosure for the windowless fallback. */
     for (WORD inset = 0; inset < 5; ++inset) {
         WORD left = (WORD)(fill[0] + inset);
         WORD top = (WORD)(fill[1] + inset);
@@ -459,7 +463,7 @@ static void aes_draw_alert(const aes_alert_t *alert)
     vs_clip(aes_state.vdi_handle, 1, clip);
     (void)vswr_mode(aes_state.vdi_handle, MD_REPLACE);
 
-    aes_alert_draw_frame(&alert->outer);
+    aes_alert_draw_frame(&alert->outer, alert->window <= 0);
     text_x = (WORD)(alert->outer.g_x + 12);
     if (aes_alert_icon_asset(alert->icon) != NULL) {
         aes_alert_draw_icon(aes_alert_icon_asset(alert->icon), text_x,

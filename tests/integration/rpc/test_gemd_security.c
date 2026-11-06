@@ -424,12 +424,19 @@ static void alert_frame(const unsigned char *before, int healthy)
     right = left + reply.w3 - 1;
     bottom = top + reply.w4 - 1;
     for (int inset = 0; inset < 5; ++inset) {
-        int ink = inset != 2 && inset != 4;
+        int ink = 0; /* Work-area padding has no additional enclosure. */
         assert(frame_pixel(after, left + 20, top + inset) == ink);
         assert(frame_pixel(after, left + 20, bottom - inset) == ink);
         assert(frame_pixel(after, left + inset, top + 20) == ink);
         assert(frame_pixel(after, right - inset, top + 20) == ink);
     }
+    assert(frame_pixel(after, left + 20, top - 1));
+    get.field = WF_WXYWH;
+    send_request(healthy, GEM_RPC_WIND_GET, &get, sizeof(get));
+    assert(receive_reply(healthy, &reply, sizeof(reply)) == 1);
+    assert(frame_pixel(after, left + 20, reply.w2 + reply.w4 - 1));
+    assert(frame_pixel(after, reply.w1, top + 20));
+    assert(frame_pixel(after, reply.w1 + reply.w3 - 1, top + 20));
 }
 
 static void modal_waits(int healthy)

@@ -104,7 +104,9 @@ selectors remain shared, globally input-modal panels. They now use movable
 titled windows centered over the current application's top window, or the
 desktop when there is no parent. `form_center()` uses the same parent selection.
 Application prompts and settings use the shared `libgemctl` dialog helpers;
-these own their event loops and clip drawing to visible work rectangles. The custom form
+these own their event loops and clip drawing to visible work rectangles.
+Titled dialogs use the standard window border only. Double enclosures are
+reserved for classic untitled forms and the windowless alert fallback. The custom form
 is a z-ordered redraw layer: gemd keeps its decoded tree alive for the blocking
 `form_do`, clips both it and ordinary window drawing against higher layers, and
 repaints its visible fragments when covering windows move or close.

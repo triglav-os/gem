@@ -116,5 +116,5 @@ The separate `gemscape_hosted` sample provides the GEM frame without CEF.
 
 Settings and website messages are titled, movable modal windows. They initially
 center on their parent (clamped to the display when necessary) and use the
-classic double enclosure. Page animation continues behind settings; the overlay
+standard window border without an additional inner enclosure. Page animation continues behind settings; the overlay
 excludes the dialog and its shadow during repainting and after movement.

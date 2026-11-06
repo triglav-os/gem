@@ -1,6 +1,7 @@
 /*
- * Shared titled dialogs, parent-relative placement and clipped classic frames.
- * Blocking prompts keep edits private until accepted and handle window moves.
+ * Shared titled dialogs with parent-relative placement and standard window
+ * chrome. Blocking prompts keep edits private until accepted and handle window
+ * moves.
  *
  * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
@@ -83,7 +84,6 @@ void gemctl_dialog_draw(WORD handle, VDI_HANDLE vdi, OBJECT *tree,
         WORD bounds[4] = {clip.g_x, clip.g_y, clip.g_x + clip.g_w - 1,
                           clip.g_y + clip.g_h - 1};
         vs_clip(vdi, 1, bounds);
-        gemctl_dialog_frame(vdi, &work);
         if (edit && edit_object > 0) {
             OBJECT *o = &tree[edit_object];
             GRECT field = {work.g_x + o->ob_x + 1, work.g_y + o->ob_y + 1,
