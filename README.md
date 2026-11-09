@@ -49,8 +49,9 @@ make run
 ```
 
 Alternatively, press F5 with **GEM — Desktop** in VS Code to
-start Desktop under the Docker debugger. Open Terminal, Files or Gemscape
-from their desktop icons. Use `make stop`
+start Desktop under the Docker debugger. Desktop starts empty apart from
+Trash; set `show_launchers = true` under `[desktop]` in `desktop.cfg` for
+Terminal, Files and Gemscape icons. Use `make stop`
 to remove this checkout's interactive container. See the
 [hosted development guide](docs/guides/HOSTED_DEVELOPMENT.md) for setup and the
 [samples guide](docs/guides/SAMPLES.md) for SDK builds.

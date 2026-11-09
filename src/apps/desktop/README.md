@@ -102,8 +102,9 @@ items before editing them. Nested Trash browsing is read-only, with Copy enabled
 Successful moves out remove their `.trashinfo` records. Permanent deletion and
 emptying keep Cancel as the default choice.
 
-The desktop also supplies Files (File Manager), Gemscape and Terminal launch
-icons. File Manager opens the launch working directory and uses the folder
+By default the desktop shows only Trash and any configured locations. With
+`[desktop] show_launchers = true` in `desktop.cfg` it also supplies Files
+(File Manager), Gemscape and Terminal launch icons. File Manager opens the launch working directory and uses the folder
 icon. Gemscape and Terminal use the AES shell launcher and its normal executable
 search path.
 

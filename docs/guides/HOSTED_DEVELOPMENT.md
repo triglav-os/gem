@@ -125,7 +125,8 @@ The supervisor waits for a complete post-Desktop RPC round trip before it
 reports readiness or launches additional applications in the full test session.
 
 The interactive session initially runs only Desktop as a libgem client on one
-display. Terminal starts from its desktop icon. The full integration check
+display. Terminal starts from its desktop icon when `[desktop] show_launchers
+= true` is set in `desktop.cfg`. The full integration check
 explicitly launches every bundled application plus Maestro; those applications are not part of normal
 F5 startup. The direct `*_hosted` alternatives and numbered UAT demos are
 separate test configurations.

@@ -65,6 +65,9 @@ same file locally. gemd watches the atomically replaced user `desktop.cfg` and
 reloads it within 100 ms, so a save made through `libgemconf` also refreshes a
 running proxy Desktop.
 
+A new Desktop is empty apart from Trash. `[desktop] show_launchers = true`
+adds the Files, Gemscape and Terminal launcher icons; it defaults to `false`.
+
 `[desktop] show_hidden` defaults to `false`. It controls every Desktop-owned
 file list: Linux File Manager windows, mounted Atari-image windows, Trash and
 the Add Location selector. The default omits dot-prefixed/OS-hidden host

@@ -79,6 +79,11 @@ def toggle_icon_view(session, capture=None):
 
 
 def check(session, fixture, folder, open_folder, blocked_folder, xdg):
+    # Launchers are off by default: below Workspace the column must match
+    # bare desktop background two icon columns further right.
+    desktop = session.frame('desktop_default')
+    assert crop(desktop, 16, 100, 72, 220) == crop(desktop, 160, 100, 72, 220), \
+        'Default Desktop shows launcher icons'
     double_click(session, 52, 54)  # Configured Workspace location.
 
     # A stationary double-click in icon view must open rather than drag.

@@ -6,6 +6,10 @@ Unreleased.
 
 ## Unreleased
 
+- Desktop starts empty apart from Trash. The Files, Gemscape and Terminal
+  launchers appear only with `[desktop] show_launchers = true` in
+  `desktop.cfg`.
+
 - Desktop launchers show a program's own icon when an icon-only
   `<program>.rsc` (made by `resgen icons` from 32x32 monochrome artwork) sits
   beside it. Gemscape, Terminal, Clock, Calculator, Gemread and Ted now ship

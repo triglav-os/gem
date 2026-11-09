@@ -577,6 +577,8 @@ static const desktop_icon_asset_t *desktop_launcher_asset(WORD launcher)
 
 void desktop_install_launchers(void)
 {
+    if (!gemconf_get_bool(&g_desktop.config, "desktop", "show_launchers", 0))
+        return;
     for (int launcher = 1; launcher <= 3; ++launcher) {
         if (g_desktop.icon_count >= DESKTOP_MAX_ICONS)
             return;

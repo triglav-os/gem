@@ -200,7 +200,8 @@ def main():
     config_dir = config_home/'gem'
     config_dir.mkdir(parents=True, exist_ok=True)
     (config_dir/'desktop.cfg').write_text(
-        '[desktop]\nshow_trash = true\nshow_hidden = false\n\n'
+        '[desktop]\nshow_trash = true\nshow_hidden = false\n'
+        'show_launchers = true\n\n'
         '[locations]\n' + str(session.path) + ' = Workspace\n')
     (session.path/'uat_child').mkdir(exist_ok=True)
     (session.path/'uat_child/0 book.PDF').unlink(missing_ok=True)
