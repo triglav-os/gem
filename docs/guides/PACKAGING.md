@@ -36,6 +36,11 @@ and `share` tree described below. Tags that do not match the pattern, such as
 git tag v1.2.3 && git push origin v1.2.3
 ```
 
+The workflow can also be started from **Actions → Release → Run workflow**
+once it is on the default branch. With a version `X.Y.Z` it creates tag
+`vX.Y.Z` on the selected commit and publishes the release. Without a version
+it only builds `dev-COMMIT` archives as downloadable workflow artifacts.
+
 ## Runtime contract
 
 The runtime contains gemd, Desktop/File Manager/Trash, Terminal, Calculator, Ted,

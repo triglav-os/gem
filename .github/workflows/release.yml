@@ -6,6 +6,14 @@ on:
   push:
     tags:
       - 'v[0-9]+.[0-9]+.[0-9]+'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: >-
+          Release version X.Y.Z (creates tag vX.Y.Z on the selected commit).
+          Leave empty to build workflow artifacts without publishing a release.
+        required: false
+        default: ''
 
 permissions:
   contents: read
@@ -35,6 +43,23 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@v4
+
+      - name: Determine version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = push ]; then
+              version="${GITHUB_REF_NAME#v}"
+          elif [ -n "$INPUT_VERSION" ]; then
+              version="${INPUT_VERSION#v}"
+          else
+              version="dev-${GITHUB_SHA::8}"
+          fi
+          if [ "$GITHUB_EVENT_NAME" = push ] || [ -n "$INPUT_VERSION" ]; then
+              [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] ||
+                  { echo "Version must be X.Y.Z, got '$version'" >&2; exit 1; }
+          fi
+          echo "VERSION=$version" >> "$GITHUB_ENV"
 
       - name: Free runner disk space
         run: |
@@ -73,8 +98,7 @@ jobs:
       - name: Create archive
         id: archive
         run: |
-          version="${GITHUB_REF_NAME#v}"
-          name="gem-${version}-linux-x86_64-${{ matrix.variant }}"
+          name="gem-${VERSION}-linux-x86_64-${{ matrix.variant }}"
           mkdir -p dist
           tar -C "$OUTPUT_ROOT" --owner=0 --group=0 --numeric-owner \
               --transform "s,^gemix,${name},S"-czf "dist/${name}.tar.gz" gemix
@@ -92,6 +116,7 @@ jobs:
   release:
     name: Publish release
     needs: package
+    if: github.event_name == 'push' || inputs.version != ''
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -109,9 +134,18 @@ jobs:
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
+          INPUT_VERSION: ${{ inputs.version }}
         run: |
-          gh release create "$GITHUB_REF_NAME" dist/*.tar.gz dist/SHA256SUMS \
+          if [ "$GITHUB_EVENT_NAME" = push ]; then
+              tag="$GITHUB_REF_NAME"
+              target=(--verify-tag)
+          else
+              # Manual run: gh creates the tag on the commit that was built.
+              tag="v${INPUT_VERSION#v}"
+              target=(--target "$GITHUB_SHA")
+          fi
+          gh release create "$tag" dist/*.tar.gz dist/SHA256SUMS \
               --repo "$GITHUB_REPOSITORY" \
-              --title "GEM for Linux ${GITHUB_REF_NAME}" \
+              --title "GEM for Linux ${tag}" \
               --generate-notes \
-              --verify-tag
+              "${target[@]}"
