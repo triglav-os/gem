@@ -13,6 +13,7 @@ import argparse
 import json
 from pathlib import Path
 import shutil
+import subprocess
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -52,7 +53,9 @@ def check(session):
     folders = [(x, y) for x, y in positions if matches(initial, 'folder', x, y)]
     assert len(folders) == 2, 'Workspace and File Manager icons are missing'
     assert matches(initial, 'prg', 36, 170), 'Gemscape launcher icon is missing'
-    assert matches(initial, 'prg', 36, 236), 'Terminal launcher icon is missing'
+    # terminal.rsc beside the Terminal program replaces the standard icon.
+    assert matches(initial, 'trash', 36, 236), \
+        'Terminal launcher does not show terminal.rsc from its directory'
     assert matches(initial, 'trash', 576, 332), 'Trash icon missing'
     x, y = folders[0]
     session.click(x + 16, y + 16)
@@ -180,7 +183,7 @@ def check(session):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--mode', choices=('direct', 'proxy'), required=True)
-    for name in ('binary', 'gemd', 'artifacts', 'resources'):
+    for name in ('binary', 'gemd', 'artifacts', 'resources', 'resgen'):
         parser.add_argument('--' + name, required=True)
     args = parser.parse_args()
     args.demo, args.capture = 'desktop', True
@@ -215,6 +218,11 @@ def main():
     terminal = session.path/'terminal'
     terminal.write_text('#!/bin/sh\nprintf ready > terminal-launched\ntouch \"uat_child/0 book.PDF\" \"uat_child/1 note.text\"\n')
     terminal.chmod(0o700)
+    # A program icon is an icon-only resource generated like the built-ins.
+    subprocess.run([args.resgen, 'icons', '-o', str(session.path/'terminal.rsc'),
+                    str(Path(__file__).resolve().parents[3] /
+                        'samples/data/artwork/icons/TRASH.PNG')],
+                   check=True, stdout=subprocess.DEVNULL)
     for program, marker in (('gemread', 'pdf-launched'), ('ted', 'text-launched')):
         (session.path/marker).unlink(missing_ok=True)
         probe = session.path/program

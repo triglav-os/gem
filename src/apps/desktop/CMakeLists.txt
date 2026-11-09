@@ -1,5 +1,6 @@
 add_executable(desktop
     desktop_assets.c
+    desktop_icon_rsc.c
     main.c
     browser.c
     browser_launch.c
@@ -49,6 +50,7 @@ target_link_options(desktop
 
 add_executable(desktop_hosted
     desktop_assets.c
+    desktop_icon_rsc.c
     main.c
     browser.c
     browser_launch.c

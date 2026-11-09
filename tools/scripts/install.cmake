@@ -11,6 +11,10 @@ endforeach()
 install(TARGETS ${gem_install_programs} ${gem_install_libraries}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
+# Desktop launcher icons live beside the programs they represent.
+foreach(program gemscape terminal clock calc gemread ted)
+    install(FILES ${GEM_APPS_DIR}/${program}.rsc DESTINATION ${CMAKE_INSTALL_BINDIR})
+endforeach()
 install(DIRECTORY ${GEM_RESOURCES_DIR}/fonts DESTINATION ${CMAKE_INSTALL_DATADIR}/gem)
 install(FILES ${GEM_RESOURCES_DIR}/cursors.rsc ${GEM_RESOURCES_DIR}/alert_icons.rsc
     ${GEM_SAMPLES_DIR}/data/gemscape_toolbar.rsc
@@ -59,6 +63,7 @@ add_custom_target(gemix_package
         --build ${CMAKE_BINARY_DIR} --destination ${GEM_OUTPUT_ROOT}/gemix
     DEPENDS ${gem_install_programs} ${gem_install_libraries} gem_runtime_fonts
         gem_runtime_cursors gem_runtime_alert_icons gem_runtime_gemscape_toolbar
+        gem_launcher_icons
     COMMENT "Staging the minimal GEM runtime package"
     VERBATIM)
 if(GEM_PLATFORM STREQUAL "rasta")

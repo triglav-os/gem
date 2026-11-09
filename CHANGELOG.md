@@ -6,6 +6,12 @@ Unreleased.
 
 ## Unreleased
 
+- Desktop launchers show a program's own icon when an icon-only
+  `<program>.rsc` (made by `resgen icons` from 32x32 monochrome artwork) sits
+  beside it. Gemscape, Terminal, Clock, Calculator, Gemread and Ted now ship
+  with such icons; artwork for the planned Fyodor, Isaac and Blaise
+  applications is included.
+
 - Pushing a `vX.Y.Z` tag builds the hosted and native runtime packages (gemd,
   GEM libraries and all bundled applications) on GitHub Actions and publishes
   them as release archives with SHA-256 checksums.

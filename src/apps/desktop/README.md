@@ -102,7 +102,31 @@ items before editing them. Nested Trash browsing is read-only, with Copy enabled
 Successful moves out remove their `.trashinfo` records. Permanent deletion and
 emptying keep Cancel as the default choice.
 
-The desktop also supplies Files (File Manager) and Gemscape launch icons using existing
-folder/program artwork. File Manager opens the launch working directory;
-Gemscape uses the AES shell launcher and its normal executable search path.
+The desktop also supplies Files (File Manager), Gemscape and Terminal launch
+icons. File Manager opens the launch working directory and uses the folder
+icon. Gemscape and Terminal use the AES shell launcher and its normal executable
+search path.
+
+## Program icons
+
+A program launcher looks for `<program>.rsc` in the directory of the program
+it resolved (any extension on the program name is replaced). If the file
+holds an icon-only GEM resource, Desktop draws its first ICONBLK, up to 32x32
+pixels, instead of the standard program icon. Otherwise the standard icon
+stays. Resources with object trees are ignored, so an application's own
+dialog resource is never mistaken for its icon. Every offset is bounds-checked
+because the file is untrusted.
+
+Icons use the same monochrome format as the built-in artwork: draw a 32x32
+PNG in `samples/data/artwork/icons/` (transparent outside the icon, black
+ink, white paper) and convert it with `resgen`:
+
+```sh
+resgen icons -o gemscape.rsc samples/data/artwork/icons/GEMSCAPE.PNG
+```
+
+The build does this for Gemscape, Terminal, Clock, Calculator, Gemread and
+Ted, and installs each resource beside its program. `FYODOR.PNG`,
+`ISAAC.PNG` and `BLAISE.PNG` are ready for the planned word processor,
+spreadsheet and email client.
 Configured locations and the bottom-right Trash icon retain their positions.

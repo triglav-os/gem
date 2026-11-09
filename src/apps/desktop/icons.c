@@ -10,6 +10,7 @@
 #define _POSIX_C_SOURCE 200809L
 
 #include "desktop.h"
+#include "desktop_icon_rsc.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -165,12 +166,9 @@ void desktop_open_selected_icon(void)
     if (selected->is_trash != 0) {
         desktop_open_trash();
     } else if (selected->launcher >= 2) {
-        const char *app = selected->launcher == 2 ? "gemscape" : "terminal";
-        char relative[64];
-        snprintf(relative, sizeof(relative), "bin/apps/%s", app);
         char program[GEM_OS_PATH_MAX], tail[2] = {0};
-        if ((gem_os_find_executable(app, program, sizeof(program)) ||
-             gem_os_find_file(relative, program, sizeof(program))) &&
+        if (desktop_launcher_program(selected->launcher, program,
+                                     sizeof(program)) &&
             shel_write(1, 1, 0, program, tail))
             desktop_set_status("Application launched.");
         else
@@ -505,6 +503,78 @@ void desktop_install_trash_icon(void)
     ++g_desktop.icon_count;
 }
 
+int desktop_launcher_program(WORD launcher, char *program, size_t size)
+{
+    const char *app = launcher == 2 ? "gemscape" : "terminal";
+    char relative[64];
+
+    if (launcher < 2 || launcher > 3 || program == NULL)
+        return 0;
+    snprintf(relative, sizeof(relative), "bin/apps/%s", app);
+    return gem_os_find_executable(app, program, size) ||
+           gem_os_find_file(relative, program, size);
+}
+
+/* Launcher artwork loaded from a program's icon resource. */
+typedef struct desktop_custom_icon {
+    desktop_icon_asset_t asset;
+    desktop_rsc_icon_t bitmap;
+} desktop_custom_icon_t;
+
+/*
+ * Loads `<program>.rsc` (any extension of the program replaced) from the
+ * program's own directory into icon. Returns nonzero when an icon-only
+ * resource with a valid ICONBLK was read.
+ */
+static int desktop_load_program_icon(const char *program,
+                                     desktop_custom_icon_t *icon)
+{
+    char path[GEM_OS_PATH_MAX];
+    const char *leaf = strrchr(program, '/');
+    const char *dot;
+    size_t stem;
+    unsigned char *bytes;
+    size_t length = 0;
+    int ok = 0;
+
+    leaf = leaf != NULL ? leaf + 1 : program;
+    dot = strrchr(leaf, '.');
+    stem = dot != NULL && dot != leaf ? (size_t)(dot - program)
+                                      : strlen(program);
+    if (stem + sizeof(".rsc") > sizeof(path))
+        return 0;
+    memcpy(path, program, stem);
+    memcpy(path + stem, ".rsc", sizeof(".rsc"));
+    bytes = gem_os_alloc(DESKTOP_RSC_ICON_MAX_FILE + 1u);
+    if (bytes == NULL)
+        return 0;
+    if (gem_os_read_file(path, (char *)bytes, DESKTOP_RSC_ICON_MAX_FILE + 1u,
+                         &length) &&
+        desktop_icon_rsc_decode(bytes, length, &icon->bitmap)) {
+        icon->asset.mask_bits = icon->bitmap.mask;
+        icon->asset.data_bits = icon->bitmap.data;
+        icon->asset.width = icon->bitmap.width;
+        icon->asset.height = icon->bitmap.height;
+        ok = 1;
+    }
+    gem_os_free(bytes);
+    return ok;
+}
+
+/* Launcher artwork from a program's .rsc, else the standard icon. */
+static const desktop_icon_asset_t *desktop_launcher_asset(WORD launcher)
+{
+    static desktop_custom_icon_t custom[4];
+    char program[GEM_OS_PATH_MAX];
+
+    if (launcher == 1)
+        return &desktop_folder_icon_asset;
+    if (desktop_launcher_program(launcher, program, sizeof(program)) &&
+        desktop_load_program_icon(program, &custom[launcher]))
+        return &custom[launcher].asset;
+    return &desktop_prg_icon_asset;
+}
+
 void desktop_install_launchers(void)
 {
     for (int launcher = 1; launcher <= 3; ++launcher) {
@@ -518,8 +588,7 @@ void desktop_install_launchers(void)
                                  : "Terminal");
         if (launcher == 1 && !gem_os_getcwd(entry->path, sizeof(entry->path)))
             strcpy(entry->path, "/");
-        entry->asset = launcher == 1 ? &desktop_folder_icon_asset
-                                     : &desktop_prg_icon_asset;
+        entry->asset = desktop_launcher_asset((WORD)launcher);
         entry->launcher = (WORD)launcher;
         entry->object_id = (WORD)(DESKTOP_ICON_BASE + g_desktop.icon_count++);
     }

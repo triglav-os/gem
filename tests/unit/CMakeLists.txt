@@ -17,3 +17,4 @@ add_subdirectory(security)
 add_subdirectory(paths)
 
 add_subdirectory(ted)
+add_subdirectory(desktop)

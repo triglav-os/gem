@@ -218,8 +218,15 @@ void desktop_refresh_trash_windows(void);
 int desktop_disk_copy_entry(desktop_browser_window_t *source,
                             const desktop_browser_entry_t *entry,
                             const char *destination, const char *parent);
-/* Append File Manager and Gemscape quick launch icons. */
+/*
+ * Append File Manager, Gemscape and Terminal quick launch icons. A program
+ * launcher uses an icon-only `<program>.rsc` (as written by `resgen icons`)
+ * from the program's directory when one loads, and the standard program
+ * icon otherwise.
+ */
 void desktop_install_launchers(void);
+/* Resolve the executable for program launcher 2 or 3; nonzero on success. */
+int desktop_launcher_program(WORD launcher, char *program, size_t size);
 /* Route Return and arrow-key navigation to the active browser. */
 void desktop_browser_handle_key(WORD key);
 /* Remember a selected filesystem entry as a possible drag source. */

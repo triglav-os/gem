@@ -47,7 +47,8 @@ libraries = {'lib' + name + '.so' for name in ('gem', 'aes', 'vdi', 'platform_li
 if cache['GEM_PLATFORM'] == 'linux':
     programs.remove('rasta')
     libraries.remove('librasta.so')
-assert {p.name for p in (relocated/bindir).iterdir()} == programs
+launcher_icons = {name + '.rsc' for name in ('gemscape', 'terminal', 'clock', 'calc', 'gemread', 'ted')}
+assert {p.name for p in (relocated/bindir).iterdir()} == programs | launcher_icons
 assert {p.name for p in (relocated/libdir).iterdir()} == libraries | {'gem'}
 assert {p.relative_to(relocated).parts[0] for p in relocated.iterdir()} == {bindir.split('/')[0], libdir.split('/')[0], datadir.split('/')[0]}
 resources = {'fonts/AtariSTHigh.fnt', 'fonts/8x16_z1.fnt', 'cursors.rsc', 'alert_icons.rsc', 'gemscape_toolbar.rsc'}

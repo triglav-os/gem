@@ -197,7 +197,7 @@ foreach(mode direct proxy)
         COMMAND ${Python3_EXECUTABLE} -B ${CMAKE_CURRENT_SOURCE_DIR}/samples/desktop.py
             --mode ${mode} --binary $<TARGET_FILE:${desktop_target}>
             --gemd $<TARGET_FILE:gemd> --artifacts ${CMAKE_BINARY_DIR}/uat
-            --resources ${GEM_RESOURCES_DIR})
+            --resources ${GEM_RESOURCES_DIR} --resgen $<TARGET_FILE:resgen>)
     set_tests_properties(uat_desktop_${mode} PROPERTIES ENVIRONMENT "RASTA_BIN=${GEM_TOOLS_DIR}/rasta" LABELS "uat;${mode}" TIMEOUT 30)
 endforeach()
 
