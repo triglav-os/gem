@@ -1,0 +1,117 @@
+# Build and publish GEM runtime packages for version tags such as v1.2.3.
+# SPDX-License-Identifier: GPL-2.0-or-later
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  package:
+    name: Package (${{ matrix.variant }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Rasta viewer backend: includes rasta and librasta.
+          - variant: hosted
+            platform: rasta
+          # Linux framebuffer/evdev backend: no Rasta.
+          - variant: native
+            platform: linux
+    env:
+      BUILD_DIR: ${{ github.workspace }}/build/release-${{ matrix.platform }}
+      OUTPUT_ROOT: ${{ github.workspace }}/build/release-${{ matrix.platform }}/out
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Free runner disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+              /opt/hostedtoolcache/CodeQL
+          df -h "$GITHUB_WORKSPACE"
+
+      - name: Configure
+        run: |
+          tools/scripts/container.sh exec cmake -S . -B "$BUILD_DIR" \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DGEM_PLATFORM=${{ matrix.platform }} \
+              -DBUILD_TESTING=OFF \
+              -DGEM_OUTPUT_ROOT="$OUTPUT_ROOT"
+
+      - name: Build and stage runtime package
+        run: |
+          tools/scripts/container.sh exec cmake --build "$BUILD_DIR" \
+              --target gemix_package --parallel "$(nproc)"
+
+      - name: Verify package contents
+        run: |
+          root="$OUTPUT_ROOT/gemix"
+          for program in gemd desktop terminal calc ted clock stout gemread gemscape; do
+              test -x "$root/bin/$program" || { echo "Missing bin/$program" >&2; exit 1; }
+          done
+          for library in libgem.so libaes.so libvdi.so; do
+              test -f "$root/lib/$library" || { echo "Missing lib/$library" >&2; exit 1; }
+          done
+          if [ "${{ matrix.platform }}" = rasta ]; then
+              test -x "$root/bin/rasta" || { echo 'Missing bin/rasta' >&2; exit 1; }
+          else
+              test ! -e "$root/bin/rasta" || { echo 'Native package contains rasta' >&2; exit 1; }
+          fi
+
+      - name: Create archive
+        id: archive
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          name="gem-${version}-linux-x86_64-${{ matrix.variant }}"
+          mkdir -p dist
+          tar -C "$OUTPUT_ROOT" --owner=0 --group=0 --numeric-owner \
+              --transform "s,^gemix,${name},S"-czf "dist/${name}.tar.gz" gemix
+          echo "name=${name}" >> "$GITHUB_OUTPUT"
+          ls -lh dist
+
+      - name: Upload archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.archive.outputs.name }}
+          path: dist/${{ steps.archive.outputs.name }}.tar.gz
+          compression-level: 0
+          if-no-files-found: error
+
+  release:
+    name: Publish release
+    needs: package
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Download archives
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Write checksums
+        working-directory: dist
+        run: sha256sum *.tar.gz > SHA256SUMS && cat SHA256SUMS
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/*.tar.gz dist/SHA256SUMS \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "GEM for Linux ${GITHUB_REF_NAME}" \
+              --generate-notes \
+              --verify-tag

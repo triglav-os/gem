@@ -16,6 +16,26 @@ files without deleting unrelated files. An older installation that contained
 SDK files should be removed using its old install manifest before upgrading;
 GEM does not guess which user files it can remove.
 
+## Release builds
+
+Pushing a tag of the form `vMAJOR.MINOR.PATCH` (for example `v1.2.3`) runs
+`.github/workflows/release.yml`. It builds the Release runtime package for
+both backends in the same Docker toolchain, with tests disabled. It checks
+that gemd, every application and the core libraries are present, and it
+publishes a GitHub release containing:
+
+- `gem-VERSION-linux-x86_64-hosted.tar.gz`: Rasta backend, including Rasta;
+- `gem-VERSION-linux-x86_64-native.tar.gz`: framebuffer/evdev backend;
+- `SHA256SUMS`.
+
+Each archive holds one top-level directory with the relocatable `bin`, `lib`
+and `share` tree described below. Tags that do not match the pattern, such as
+`v1.2` or `v1.2.3-rc1`, do not trigger a release.
+
+```sh
+git tag v1.2.3 && git push origin v1.2.3
+```
+
 ## Runtime contract
 
 The runtime contains gemd, Desktop/File Manager/Trash, Terminal, Calculator, Ted,

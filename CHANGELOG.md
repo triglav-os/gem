@@ -6,6 +6,10 @@ Unreleased.
 
 ## Unreleased
 
+- Pushing a `vX.Y.Z` tag builds the hosted and native runtime packages (gemd,
+  GEM libraries and all bundled applications) on GitHub Actions and publishes
+  them as release archives with SHA-256 checksums.
+
 - Ted replaces its in-window text buttons with 16×16 command icons and the
   shared Gemscape/Gemread toolbar and status-bar layout. Drawing and hit targets
   follow resizing; disabled actions are dimmed and icon hints use the status bar.
