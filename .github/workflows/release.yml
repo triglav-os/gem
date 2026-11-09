@@ -101,7 +101,7 @@ jobs:
           name="gem-${VERSION}-linux-x86_64-${{ matrix.variant }}"
           mkdir -p dist
           tar -C "$OUTPUT_ROOT" --owner=0 --group=0 --numeric-owner \
-              --transform "s,^gemix,${name},S"-czf "dist/${name}.tar.gz" gemix
+              --transform "s,^gemix,${name},S" -czf "dist/${name}.tar.gz" gemix
           echo "name=${name}" >> "$GITHUB_OUTPUT"
           ls -lh dist
 
