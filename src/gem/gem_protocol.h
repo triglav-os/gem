@@ -16,10 +16,10 @@
 #include <stdint.h>
 
 #define GEM_RPC_MAGIC 0x47454d31u
-#define GEM_RPC_VERSION 2u
+#define GEM_RPC_VERSION 3u
 #define GEM_RPC_TEXT_MAX 512u
-#define GEM_RPC_MENU_MAX_OBJECTS 64u
-#define GEM_RPC_MENU_MAX_STRINGS 32u
+#define GEM_RPC_MENU_MAX_OBJECTS 256u
+#define GEM_RPC_MENU_MAX_STRINGS 256u
 #define GEM_RPC_MENU_STRING_MAX 64u
 #define GEM_RPC_PAYLOAD_MAX 65536u
 #define GEM_RPC_LOCATION_MAX 32u
@@ -384,6 +384,10 @@ typedef struct gem_rpc_menu_bar_req {
     OBJECT objects[GEM_RPC_MENU_MAX_OBJECTS];
     gem_rpc_menu_string_t strings[GEM_RPC_MENU_MAX_STRINGS];
 } gem_rpc_menu_bar_req_t;
+
+/* A whole menu bar travels in one request. */
+_Static_assert(sizeof(gem_rpc_menu_bar_req_t) <= GEM_RPC_PAYLOAD_MAX,
+               "menu bar request exceeds the RPC payload limit");
 
 typedef struct gem_rpc_menu_tnormal_req {
     WORD title;

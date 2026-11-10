@@ -63,18 +63,17 @@ const desktop_icon_asset_t *
 desktop_browser_entry_asset(const desktop_browser_window_t *browser,
                             const desktop_browser_entry_t *entry)
 {
-    if (entry == NULL) {
-        return &desktop_doc_icon_asset;
-    }
-    if (entry->is_parent != 0 || entry->is_dir != 0) {
-        return &desktop_folder_icon_asset;
-    }
-    if (desktop_browser_entry_has_prg_icon(browser, entry) != 0) {
-        const desktop_icon_asset_t *own = desktop_program_icon(entry->name);
+    const desktop_icon_asset_t *fallback = &desktop_doc_icon_asset;
 
-        return own != NULL ? own : &desktop_prg_icon_asset;
-    }
-    return &desktop_doc_icon_asset;
+    if (entry == NULL)
+        return desktop_standard_icon(fallback);
+    if (entry->is_parent != 0)
+        return desktop_standard_icon(&desktop_folder_icon_asset);
+    if (entry->is_dir != 0)
+        fallback = &desktop_folder_icon_asset;
+    else if (desktop_browser_entry_has_prg_icon(browser, entry) != 0)
+        fallback = &desktop_prg_icon_asset;
+    return desktop_named_icon(entry->name, fallback);
 }
 
 static WORD desktop_browser_max_top(const desktop_browser_window_t *browser)

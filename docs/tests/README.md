@@ -176,3 +176,7 @@ payload. Evidence is under `build/packaged-browser/`; this additional run is
 separate from the numbered CTest report. Native Release package and relocated
 SDK checks also passed with `/usr` and `lib/x86_64-linux-gnu`; their log is
 `build/package-native/build.log`. Native display/input hardware was not used.
+
+`test_desktop_icon_lookup` checks named and common icon precedence in File
+Manager and Trash, built-in fallbacks for missing or malformed resources,
+cache refresh and retained icon storage across cache replacement.

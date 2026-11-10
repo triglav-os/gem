@@ -6,6 +6,18 @@ Unreleased.
 
 ## Unreleased
 
+- Desktop, File Manager and Trash look in the shared icon directory before
+  using built-in folder, disk, document, program or trash artwork. Files
+  supports `filemanager.rsc`; browser folders and documents also support
+  icons named after their entries. Missing or invalid resources fall back
+  to the common type icon, then the built-in image.
+
+- Menu bars sent through gemd may hold 256 objects and 256 titles and entries
+  (was 64 and 32), enough for a full application menu. Previously a larger
+  menu was cut short and silently refused, leaving no menu bar. `menu_bar()`
+  now returns 0 for a tree over the limits and keeps the current bar. The
+  private RPC protocol is now version 3; rebuild clients with the server.
+
 - Desktop starts empty apart from Trash. The Files, Gemscape and Terminal
   launchers appear only with `[desktop] show_launchers = true` in
   `desktop.cfg`.

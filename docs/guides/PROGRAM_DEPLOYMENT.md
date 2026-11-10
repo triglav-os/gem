@@ -71,6 +71,17 @@ resource. Icons are never read from the program's own directory. Desktop reads
 the icon files when it lists a directory, so an icon installed while a window
 is open appears once that window is refreshed or opened again.
 
+Desktop, File Manager and Trash share the same lookup rules. File Manager
+and Trash entries first try `<entry-name-without-extension>.rsc`, including
+folders and documents. If that icon is absent or invalid, they try the common
+`folder.rsc`, `document.rsc` or `program.rsc`, then the built-in artwork.
+The parent-directory entry uses `folder.rsc`. Desktop locations use
+`folder.rsc` or `disk.rsc`; Trash uses `trash.rsc`. The Files launcher tries
+`filemanager.rsc`, then `folder.rsc`. These resources all live in the same
+`icons/` directory and use the same XDG override order and validation as
+program icons. Browser refresh reloads common icons as well as per-entry
+lookups. Launcher artwork is loaded when the desktop launchers are created.
+
 ## Checking an installation
 
 - `<prefix>/Programs/<name>` exists, is lowercase and resolves to an

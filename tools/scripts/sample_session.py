@@ -113,7 +113,7 @@ def gemd_responding(path):
             connection.connect(str(path))
 
             def call(opcode):
-                connection.sendall(struct.pack('=IHHI', 0x47454d31, 2,
+                connection.sendall(struct.pack('=IHHI', 0x47454d31, 3,
                                                opcode, 0))
                 magic, status, size = struct.unpack(
                     '=IiI', receive_exact(connection, 12))
