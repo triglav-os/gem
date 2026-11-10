@@ -310,3 +310,20 @@ rejected edits and uses the existing atomic-write platform helper for saves.
 Its model tests cover capacity, UTF-8 movement and undo; UI tests verify file
 contents and cancellation of an unsaved close. These checks do not add a new
 analyzer claim or change the previously recorded remaining diagnostics.
+
+## Complete menu transport (2026-11-10)
+
+`test_menu_limits` passes under GCC ASan/UBSan with 32, 33 and 49 strings,
+64, 65 and 256 objects, oversized object graphs and labels, and replacement
+failure followed by mutation of the retained menu. `test_gemd_security`
+adds missing/duplicate/unterminated strings, object-count overflow and short
+payloads to its malformed-link and multi-application menu lifetime checks.
+The private wire format is version 3; matching SDK clients/server are required.
+
+The full `make tests` run in the GEMix SDK (RelWithDebInfo) passed 116 of
+117 checks, including all menu, security, direct/proxy UAT and browser tests.
+`test_container_identity` failed because that image was invoked with numeric
+UID 1000 without GEM's account layer; it passes when rerun in the supplied
+`tools/container/Dockerfile.user` layer. The generated full-run report retains
+that environmental failure. The earlier full Debug build exposed the existing
+`test_paths` sanitizer-link omission; targeted Debug menu/security tests passed.

@@ -180,3 +180,8 @@ SDK checks also passed with `/usr` and `lib/x86_64-linux-gnu`; their log is
 `test_desktop_icon_lookup` checks named and common icon precedence in File
 Manager and Trash, built-in fallbacks for missing or malformed resources,
 cache refresh and retained icon storage across cache replacement.
+
+`test_menu_limits` checks 32/33/49 menu strings, 64/65/256 objects, rejected
+oversized labels/graphs and active-tree preservation. `test_gemd_security`
+checks protocol-2 refusal by protocol 3, payload size, terminated and unique
+strings, and malformed topology while other application sessions remain live.

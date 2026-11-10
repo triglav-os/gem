@@ -6,6 +6,11 @@ Unreleased.
 
 ## Unreleased
 
+- Rejected menu replacements (including negative RPC status) preserve the
+  active client tree. Menu labels are rejected when oversized or unterminated
+  instead of silently shortened; bounded iterative graph validation avoids
+  recursion and rejects malformed input before dispatch.
+
 - Desktop, File Manager and Trash look in the shared icon directory before
   using built-in folder, disk, document, program or trash artwork. Files
   supports `filemanager.rsc`; browser folders and documents also support

@@ -190,8 +190,8 @@ static void menu_client(void)
     tree[6].ob_flags = LASTOB;
     tree[6].ob_spec = (LONG)(intptr_t)item;
     assert(appl_init() > 0);
-    assert(menu_bar(tree, 1));
-    assert(menu_bar(tree, 1));
+    assert(menu_bar(tree, 1) == 1);
+    assert(menu_bar(tree, 1) == 1);
     assert(menu_tnormal(tree, 3, 1));
     /* Deliberately disconnect without menu_bar(false) or appl_exit(). */
 }

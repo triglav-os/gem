@@ -704,7 +704,8 @@ int32_t gemd_dispatch(gemd_session_t *session, const gem_rpc_header_t *header,
 
             if (req->show == 0) {
                 status = menu_bar(session->menu_objects, 0);
-                gemd_free_session_menu(session);
+                if (status > 0)
+                    gemd_free_session_menu(session);
                 break;
             }
 
@@ -741,15 +742,17 @@ int32_t gemd_dispatch(gemd_session_t *session, const gem_rpc_header_t *header,
                 }
             }
 
-            if (session->menu_objects != NULL) {
-                menu_bar(session->menu_objects, 0);
+            status = menu_bar(objects, req->show);
+            if (status <= 0) {
+                free(objects);
+                free(strings_blob);
+                break;
             }
             gemd_free_session_menu(session);
             session->menu_objects = objects;
             session->menu_strings_blob = strings_blob;
             session->menu_count = count;
 
-            status = menu_bar(objects, req->show);
             aes_trace(
                 "gemd menu_bar app=%d objects=%d strings=%d "
                 "title0=%s show=%d status=%d",

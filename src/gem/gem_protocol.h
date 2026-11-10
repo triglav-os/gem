@@ -19,7 +19,7 @@
 #define GEM_RPC_VERSION 3u
 #define GEM_RPC_TEXT_MAX 512u
 #define GEM_RPC_MENU_MAX_OBJECTS 256u
-#define GEM_RPC_MENU_MAX_STRINGS 256u
+#define GEM_RPC_MENU_MAX_STRINGS GEM_RPC_MENU_MAX_OBJECTS
 #define GEM_RPC_MENU_STRING_MAX 64u
 #define GEM_RPC_PAYLOAD_MAX 65536u
 #define GEM_RPC_LOCATION_MAX 32u
@@ -210,7 +210,7 @@ typedef struct gem_rpc_location_list {
 /* Keep the location-list wire size stable for a running mixed-version
  * desktop/gemd pair.  The final entry's previously reserved word carries
  * list-wide Desktop options, including when that entry is in use. */
-#define GEM_RPC_LOCATION_LIST_OPTIONS(list) \
+#define GEM_RPC_LOCATION_LIST_OPTIONS(list)                                    \
     ((list).entries[GEM_RPC_LOCATION_MAX - 1u].reserved)
 
 typedef struct gem_rpc_location_req {

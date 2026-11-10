@@ -77,7 +77,7 @@ owned window work areas and explicit dialog bounds. Menu arrays must have one
 LASTOB on the final object and keep unused entries linked (hide them with
 HIDETREE); truncating a popup’s links leaves an invalid disconnected graph. A
 menu bar holds at most 256 objects and 256 titles/entries of up to 63 bytes;
-`menu_bar()` returns 0 for a larger tree and keeps the current bar. Hidden
+`menu_bar()` returns -1 for a larger tree and keeps the current bar. Hidden
 children are excluded from popup row layout and saved-region bounds. Object
 types are matched on their low byte on both peers, so extended type bits in the
 high byte travel with the object without changing which entries need strings.
@@ -237,3 +237,19 @@ Windows that request scroll controls keep the existing scrollbar geometry.
 This is a hosted AES geometry policy, with unchanged public flags and wire
 layout. Both direct and gemd clients receive it. Native needs no application
 special case or window-scrollbar synchronization for its child controls.
+
+### Complete application menus
+
+Menu-bar requests carry up to 256 objects and 256 title/entry strings,
+including separator strings. Each string holds at most 63 bytes plus its
+terminator. The fixed request remains within the 64 KiB payload limit,
+checked at compile time. A bounded iterative walk rejects out-of-range
+links; unsupported pointer forms, disconnected/cyclic graphs, missing or
+duplicate strings, unterminated/oversized strings and invalid LASTOB layout
+are rejected, never truncated. A failed replacement leaves the prior client
+menu and server-owned storage installed; successful removal releases it.
+
+This changes the private request layout from protocol 2 to 3. Deploy matching
+libgem and gemd together and restart existing clients/servers. Older peers
+are disconnected at envelope validation, before their payload is interpreted.
+Public GEM signatures and direct AES menus are unchanged.

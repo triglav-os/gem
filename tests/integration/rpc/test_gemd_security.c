@@ -73,6 +73,23 @@ static void send_request(int fd, uint16_t opcode, const void *data,
         assert(send(fd, data, size, MSG_NOSIGNAL) == size);
 }
 
+/* Version and envelope failures close only the incompatible peer. */
+static void incompatible_peers(void)
+{
+    const gem_rpc_header_t headers[] = {
+        {GEM_RPC_MAGIC, 2, GEM_RPC_APPL_INIT, 0},
+        {GEM_RPC_MAGIC, GEM_RPC_VERSION, GEM_RPC_MENU_BAR,
+         GEM_RPC_PAYLOAD_MAX + 1}};
+    for (size_t i = 0; i < sizeof(headers) / sizeof(headers[0]); ++i) {
+        int fd = connect_peer();
+        char byte;
+        assert(send(fd, &headers[i], sizeof(headers[i]), MSG_NOSIGNAL) ==
+               sizeof(headers[i]));
+        assert(recv(fd, &byte, 1, 0) == 0);
+        close(fd);
+    }
+}
+
 static int32_t receive_reply(int fd, void *out, size_t size)
 {
     gem_rpc_reply_t reply;
@@ -207,20 +224,45 @@ static gem_rpc_menu_bar_req_t wide_menu(const int *items, int tops)
         const WORD last = (WORD)(popup + items[top]);
         WORD item;
 
-        req.objects[title] =
-            (OBJECT){top == tops - 1 ? 2 : (WORD)(title + 1), NIL, NIL,
-                     G_TITLE, 0, 0, 0, (WORD)(top * 8), 0, 8, 1};
+        req.objects[title] = (OBJECT){top == tops - 1 ? 2 : (WORD)(title + 1),
+                                      NIL,
+                                      NIL,
+                                      G_TITLE,
+                                      0,
+                                      0,
+                                      0,
+                                      (WORD)(top * 8),
+                                      0,
+                                      8,
+                                      1};
         req.strings[req.string_count].object = title;
         snprintf(req.strings[req.string_count++].text, GEM_RPC_MENU_STRING_MAX,
                  " Menu%d ", top);
         next = (WORD)(last + 1);
-        req.objects[popup] =
-            (OBJECT){top == tops - 1 ? popups : next, first, last, G_BOX, 0,
-                     0, 0x1100L, (WORD)(top * 8), 0, 20, (WORD)items[top]};
+        req.objects[popup] = (OBJECT){top == tops - 1 ? popups : next,
+                                      first,
+                                      last,
+                                      G_BOX,
+                                      0,
+                                      0,
+                                      0x1100L,
+                                      (WORD)(top * 8),
+                                      0,
+                                      20,
+                                      (WORD)items[top]};
         for (item = first; item <= last; ++item) {
             req.objects[item] =
-                (OBJECT){item == last ? popup : (WORD)(item + 1), NIL, NIL,
-                         G_STRING, 0, 0, 0, 0, (WORD)(item - first), 20, 1};
+                (OBJECT){item == last ? popup : (WORD)(item + 1),
+                         NIL,
+                         NIL,
+                         G_STRING,
+                         0,
+                         0,
+                         0,
+                         0,
+                         (WORD)(item - first),
+                         20,
+                         1};
             req.strings[req.string_count].object = item;
             snprintf(req.strings[req.string_count++].text,
                      GEM_RPC_MENU_STRING_MAX, "  Item %d ", item);
@@ -277,6 +319,19 @@ static void bad_menus(int fd)
     bad = good;
     bad.strings[1].object = 5;
     assert(call(fd, GEM_RPC_MENU_BAR, &bad, sizeof(bad)) == -1);
+    bad = good;
+    memset(bad.strings[1].text, 'x', GEM_RPC_MENU_STRING_MAX);
+    assert(call(fd, GEM_RPC_MENU_BAR, &bad, sizeof(bad)) == -1);
+    bad = good;
+    bad.string_count = 1;
+    assert(call(fd, GEM_RPC_MENU_BAR, &bad, sizeof(bad)) == -1);
+    bad = good;
+    bad.strings[1].object = bad.strings[0].object;
+    assert(call(fd, GEM_RPC_MENU_BAR, &bad, sizeof(bad)) == -1);
+    bad = good;
+    bad.object_count = GEM_RPC_MENU_MAX_OBJECTS + 1;
+    assert(call(fd, GEM_RPC_MENU_BAR, &bad, sizeof(bad)) == -1);
+    assert(call(fd, GEM_RPC_MENU_BAR, &good, sizeof(good) - 1) == -1);
     /* Systematically mutate each tree link, including valid-shaped variants.
      * All rejected graphs must leave the next request and menu usable. */
     for (int object = 0; object < 7; ++object) {
@@ -712,6 +767,7 @@ int main(void)
     b_id = start(b);
     c_id = start(c);
     assert(a_id != b_id && a_id != c_id && b_id != c_id);
+    incompatible_peers();
     stalls(a);
     a_window = window(a, 40);
     b_window = window(b, 220);

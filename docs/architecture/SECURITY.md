@@ -72,7 +72,10 @@ Menu validation checks all indices, string-to-object assignments, final
 `LASTOB`, supported types, and a rooted tree with one parent per object.
 An iterative walk rejects cycles and disconnected objects before AES sees
 the tree. `menu_tnormal` checks both the stored object count and title type.
-Replacing/removing a menu detaches its old storage before freeing it.
+Replacing/removing a menu frees its old storage only after AES accepts the
+replacement/removal. Menu requests allow 256 objects and strings within the
+64 KiB envelope; labels exceeding 63 bytes are rejected without truncation.
+Missing, duplicate or unterminated strings and out-of-range links are rejected.
 
 Current hosted service limits are:
 

@@ -86,3 +86,16 @@ set_tests_properties(test_aes_rpc PROPERTIES LABELS integration TIMEOUT 30
     RESOURCE_LOCK gem_rpc_hid
     ENVIRONMENT
         "GEM_RESOURCE_DIR=${GEM_RESOURCES_DIR};GEMIX_HOME=$<TARGET_FILE_DIR:shell_clock_child>;ASAN_OPTIONS=detect_leaks=0;UBSAN_OPTIONS=halt_on_error=1")
+
+add_executable(test_menu_limits test_menu_limits.c)
+target_include_directories(test_menu_limits PRIVATE ${PROJECT_SOURCE_DIR}/src/gem)
+target_link_libraries(test_menu_limits PRIVATE gem)
+target_compile_options(test_menu_limits PRIVATE -Wall -Wextra -pedantic -UNDEBUG
+    $<$<CONFIG:Debug>:-g;-fsanitize=address,undefined>)
+target_link_options(test_menu_limits PRIVATE $<$<CONFIG:Debug>:-fsanitize=address,undefined>)
+set_target_properties(test_menu_limits PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${GEM_OUTPUT_ROOT}/tests)
+add_test(NAME test_menu_limits COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/run.sh
+    $<TARGET_FILE:gemd> $<TARGET_FILE:test_menu_limits>)
+set_tests_properties(test_menu_limits PROPERTIES LABELS integration TIMEOUT 30
+    RESOURCE_LOCK gem_rpc_hid
+    ENVIRONMENT "GEM_RESOURCE_DIR=${GEM_RESOURCES_DIR};ASAN_OPTIONS=detect_leaks=0;UBSAN_OPTIONS=halt_on_error=1")

@@ -222,7 +222,9 @@ int gem_rpc_valid_request(uint16_t opcode, const void *payload, uint32_t size)
             return 0;
         for (i = 0; i < req->string_count; ++i) {
             WORD object = req->strings[i].object;
-            if (object < 0 || object >= req->object_count || strings[object])
+            if (object < 0 || object >= req->object_count || strings[object] ||
+                memchr(req->strings[i].text, '\0', GEM_RPC_MENU_STRING_MAX) ==
+                    NULL)
                 return 0;
             strings[object] = 1;
         }
