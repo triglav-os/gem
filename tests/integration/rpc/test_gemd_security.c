@@ -185,6 +185,77 @@ static gem_rpc_menu_bar_req_t menu(void)
     return req;
 }
 
+/* Build a menu bar with one title per entry of items[], each title owning
+ * a popup with that many strings, in the layout an AES resource uses. */
+static gem_rpc_menu_bar_req_t wide_menu(const int *items, int tops)
+{
+    gem_rpc_menu_bar_req_t req = {0};
+    const WORD popups = (WORD)(3 + tops);
+    WORD next = (WORD)(popups + 1);
+    int top;
+
+    req.show = 1;
+    req.objects[0] = (OBJECT){NIL, 1, popups, G_IBOX, 0, 0, 0, 0, 0, 80, 25};
+    req.objects[1] = (OBJECT){popups, 2, 2, G_BOX, 0, 0, 0x1100L, 0, 0, 80, 1};
+    req.objects[2] =
+        (OBJECT){1, 3, (WORD)(2 + tops), G_IBOX, 0, 0, 0, 0, 0, 80, 1};
+    req.objects[popups] = (OBJECT){0, next, NIL, G_IBOX, 0, 0, 0, 0, 0, 0, 0};
+    for (top = 0; top < tops; ++top) {
+        const WORD title = (WORD)(3 + top);
+        const WORD popup = next;
+        const WORD first = (WORD)(popup + 1);
+        const WORD last = (WORD)(popup + items[top]);
+        WORD item;
+
+        req.objects[title] =
+            (OBJECT){top == tops - 1 ? 2 : (WORD)(title + 1), NIL, NIL,
+                     G_TITLE, 0, 0, 0, (WORD)(top * 8), 0, 8, 1};
+        req.strings[req.string_count].object = title;
+        snprintf(req.strings[req.string_count++].text, GEM_RPC_MENU_STRING_MAX,
+                 " Menu%d ", top);
+        next = (WORD)(last + 1);
+        req.objects[popup] =
+            (OBJECT){top == tops - 1 ? popups : next, first, last, G_BOX, 0,
+                     0, 0x1100L, (WORD)(top * 8), 0, 20, (WORD)items[top]};
+        for (item = first; item <= last; ++item) {
+            req.objects[item] =
+                (OBJECT){item == last ? popup : (WORD)(item + 1), NIL, NIL,
+                         G_STRING, 0, 0, 0, 0, (WORD)(item - first), 20, 1};
+            req.strings[req.string_count].object = item;
+            snprintf(req.strings[req.string_count++].text,
+                     GEM_RPC_MENU_STRING_MAX, "  Item %d ", item);
+        }
+    }
+    req.objects[popups].ob_tail = (WORD)(next - 1 - items[tops - 1]);
+    req.object_count = next;
+    req.objects[next - 1].ob_flags = LASTOB;
+    return req;
+}
+
+/* Application-sized menus exceed the original 64-object/32-string budget. */
+static void large_menus(int fd)
+{
+    static const int app[] = {7, 6, 7, 17, 12, 1};
+    /* Root, bar, title row, one title, popup row and popup: six objects. */
+    const int largest[] = {(int)GEM_RPC_MENU_MAX_OBJECTS - 6};
+    gem_rpc_menu_bar_req_t req = wide_menu(app, 6);
+    gem_rpc_menu_bar_req_t over;
+
+    assert(req.object_count > 64 && req.string_count > 32);
+    assert(gem_rpc_valid_request(GEM_RPC_MENU_BAR, &req, sizeof(req)));
+    assert(call(fd, GEM_RPC_MENU_BAR, &req, sizeof(req)) == 1);
+    req = wide_menu(largest, 1);
+    assert(req.object_count == (WORD)GEM_RPC_MENU_MAX_OBJECTS);
+    assert(gem_rpc_valid_request(GEM_RPC_MENU_BAR, &req, sizeof(req)));
+    over = req;
+    over.object_count = (WORD)(GEM_RPC_MENU_MAX_OBJECTS + 1);
+    assert(call(fd, GEM_RPC_MENU_BAR, &over, sizeof(over)) == -1);
+    over = req;
+    over.string_count = (WORD)(GEM_RPC_MENU_MAX_STRINGS + 1);
+    assert(call(fd, GEM_RPC_MENU_BAR, &over, sizeof(over)) == -1);
+    puts("application-sized menu bars accepted up to the protocol limits");
+}
+
 static void bad_menus(int fd)
 {
     gem_rpc_menu_bar_req_t good = menu(), bad;
@@ -646,6 +717,7 @@ int main(void)
     b_window = window(b, 220);
     c_window = window(c, 400);
     bad_menus(a);
+    large_menus(a);
     ownership(a, b, a_window);
     drawing(a, b, c);
     input_routing((int[3]){a, b, c}, (WORD[3]){a_window, b_window, c_window});

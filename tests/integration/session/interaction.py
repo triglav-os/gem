@@ -65,7 +65,7 @@ class Interaction:
 
     def rpc(self, opcode, payload=b''):
         # Version 2 local wire format from src/gem/gem_protocol.h.
-        self.connection.sendall(struct.pack('=IHHI', 0x47454d31, 2,
+        self.connection.sendall(struct.pack('=IHHI', 0x47454d31, 3,
                                             opcode, len(payload)) + payload)
         magic, status, size = struct.unpack('=IiI', self.receive(12))
         assert magic == 0x47454d31 and size <= 65536
@@ -224,7 +224,7 @@ class Interaction:
         before = self.snapshot('system_alert_before')
         # A split frame is legal. Its deadline must exclude time for which
         # GEM's synchronous menu prevents the server from receiving bytes.
-        request = struct.pack('=IHHIhh', 0x47454d31, 2, 33, 4, witness, 4)
+        request = struct.pack('=IHHIhh', 0x47454d31, 3, 33, 4, witness, 4)
         self.connection.sendall(request[:8])
         self.session.pause(.1)
         for kind, x, y in ((3, 12, 10), (10, 12, 10),

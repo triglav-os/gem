@@ -30,7 +30,7 @@ Each generator updates only its marked section in `include/gem/gemd.h`,
 preserving the other transport declarations. Apply `.clang-format` with Clang
 Format 18 after regeneration; the generated sources follow the same standards
 as handwritten C. Dispatch offsets are derived directly from validated counts.
-The private protocol is version 2 and remains a same-host ABI, with matching
+The private protocol is version 3 and remains a same-host ABI, with matching
 builds required. Editing state uses session-scoped opaque tree identifiers.
 
 Each extended scalar request holds at most 16384 WORDs of aggregate array data.
@@ -75,7 +75,9 @@ are never executed in the server. Object-tree drawing includes the desktop
 owner’s exposed background, with menu and open-window occlusion, as well as
 owned window work areas and explicit dialog bounds. Menu arrays must have one
 LASTOB on the final object and keep unused entries linked (hide them with
-HIDETREE); truncating a popup’s links leaves an invalid disconnected graph. Hidden
+HIDETREE); truncating a popup’s links leaves an invalid disconnected graph. A
+menu bar holds at most 256 objects and 256 titles/entries of up to 63 bytes;
+`menu_bar()` returns 0 for a larger tree and keeps the current bar. Hidden
 children are excluded from popup row layout and saved-region bounds. Object
 types are matched on their low byte on both peers, so extended type bits in the
 high byte travel with the object without changing which entries need strings.

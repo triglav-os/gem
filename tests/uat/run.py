@@ -150,10 +150,10 @@ class Session:
             self.connection.connect(self.env['GEMD_SOCKET'])
             connected = True
         if connected and opcode != 1:
-            self.connection.sendall(struct.pack('=IHHI', 0x47454d31, 2, 1, 0))
+            self.connection.sendall(struct.pack('=IHHI', 0x47454d31, 3, 1, 0))
             magic, status, size = struct.unpack('=IiI', self.receive(12))
             assert magic == 0x47454d31 and status > 0 and size == 0
-        self.connection.sendall(struct.pack('=IHHI', 0x47454d31, 2, opcode,
+        self.connection.sendall(struct.pack('=IHHI', 0x47454d31, 3, opcode,
                                             len(payload)) + payload)
         magic, status, size = struct.unpack('=IiI', self.receive(12))
         assert magic == 0x47454d31 and size <= 65536

@@ -89,7 +89,7 @@ Current hosted service limits are:
 | Nested application update locks | 64 |
 | Outstanding update lock | 5 seconds absolute |
 | Normal server-side event poll | Nonblocking; libgem waits in the client |
-| Menu objects / copied strings | 64 / 32 |
+| Menu objects / copied strings | 256 / 256 (63 bytes each) |
 | Concurrent AES launch records | 32 |
 | Generated DESKTOP.INF compatibility image | 32767 bytes |
 | System-menu registrations | 6 labels; 63 bytes each |
@@ -202,7 +202,7 @@ cooperating modern applications must avoid writing the same component at once.
 Copied AES trees also validate offsets, aligned descriptors and nonoverlapping
 regions before relocation. USERDEF callbacks execute in the originating client;
 gemd services nested requests with bounded callback waits. The wire protocol
-is version 2; use matching clients and server builds. See
+is version 3; use matching clients and server builds. See
 [API transport](API_TRANSPORT.md) for the full current interface and limits.
 
 ## Regression coverage

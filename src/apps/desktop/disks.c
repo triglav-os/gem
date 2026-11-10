@@ -107,7 +107,7 @@ static void desktop_add_folder_icon(const char *path, const char *label)
     } else {
         desktop_label_from_path(path, entry->label, sizeof(entry->label));
     }
-    entry->asset = &desktop_folder_icon_asset;
+    entry->asset = desktop_standard_icon(&desktop_folder_icon_asset);
     entry->draw_info.asset = entry->asset;
     entry->draw_info.label = entry->label;
     entry->userblk.ab_code = (LONG)(intptr_t)desktop_user_draw;
@@ -127,7 +127,8 @@ static void desktop_mark_disk_icon(const char *path)
     WORD i;
     for (i = 0; i < g_desktop.icon_count; ++i) {
         if (strcmp(g_desktop.icons[i].path, path) == 0) {
-            g_desktop.icons[i].asset = &desktop_disk_icon_asset;
+            g_desktop.icons[i].asset =
+                desktop_standard_icon(&desktop_disk_icon_asset);
             g_desktop.icons[i].draw_info.asset = g_desktop.icons[i].asset;
             return;
         }

@@ -129,6 +129,17 @@ is bounds-checked because the file is untrusted. File Manager remembers icon
 lookups until the window lists a directory again, so newly installed icons
 appear after the folder is reopened or refreshed.
 
+Desktop, File Manager and Trash share the same lookup rules. File Manager
+and Trash entries first try `<entry-name-without-extension>.rsc`, including
+folders and documents. If that icon is absent or invalid, they try the common
+`folder.rsc`, `document.rsc` or `program.rsc`, then the built-in artwork.
+The parent-directory entry uses `folder.rsc`. Desktop locations use
+`folder.rsc` or `disk.rsc`; Trash uses `trash.rsc`. The Files launcher tries
+`filemanager.rsc`, then `folder.rsc`. These resources all live in the same
+`icons/` directory and use the same XDG override order and validation as
+program icons. Browser refresh reloads common icons as well as per-entry
+lookups. Launcher artwork is loaded when the desktop launchers are created.
+
 Icons use the same monochrome format as the built-in artwork: draw a 32x32
 PNG in `samples/data/artwork/icons/` (transparent outside the icon, black
 ink, white paper) and convert it with `resgen`:

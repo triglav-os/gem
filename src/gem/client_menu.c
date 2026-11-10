@@ -25,8 +25,12 @@ gem_menu_tree_extent_visit(const OBJECT *tree, WORD object,
                            uint8_t visited[GEM_RPC_MENU_MAX_OBJECTS],
                            WORD *extent)
 {
-    if (tree == NULL || visited == NULL || extent == NULL || object < ROOT ||
-        object >= (WORD)GEM_RPC_MENU_MAX_OBJECTS) {
+    if (tree == NULL || visited == NULL || extent == NULL || object < ROOT) {
+        return;
+    }
+    if (object >= (WORD)GEM_RPC_MENU_MAX_OBJECTS) {
+        /* Too large to send; menu_bar() refuses an extent this high. */
+        *extent = (WORD)GEM_RPC_MENU_MAX_OBJECTS;
         return;
     }
     if (visited[object] != 0u) {
@@ -61,7 +65,6 @@ static WORD gem_menu_tree_extent(const OBJECT *tree)
 
 WORD menu_bar(OBJECT *tree, WORD show)
 {
-    client_menu = show ? tree : NULL;
     int32_t status = 0;
     gem_rpc_menu_bar_req_t req;
     WORD extent;
@@ -74,21 +77,22 @@ WORD menu_bar(OBJECT *tree, WORD show)
     memset(&req, 0, sizeof(req));
     req.show = show;
     if (show == 0) {
+        client_menu = NULL;
         if (!gem_rpc_call(GEM_RPC_MENU_BAR, &req, sizeof(req), &status, NULL,
                           0))
             return 0;
         return (WORD)status;
     }
+    /* A truncated tree would only be rejected by gemd, so refuse a tree
+     * over the limits here and leave the current menu bar in place. */
     extent = gem_menu_tree_extent(tree);
-    req.object_count = (WORD)(extent + 1);
-    if (req.object_count > (WORD)GEM_RPC_MENU_MAX_OBJECTS) {
-        req.object_count = (WORD)GEM_RPC_MENU_MAX_OBJECTS;
+    if (extent >= (WORD)GEM_RPC_MENU_MAX_OBJECTS) {
+        return 0;
     }
+    req.object_count = (WORD)(extent + 1);
     memcpy(req.objects, tree, (size_t)req.object_count * sizeof(OBJECT));
 
-    for (i = 0; i < req.object_count &&
-                req.string_count < (WORD)GEM_RPC_MENU_MAX_STRINGS;
-         ++i) {
+    for (i = 0; i < req.object_count; ++i) {
         const char *text;
         UWORD type = (UWORD)(tree[i].ob_type & 0xffu);
 
@@ -100,6 +104,9 @@ WORD menu_bar(OBJECT *tree, WORD show)
         if ((tree[i].ob_flags & INDIRECT) != 0 || tree[i].ob_spec == 0) {
             continue;
         }
+        if (req.string_count >= (WORD)GEM_RPC_MENU_MAX_STRINGS) {
+            return 0;
+        }
         text = (const char *)(intptr_t)tree[i].ob_spec;
         req.strings[req.string_count].object = i;
         strncpy(req.strings[req.string_count].text, text,
@@ -109,6 +116,10 @@ WORD menu_bar(OBJECT *tree, WORD show)
 
     if (!gem_rpc_call(GEM_RPC_MENU_BAR, &req, sizeof(req), &status, NULL, 0u)) {
         return 0;
+    }
+    /* Only an installed tree republishes its later mutations. */
+    if (status != 0) {
+        client_menu = tree;
     }
     return (WORD)status;
 }

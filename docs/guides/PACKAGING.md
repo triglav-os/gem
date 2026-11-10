@@ -53,7 +53,8 @@ outputs remain available for debugging.
 
 Fonts, cursor/alert resources and Gemscape toolbar artwork live in share/gem.
 Clock's installed proxy variant draws its own numerals and needs no numeral
-resource. Built-in Desktop icons are compiled in. Each bundled program except
+resource. Built-in Desktop icons are compiled in as fallbacks; optional folder, disk,
+document, program and trash resources in share/gem/icons override them. Each bundled program except
 Desktop, Stout and gemd has a small icon-only `<program>.rsc` in
 share/gem/icons, which Desktop uses for that program's launcher and File
 Manager entry. [Program deployment](PROGRAM_DEPLOYMENT.md) describes how
