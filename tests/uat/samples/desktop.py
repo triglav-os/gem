@@ -53,9 +53,9 @@ def check(session):
     folders = [(x, y) for x, y in positions if matches(initial, 'folder', x, y)]
     assert len(folders) == 2, 'Workspace and File Manager icons are missing'
     assert matches(initial, 'prg', 36, 170), 'Gemscape launcher icon is missing'
-    # terminal.rsc beside the Terminal program replaces the standard icon.
+    # icons/terminal.rsc in the resource directory replaces the standard icon.
     assert matches(initial, 'trash', 36, 236), \
-        'Terminal launcher does not show terminal.rsc from its directory'
+        'Terminal launcher does not show icons/terminal.rsc'
     assert matches(initial, 'trash', 576, 332), 'Trash icon missing'
     x, y = folders[0]
     session.click(x + 16, y + 16)
@@ -219,8 +219,19 @@ def main():
     terminal = session.path/'terminal'
     terminal.write_text('#!/bin/sh\nprintf ready > terminal-launched\ntouch \"uat_child/0 book.PDF\" \"uat_child/1 note.text\"\n')
     terminal.chmod(0o700)
-    # A program icon is an icon-only resource generated like the built-ins.
-    subprocess.run([args.resgen, 'icons', '-o', str(session.path/'terminal.rsc'),
+    # Program icons come from <resources>/icons/<program>.rsc. Use a private
+    # resource directory so the fixture's icon replaces the shipped ones: the
+    # Terminal launcher gets the Trash artwork and Gemscape has no icon.
+    # Kept outside the browsed Workspace so its listing is unchanged.
+    resources = session.path.parent/(session.path.name + '_resources')
+    shutil.rmtree(resources, ignore_errors=True)
+    (resources/'icons').mkdir(parents=True)
+    for item in Path(session.env['GEM_RESOURCE_DIR']).iterdir():
+        if item.name != 'icons':
+            (resources/item.name).symlink_to(item.resolve())
+    session.env['GEM_RESOURCE_DIR'] = str(resources)
+    (session.path/'terminal.rsc').unlink(missing_ok=True)
+    subprocess.run([args.resgen, 'icons', '-o', str(resources/'icons/terminal.rsc'),
                     str(Path(__file__).resolve().parents[3] /
                         'samples/data/artwork/icons/TRASH.PNG')],
                    check=True, stdout=subprocess.DEVNULL)

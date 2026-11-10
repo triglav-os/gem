@@ -105,11 +105,12 @@ def check(session, initial):
         checkpoint(session,'initial',session.frame('stable'))
         return
     if n==17:
-        session.event(3,150,20); session.event(10,150,20)
-        session.event(3,200,55); session.event(11,200,55)
+        # The window opens at 4x4 graf_handle() cells (32,64) in the 8x16 font.
+        session.event(3,150,52); session.event(10,150,52)
+        session.event(3,200,87); session.event(11,200,87)
         session.event(3,639,399)
         changed(session,'moved',initial)
-        session.click(83,56); exited(session)
+        session.click(90,87); exited(session)
     elif n==18:
         session.event(3,58,10)
         menu=changed(session,'menu_open',initial)

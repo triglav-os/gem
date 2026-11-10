@@ -252,6 +252,11 @@ WORD vdi_string_width(const char *string);
 WORD vdi_font_ascent(void);
 
 /*
+ * Returns the maximum character cell width of the active VDI font in pixels.
+ */
+WORD vdi_font_cell_width(void);
+
+/*
  * Returns the full cell height of the active VDI font in pixels.
  */
 WORD vdi_font_text_height(void);

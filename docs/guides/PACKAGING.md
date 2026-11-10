@@ -54,8 +54,10 @@ outputs remain available for debugging.
 Fonts, cursor/alert resources and Gemscape toolbar artwork live in share/gem.
 Clock's installed proxy variant draws its own numerals and needs no numeral
 resource. Built-in Desktop icons are compiled in. Each bundled program except
-Desktop, Stout and gemd has a small icon-only `<program>.rsc` beside it in bin,
-which Desktop uses for that program's launcher.
+Desktop, Stout and gemd has a small icon-only `<program>.rsc` in
+share/gem/icons, which Desktop uses for that program's launcher and File
+Manager entry. [Program deployment](PROGRAM_DEPLOYMENT.md) describes how
+distributions add further programs and icons.
 No demonstration disk is needed to run GEM, so no sample disks, extracted disk
 contents or historical IMGVIEW sources are included. Stout accepts user-supplied
 ST/MSA images and Atari programs. Any future optional disk pack must ship the

@@ -176,6 +176,10 @@ The November 2026 dialog review updates demos 24, 27 and 33 for the `11010`
 enclosure on untitled forms. Titled alerts in demos 32/33 and the file chooser
 in demo 34 use only standard window borders.
 
+The `graf_handle()` font-cell change updates demo 17 (its window is placed and
+sized in 8x16 cells) and demo 32 (its probe list uses the font height as line
+spacing).
+
 Inspect the PBMs in `tests/data/uat/` and compare them with the demo's source and
 catalog requirements before retaining them. Run `make tests` afterwards: proxy
 checkpoints must match the same direct references. `--capture` on `run.py`

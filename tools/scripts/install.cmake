@@ -11,10 +11,8 @@ endforeach()
 install(TARGETS ${gem_install_programs} ${gem_install_libraries}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
-# Desktop launcher icons live beside the programs they represent.
-foreach(program gemscape terminal clock calc gemread ted)
-    install(FILES ${GEM_APPS_DIR}/${program}.rsc DESTINATION ${CMAKE_INSTALL_BINDIR})
-endforeach()
+# Desktop program icons live in the shared icon directory, by program name.
+install(DIRECTORY ${GEM_RESOURCES_DIR}/icons DESTINATION ${CMAKE_INSTALL_DATADIR}/gem)
 install(DIRECTORY ${GEM_RESOURCES_DIR}/fonts DESTINATION ${CMAKE_INSTALL_DATADIR}/gem)
 install(FILES ${GEM_RESOURCES_DIR}/cursors.rsc ${GEM_RESOURCES_DIR}/alert_icons.rsc
     ${GEM_SAMPLES_DIR}/data/gemscape_toolbar.rsc

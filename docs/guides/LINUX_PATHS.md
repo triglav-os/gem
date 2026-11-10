@@ -15,6 +15,7 @@ they are not installation locations or persistent user-settings directories.
 | Browser log | `~/.local/state/gem/gemscape/cef.log` | `XDG_STATE_HOME` |
 | Interactive process logs | `~/.local/state/gem/sessions/<checkout-id>/` | `XDG_STATE_HOME` |
 | Home Trash | `~/.local/share/Trash/` | `XDG_DATA_HOME` |
+| Additional or replacement program icons | `~/.local/share/gem/icons/` | `XDG_DATA_HOME` |
 | gemd socket | `$XDG_RUNTIME_DIR/gem/gemd.sock` | `GEMD_SOCKET` |
 | Rasta framebuffer | `$XDG_RUNTIME_DIR/gem/rasta.fb` | `GEM_RASTA_FRAMEBUFFER` |
 
@@ -83,6 +84,7 @@ described in [the native guide](GEMIX_LINUX.md).
 | Applications and gemd (plus hosted Rasta) | `bin/` |
 | Required shared libraries | `lib/` (or configured architecture libdir) |
 | Fonts, cursors, alerts and Gemscape toolbar | `share/gem/` |
+| Program icons (`<program>.rsc`) | `share/gem/icons/` |
 | Private CEF libraries and required companion data | `lib/gem/cef/` |
 | Documentation / licenses | `share/doc/gem/`, `share/licenses/` |
 

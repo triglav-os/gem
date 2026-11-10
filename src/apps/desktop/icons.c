@@ -515,36 +515,73 @@ int desktop_launcher_program(WORD launcher, char *program, size_t size)
            gem_os_find_file(relative, program, size);
 }
 
-/* Launcher artwork loaded from a program's icon resource. */
+/* Program artwork loaded from an icon resource. */
 typedef struct desktop_custom_icon {
     desktop_icon_asset_t asset;
     desktop_rsc_icon_t bitmap;
 } desktop_custom_icon_t;
 
+enum {
+    /* Longest program name (without extension) that may own an icon. */
+    DESKTOP_ICON_NAME_MAX = 64,
+    /* Program icons remembered between browser reloads. */
+    DESKTOP_ICON_CACHE_SLOTS = 64
+};
+
+/* One remembered lookup; `found` is zero for names without an icon. */
+typedef struct desktop_icon_cache_slot {
+    char name[DESKTOP_ICON_NAME_MAX];
+    WORD used;
+    WORD found;
+    desktop_custom_icon_t icon;
+} desktop_icon_cache_slot_t;
+
+static desktop_icon_cache_slot_t desktop_icon_cache[DESKTOP_ICON_CACHE_SLOTS];
+static size_t desktop_icon_cache_next;
+
 /*
- * Loads `<program>.rsc` (any extension of the program replaced) from the
- * program's own directory into icon. Returns nonzero when an icon-only
- * resource with a valid ICONBLK was read.
+ * Copies the icon name of a program (its leaf name with any extension
+ * removed) into `name`. Hidden, empty and overlong names have no icon.
  */
-static int desktop_load_program_icon(const char *program,
-                                     desktop_custom_icon_t *icon)
+static int desktop_program_icon_name(const char *program, char *name,
+                                     size_t size)
 {
-    char path[GEM_OS_PATH_MAX];
-    const char *leaf = strrchr(program, '/');
+    const char *leaf;
     const char *dot;
     size_t stem;
+
+    if (program == NULL || name == NULL || size == 0u)
+        return 0;
+    leaf = strrchr(program, '/');
+    leaf = leaf != NULL ? leaf + 1 : program;
+    dot = strrchr(leaf, '.');
+    stem = dot != NULL ? (size_t)(dot - leaf) : strlen(leaf);
+    if (stem == 0u || leaf[0] == '.' || stem >= size)
+        return 0;
+    memcpy(name, leaf, stem);
+    name[stem] = '\0';
+    return 1;
+}
+
+/*
+ * Loads `icons/<name>.rsc` from the GEM resource search path (see
+ * gem_os_find_resource) into icon. Returns nonzero when an icon-only
+ * resource with a valid ICONBLK was read.
+ */
+static int desktop_load_program_icon(const char *name,
+                                     desktop_custom_icon_t *icon)
+{
+    char relative[sizeof("icons/") + DESKTOP_ICON_NAME_MAX + sizeof(".rsc")];
+    char path[GEM_OS_PATH_MAX];
     unsigned char *bytes;
     size_t length = 0;
     int ok = 0;
 
-    leaf = leaf != NULL ? leaf + 1 : program;
-    dot = strrchr(leaf, '.');
-    stem = dot != NULL && dot != leaf ? (size_t)(dot - program)
-                                      : strlen(program);
-    if (stem + sizeof(".rsc") > sizeof(path))
+    if (strlen(name) >= DESKTOP_ICON_NAME_MAX)
         return 0;
-    memcpy(path, program, stem);
-    memcpy(path + stem, ".rsc", sizeof(".rsc"));
+    snprintf(relative, sizeof(relative), "icons/%s.rsc", name);
+    if (!gem_os_find_resource(relative, path, sizeof(path)))
+        return 0;
     bytes = gem_os_alloc(DESKTOP_RSC_ICON_MAX_FILE + 1u);
     if (bytes == NULL)
         return 0;
@@ -561,16 +598,47 @@ static int desktop_load_program_icon(const char *program,
     return ok;
 }
 
-/* Launcher artwork from a program's .rsc, else the standard icon. */
+const desktop_icon_asset_t *desktop_program_icon(const char *program)
+{
+    char name[DESKTOP_ICON_NAME_MAX];
+    desktop_icon_cache_slot_t *slot;
+    size_t i;
+
+    if (!desktop_program_icon_name(program, name, sizeof(name)))
+        return NULL;
+    for (i = 0; i < DESKTOP_ICON_CACHE_SLOTS; ++i) {
+        slot = &desktop_icon_cache[i];
+        if (slot->used != 0 && strcmp(slot->name, name) == 0)
+            return slot->found != 0 ? &slot->icon.asset : NULL;
+    }
+    /* Round-robin replacement; callers use the asset immediately. */
+    slot = &desktop_icon_cache[desktop_icon_cache_next];
+    desktop_icon_cache_next =
+        (desktop_icon_cache_next + 1u) % DESKTOP_ICON_CACHE_SLOTS;
+    memset(slot, 0, sizeof(*slot));
+    memcpy(slot->name, name, strlen(name) + 1u);
+    slot->used = 1;
+    slot->found = (WORD)desktop_load_program_icon(name, &slot->icon);
+    return slot->found != 0 ? &slot->icon.asset : NULL;
+}
+
+void desktop_program_icons_forget(void)
+{
+    memset(desktop_icon_cache, 0, sizeof(desktop_icon_cache));
+    desktop_icon_cache_next = 0;
+}
+
+/* Launcher artwork from the icon directory, else the standard icon. */
 static const desktop_icon_asset_t *desktop_launcher_asset(WORD launcher)
 {
+    /* Launcher entries keep their asset pointer, so own private copies. */
     static desktop_custom_icon_t custom[4];
-    char program[GEM_OS_PATH_MAX];
 
     if (launcher == 1)
         return &desktop_folder_icon_asset;
-    if (desktop_launcher_program(launcher, program, sizeof(program)) &&
-        desktop_load_program_icon(program, &custom[launcher]))
+    if ((launcher == 2 || launcher == 3) &&
+        desktop_load_program_icon(launcher == 2 ? "gemscape" : "terminal",
+                                  &custom[launcher]))
         return &custom[launcher].asset;
     return &desktop_prg_icon_asset;
 }

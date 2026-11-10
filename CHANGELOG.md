@@ -10,11 +10,20 @@ Unreleased.
   launchers appear only with `[desktop] show_launchers = true` in
   `desktop.cfg`.
 
-- Desktop launchers show a program's own icon when an icon-only
-  `<program>.rsc` (made by `resgen icons` from 32x32 monochrome artwork) sits
-  beside it. Gemscape, Terminal, Clock, Calculator, Gemread and Ted now ship
-  with such icons; artwork for the planned Fyodor, Isaac and Blaise
-  applications is included.
+- Desktop launchers and executable entries in File Manager windows show a
+  program's own icon when an icon-only `<name>.rsc` (made by `resgen icons`
+  from 32x32 monochrome artwork) is in the icon directory: `share/gem/icons/`
+  of the installation, `~/.local/share/gem/icons/` for the user, or
+  `GEM_RESOURCE_DIR/icons/`. The name is the program's file name without its
+  extension. Icons beside the program are no longer used. Gemscape, Terminal,
+  Clock, Calculator, Gemread and Ted now ship with such icons; artwork for the
+  planned Fyodor, Isaac and Blaise applications is included.
+
+- `graf_handle()` now reports the character cell of the font that the AES
+  draws object text in (8x16 with the standard system font) instead of a fixed
+  6x8 cell, so dialogs sized from it no longer come out too small. Menu trees
+  written in character units keep the 6x8 grid, and Stout's Atari metrics are
+  unchanged.
 
 - Pushing a `vX.Y.Z` tag builds the hosted and native runtime packages (gemd,
   GEM libraries and all bundled applications) on GitHub Actions and publishes

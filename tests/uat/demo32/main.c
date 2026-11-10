@@ -13,7 +13,7 @@
 #include <stdio.h>
 #include <string.h>
 
-enum { demo32_line_count = 11, demo32_line_gap = 6 };
+enum { demo32_line_count = 11 };
 
 typedef struct demo32_state {
     WORD handle;
@@ -111,7 +111,7 @@ static void demo32_draw(demo32_state_t *state, const GRECT *dirty)
 
             for (line = 0; line < demo32_line_count; ++line) {
                 WORD text_y = (WORD)(work.g_y + 6 +
-                                     line * (state->char_h + demo32_line_gap) +
+                                     line * state->char_h +
                                      state->ascent);
 
                 v_gtext(vdi_handle, (WORD)(work.g_x + 8), text_y,

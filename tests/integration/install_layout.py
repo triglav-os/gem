@@ -47,11 +47,12 @@ libraries = {'lib' + name + '.so' for name in ('gem', 'aes', 'vdi', 'platform_li
 if cache['GEM_PLATFORM'] == 'linux':
     programs.remove('rasta')
     libraries.remove('librasta.so')
-launcher_icons = {name + '.rsc' for name in ('gemscape', 'terminal', 'clock', 'calc', 'gemread', 'ted')}
-assert {p.name for p in (relocated/bindir).iterdir()} == programs | launcher_icons
+program_icons = {'icons/' + name + '.rsc' for name in ('gemscape', 'terminal', 'clock', 'calc', 'gemread', 'ted')}
+assert {p.name for p in (relocated/bindir).iterdir()} == programs
 assert {p.name for p in (relocated/libdir).iterdir()} == libraries | {'gem'}
 assert {p.relative_to(relocated).parts[0] for p in relocated.iterdir()} == {bindir.split('/')[0], libdir.split('/')[0], datadir.split('/')[0]}
-resources = {'fonts/AtariSTHigh.fnt', 'fonts/8x16_z1.fnt', 'cursors.rsc', 'alert_icons.rsc', 'gemscape_toolbar.rsc'}
+resources = {'fonts/AtariSTHigh.fnt', 'fonts/8x16_z1.fnt', 'cursors.rsc', 'alert_icons.rsc',
+             'gemscape_toolbar.rsc'} | program_icons
 assert {str(p.relative_to(relocated/datadir/'gem')) for p in (relocated/datadir/'gem').rglob('*') if p.is_file()} == resources
 cef = relocated/libdir/'gem/cef'
 cef_binaries = {'libcef.so', 'libEGL.so', 'libGLESv2.so', 'libvk_swiftshader.so', 'libvulkan.so.1'}

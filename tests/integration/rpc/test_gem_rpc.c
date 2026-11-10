@@ -221,6 +221,8 @@ int main(int argc, char **argv)
     assert(
         vqt_fontinfo(handle, &min_ade, &max_ade, distances, &width, effects));
     assert(min_ade <= 'A' && max_ade >= 'z' && width > 0 && distances[3] > 0);
+    /* graf_handle() reports the cell of the font that objects draw in. */
+    assert(cw == width && ch == distances[3]);
     assert(vqt_fontinfo(handle, NULL, NULL, NULL, NULL, NULL));
     graf_mkstate(&mx, &my, &buttons, &keys);
     assert(mx >= 0 && my >= 0);

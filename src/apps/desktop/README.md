@@ -110,13 +110,24 @@ search path.
 
 ## Program icons
 
-A program launcher looks for `<program>.rsc` in the directory of the program
-it resolved (any extension on the program name is replaced). If the file
-holds an icon-only GEM resource, Desktop draws its first ICONBLK, up to 32x32
-pixels, instead of the standard program icon. Otherwise the standard icon
-stays. Resources with object trees are ignored, so an application's own
-dialog resource is never mistaken for its icon. Every offset is bounds-checked
-because the file is untrusted.
+Program icons live in one icon directory, named after the program:
+`icons/<name>.rsc` on the GEM resource search path. Installed icons are in
+`<prefix>/share/gem/icons/` (for example `/usr/share/gem/icons/terminal.rsc`);
+a user can add or override icons in `~/.local/share/gem/icons/`
+(`$XDG_DATA_HOME/gem/icons/`), and `GEM_RESOURCE_DIR/icons/` takes precedence
+over both. The name is the program's file name without any extension, so
+`/opt/gem/Programs/terminal` and `TERMINAL.PRG` look for `terminal.rsc` and
+`TERMINAL.rsc` respectively. Icons are no longer read from the program's own
+directory.
+
+Desktop launchers and executable entries in File Manager windows use the icon
+when the file holds an icon-only GEM resource: Desktop draws its first
+ICONBLK, up to 32x32 pixels, instead of the standard program icon. Otherwise
+the standard icon stays. Resources with object trees are ignored, so an
+application's own dialog resource is never mistaken for its icon. Every offset
+is bounds-checked because the file is untrusted. File Manager remembers icon
+lookups until the window lists a directory again, so newly installed icons
+appear after the folder is reopened or refreshed.
 
 Icons use the same monochrome format as the built-in artwork: draw a 32x32
 PNG in `samples/data/artwork/icons/` (transparent outside the icon, black
@@ -127,7 +138,8 @@ resgen icons -o gemscape.rsc samples/data/artwork/icons/GEMSCAPE.PNG
 ```
 
 The build does this for Gemscape, Terminal, Clock, Calculator, Gemread and
-Ted, and installs each resource beside its program. `FYODOR.PNG`,
+Ted, writes each resource to `bin/resources/icons/` and installs it in
+`share/gem/icons/`. `FYODOR.PNG`,
 `ISAAC.PNG` and `BLAISE.PNG` are ready for the planned word processor,
 spreadsheet and email client.
 Configured locations and the bottom-right Trash icon retain their positions.

@@ -220,11 +220,20 @@ int desktop_disk_copy_entry(desktop_browser_window_t *source,
                             const char *destination, const char *parent);
 /*
  * Append File Manager, Gemscape and Terminal quick launch icons. A program
- * launcher uses an icon-only `<program>.rsc` (as written by `resgen icons`)
- * from the program's directory when one loads, and the standard program
- * icon otherwise.
+ * launcher uses its icon from the icon directory (see desktop_program_icon)
+ * when one loads, and the standard program icon otherwise.
  */
 void desktop_install_launchers(void);
+/*
+ * Program artwork for `program` (a name or path; any extension is ignored):
+ * the icon-only resource `icons/<name>.rsc`, as written by `resgen icons`,
+ * found through the GEM resource search path, e.g. /usr/share/gem/icons.
+ * Results are cached. Returns NULL when no valid icon exists; the asset is
+ * valid only until the next call, so use it immediately.
+ */
+const desktop_icon_asset_t *desktop_program_icon(const char *program);
+/* Drop cached program icons so installed or removed icons are noticed. */
+void desktop_program_icons_forget(void);
 /* Resolve the executable for program launcher 2 or 3; nonzero on success. */
 int desktop_launcher_program(WORD launcher, char *program, size_t size);
 /* Route Return and arrow-key navigation to the active browser. */

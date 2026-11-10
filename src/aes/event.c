@@ -720,11 +720,17 @@ WORD graf_handle(WORD *charw, WORD *charh, WORD *boxw, WORD *boxh)
     if (aes_ensure_vdi() == 0) {
         return 0;
     }
+    /* Report the cell of the font that object text is drawn in, so that
+     * callers sizing dialogs from it match what the AES paints. */
     if (charw != NULL) {
-        *charw = AES_CHAR_WIDTH;
+        WORD width = vdi_font_cell_width();
+
+        *charw = (width > 0) ? width : AES_CHAR_WIDTH;
     }
     if (charh != NULL) {
-        *charh = AES_CHAR_HEIGHT;
+        WORD height = vdi_font_text_height();
+
+        *charh = (height > 0) ? height : AES_CHAR_HEIGHT;
     }
     if (boxw != NULL) {
         *boxw = 8;

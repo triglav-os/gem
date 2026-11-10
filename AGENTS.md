@@ -22,6 +22,8 @@ update this index when documents move or new essential guidance is added.
   layout, XDG storage, Docker mounts and legacy settings migration.
 - [Packaging contract](docs/guides/PACKAGING.md): minimal runtime/SDK contents,
   dependency notices, staging and integrity checks.
+- [Program deployment](docs/guides/PROGRAM_DEPLOYMENT.md): where distributions
+  install programs, Programs entries and desktop icons, and the icon search order.
 - [Configuration guide](docs/guides/CONFIGURATION.md): XDG component files,
   syntax, Desktop locations and the libgemconf API.
 - [Gemscape browser](docs/guides/GEMSCAPE.md): input, settings, profiles,

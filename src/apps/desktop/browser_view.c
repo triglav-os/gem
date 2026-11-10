@@ -70,7 +70,9 @@ desktop_browser_entry_asset(const desktop_browser_window_t *browser,
         return &desktop_folder_icon_asset;
     }
     if (desktop_browser_entry_has_prg_icon(browser, entry) != 0) {
-        return &desktop_prg_icon_asset;
+        const desktop_icon_asset_t *own = desktop_program_icon(entry->name);
+
+        return own != NULL ? own : &desktop_prg_icon_asset;
     }
     return &desktop_doc_icon_asset;
 }

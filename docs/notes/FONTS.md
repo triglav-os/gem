@@ -174,10 +174,13 @@ bring-up description of a tiny fallback in `_vdi.c` no longer describes the
 code. Public font/text entry points are in
 [src/vdi/text.c](../../src/vdi/text.c).
 
-Hosted AES retains its established 6x8 resource coordinate grid. Stout's
-`graf_handle()` trap adapter reports the Atari high-resolution 8x16 system
-character cell to emulated programs, so embedded Atari resources expand
-correctly without changing native application geometry. TEDINFO font selectors
+Hosted `graf_handle()` reports the cell of the active system font, the font
+the AES draws object text in (8x16 normally, 6x6 with small metrics), and falls
+back to 6x8 only before fonts are available. Menu trees given in character
+units still expand on the established 6x8 grid. Stout's `graf_handle()` trap
+adapter reports the Atari high-resolution 8x16 system character cell to
+emulated programs, so embedded Atari resources expand correctly without
+changing native application geometry. TEDINFO font selectors
 are applied while each object is drawn. Private Stout selectors distinguish
 guest `IBM` and `SMALL` TEDINFOs from native hosted objects; guest `SMALL` uses
 the Atari 6x6 cell, while native `SMALL` keeps its 8x16 cell so Desktop and File

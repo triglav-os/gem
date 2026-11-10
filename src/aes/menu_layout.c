@@ -19,7 +19,6 @@ void aes_menu_prepare_tree(OBJECT *tree)
 {
     WORD last_object;
     WORD wchar = AES_CHAR_WIDTH;
-    WORD hchar = AES_CHAR_HEIGHT;
     WORD boxw = AES_DECOR;
     WORD boxh = aes_menu_chrome_height();
     WORD menu_bar_height;
@@ -174,7 +173,9 @@ void aes_menu_prepare_tree(OBJECT *tree)
         popup_parent = aes_menu_popup_container(tree);
     }
 
-    (void)graf_handle(&wchar, &hchar, &boxw, &boxh);
+    /* Character-sized menu trees keep the established 6x8 resource grid;
+     * graf_handle() reports the drawn font cell, which is larger. */
+    (void)graf_handle(NULL, NULL, &boxw, &boxh);
     menu_bar_height = boxh;
     menu_item_height = aes_chrome_height();
     menu_separator_height = (WORD)aes_max_word((WORD)8, (WORD)(boxh - 4));

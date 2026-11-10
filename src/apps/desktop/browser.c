@@ -159,6 +159,8 @@ static int desktop_browser_load_directory(desktop_browser_window_t *browser,
         return 0;
     }
     desktop_browser_reset_entries(browser, path);
+    /* Notice program icons installed or removed since the last listing. */
+    desktop_program_icons_forget();
     if (add_parent != 0) {
         desktop_browser_add_parent(browser);
     }
