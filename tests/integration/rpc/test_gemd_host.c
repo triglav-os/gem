@@ -414,8 +414,8 @@ static void compact_window_geometry(void)
                          &round_trip.g_y, &round_trip.g_w, &round_trip.g_h));
         assert(memcmp(&outer, &round_trip, sizeof(outer)) == 0);
         if (scroll[i] == 0) {
-            assert(outer.g_x + outer.g_w - work.g_x - work.g_w == 4);
-            assert(outer.g_y + outer.g_h - work.g_y - work.g_h == 4);
+            assert(outer.g_x + outer.g_w - work.g_x - work.g_w == 1);
+            assert(outer.g_y + outer.g_h - work.g_y - work.g_h == 1);
             for (WORD y = (WORD)(outer.g_y + outer.g_h - 12);
                  y < outer.g_y + outer.g_h; ++y) {
                 for (WORD x = (WORD)(outer.g_x + outer.g_w - 12);

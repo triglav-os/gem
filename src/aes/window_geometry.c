@@ -63,7 +63,7 @@ WORD aes_window_scroll_button_side(const aes_window_t *window)
 WORD aes_window_right_border(const aes_window_t *window)
 {
     if (aes_window_has_compact_sizer(window) != 0) {
-        return 4;
+        return 1;
     }
     if (window != NULL &&
         ((window->kind & SIZER) != 0u || aes_window_has_vscroll(window) != 0)) {
@@ -75,7 +75,7 @@ WORD aes_window_right_border(const aes_window_t *window)
 WORD aes_window_bottom_border(const aes_window_t *window)
 {
     if (aes_window_has_compact_sizer(window) != 0) {
-        return 4;
+        return 1;
     }
     if (window != NULL &&
         ((window->kind & SIZER) != 0u || aes_window_has_hscroll(window) != 0)) {

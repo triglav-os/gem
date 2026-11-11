@@ -304,3 +304,12 @@ Build and install headers, libgem and gemd together when using the optional
 existing applications need no changes. See [the transport contract](../architecture/API_TRANSPORT.md#optional-hosted-physical-keyboard-events).
 The CPC consumer can layer these artifacts over its pinned SDK image without
 replacing the published image, keyed by the local source contents.
+
+## Compact resizable frames
+
+A window with `SIZER` and no scroll arrows or sliders has a one-pixel
+bottom/right border. `WF_WORKXYWH` and `wind_calc` exclude that border
+exactly, so a status strip can meet it without extra bottom padding. AES
+draws no inner frame or L-shaped grip for this mode. The native sizing
+hit target remains the corner portion of the outer border; clicks inside
+the work rectangle remain client input. Scrollbar frames are unchanged.

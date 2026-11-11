@@ -6,6 +6,11 @@ Unreleased.
 
 ## Unreleased
 
+- Scrollbar-free resizable windows use a one-pixel bottom/right border.
+  The work area reaches that border without a gutter, inner frame or
+  L-shaped corner strokes. AES retains native sizing on the corner border;
+  windows with scrollbars retain their existing chrome.
+
 - Rejected menu replacements (including negative RPC status) preserve the
   active client tree. Menu labels are rejected when oversized or unterminated
   instead of silently shortened; bounded iterative graph validation avoids
