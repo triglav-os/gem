@@ -107,7 +107,8 @@ static void desktop_add_folder_icon(const char *path, const char *label)
     } else {
         desktop_label_from_path(path, entry->label, sizeof(entry->label));
     }
-    entry->asset = desktop_standard_icon(&desktop_folder_icon_asset);
+    (void)desktop_icon_copy(path, &desktop_folder_icon_asset, &entry->custom);
+    desktop_bind_location_icon(entry);
     entry->draw_info.asset = entry->asset;
     entry->draw_info.label = entry->label;
     entry->userblk.ab_code = (LONG)(intptr_t)desktop_user_draw;
@@ -122,7 +123,7 @@ static void desktop_add_folder_icon(const char *path, const char *label)
     ++g_desktop.icon_count;
 }
 
-void desktop_bind_file_icon(desktop_icon_entry_t *entry)
+void desktop_bind_location_icon(desktop_icon_entry_t *entry)
 {
     entry->custom.asset.mask_bits = entry->custom.bitmap.mask;
     entry->custom.asset.data_bits = entry->custom.bitmap.data;
@@ -155,7 +156,7 @@ static void desktop_add_file_icon(const char *path, const char *label)
                             entry->is_app != 0 ? &desktop_prg_icon_asset
                                                : &desktop_doc_icon_asset,
                             &entry->custom);
-    desktop_bind_file_icon(entry);
+    desktop_bind_location_icon(entry);
     entry->draw_info.asset = entry->asset;
     entry->draw_info.label = entry->label;
     entry->userblk.ab_code = (LONG)(intptr_t)desktop_user_draw;
@@ -169,8 +170,9 @@ static void desktop_mark_disk_icon(const char *path)
     WORD i;
     for (i = 0; i < g_desktop.icon_count; ++i) {
         if (strcmp(g_desktop.icons[i].path, path) == 0) {
-            g_desktop.icons[i].asset =
-                desktop_standard_icon(&desktop_disk_icon_asset);
+            (void)desktop_icon_copy(NULL, &desktop_disk_icon_asset,
+                                    &g_desktop.icons[i].custom);
+            desktop_bind_location_icon(&g_desktop.icons[i]);
             g_desktop.icons[i].draw_info.asset = g_desktop.icons[i].asset;
             return;
         }

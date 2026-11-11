@@ -11,7 +11,7 @@ endforeach()
 install(TARGETS ${gem_install_programs} ${gem_install_libraries}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
-# Desktop program icons live in the shared icon directory, by program name.
+# Program, location and file-type icons share the Desktop icon directory.
 install(DIRECTORY ${GEM_RESOURCES_DIR}/icons DESTINATION ${CMAKE_INSTALL_DATADIR}/gem)
 install(DIRECTORY ${GEM_RESOURCES_DIR}/fonts DESTINATION ${CMAKE_INSTALL_DATADIR}/gem)
 install(FILES ${GEM_RESOURCES_DIR}/cursors.rsc ${GEM_RESOURCES_DIR}/alert_icons.rsc

@@ -69,6 +69,11 @@ same file locally. gemd watches the atomically replaced user `desktop.cfg` and
 reloads it within 100 ms, so a save made through `libgemconf` also refreshes a
 running proxy Desktop.
 
+Folder locations select artwork by the actual folder name rather than the
+display label. Home, Programs, Documents and Library map to their bundled
+icons regardless of ASCII case; exact-name custom resources take precedence.
+See [icon lookup and deployment](PROGRAM_DEPLOYMENT.md).
+
 Desktop also writes `desktop-icons.cfg` itself: `[positions]` maps each icon
 the user has dragged (by path, or `launcher:N` for a launcher) to a grid
 `column,row`. It is separate from gemd-owned `desktop.cfg`, so moving icons

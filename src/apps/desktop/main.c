@@ -124,8 +124,9 @@ void desktop_refresh_icon_bindings(void)
     WORD i;
 
     for (i = 0; i < g_desktop.icon_count; ++i) {
-        if (g_desktop.icons[i].is_file != 0)
-            desktop_bind_file_icon(&g_desktop.icons[i]);
+        if (g_desktop.icons[i].is_file != 0 ||
+            g_desktop.icons[i].is_folder != 0)
+            desktop_bind_location_icon(&g_desktop.icons[i]);
         g_desktop.icons[i].draw_info.asset = g_desktop.icons[i].asset;
         g_desktop.icons[i].draw_info.label = g_desktop.icons[i].label;
         g_desktop.icons[i].userblk.ab_code = (LONG)(intptr_t)desktop_user_draw;

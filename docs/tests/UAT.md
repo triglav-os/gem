@@ -205,6 +205,14 @@ captured PBMs live under `<build-dir>/uat/desktop_<mode>/`. These checks use
 deterministic HID input and require no AI or manual clicking. The fixture
 configures its session directory as the sole folder shortcut.
 
+A separate headless visual check on 2026-11-11 verified the shipped Home,
+Documents, Library and Programs artwork in both Desktop and File Manager,
+using direct and proxy sessions. Desktop shortcut labels deliberately differed
+from the actual folder names. Captures and the check log are under
+`build/icon-artwork/`; this additional check is not counted as a CTest case.
+The persistent lookup regression is `test_desktop_icon_lookup`, described in
+[test reporting](README.md).
+
 Desktop checks also open the three-line system menu, require distinct
 Add Location, Remove Location and Shutdown rows with separators, open/cancel
 the directory chooser, assert that Desk has no blank rows with one browser

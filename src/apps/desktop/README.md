@@ -150,8 +150,12 @@ is tried longest first, so `backup.tar.gz` uses `.tar.gz.rsc` before
 `.gz.rsc`. Folders and hidden files such as `.profile` never use extension
 icons. If no icon is found, or it is invalid, they try the common
 `folder.rsc`, `document.rsc` or `program.rsc`, then the built-in artwork.
-The parent-directory entry uses `folder.rsc`. Desktop locations use
-`folder.rsc` or `disk.rsc`; Trash uses `trash.rsc`. The Files launcher tries
+Folders named Home, Programs, Documents and Library also map to `home.rsc`,
+`programs.rsc`, `documents.rsc` and `library.rsc`, ignoring ASCII case. An
+exact-name resource takes precedence. Desktop folder locations use the same
+lookup by the actual folder name, independently of their displayed label.
+The parent-directory entry uses `folder.rsc`; disk locations use `disk.rsc`;
+Trash uses `trash.rsc`. The Files launcher tries
 `filemanager.rsc`, then `folder.rsc`. These resources all live in the same
 `icons/` directory and use the same XDG override order and validation as
 program icons. Browser refresh reloads common icons as well as per-entry
@@ -165,8 +169,9 @@ ink, white paper) and convert it with `resgen`:
 resgen icons -o gemscape.rsc samples/data/artwork/icons/GEMSCAPE.PNG
 ```
 
-The build does this for Gemscape, Terminal, Clock, Calculator, Gemread and
-Ted, writes each resource to `bin/resources/icons/` and installs it in
+The build does this for Gemscape, Terminal, Clock, Calculator, Gemread, Ted,
+Home, Programs, Documents and Library. It writes each resource with a lowercase
+name to `bin/resources/icons/` and installs it in
 `share/gem/icons/`. `FYODOR.PNG`,
 `ISAAC.PNG` and `BLAISE.PNG` are ready for the planned word processor,
 spreadsheet and email client.

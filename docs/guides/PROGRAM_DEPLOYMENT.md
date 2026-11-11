@@ -13,6 +13,7 @@ see the [packaging contract](PACKAGING.md) for their contents.
 | Executable | `<prefix>/bin/<name>` | Any GEM client or Linux program Desktop may launch |
 | Program entry | A folder that Desktop shows as a location, e.g. `<prefix>/Programs/<name>` | Lowercase name; usually a relative symlink to `../bin/<name>` |
 | Icon | `<prefix>/share/gem/icons/<name>.rsc` | Same `<name>` as the entry, without any extension |
+| Folder icon | `<prefix>/share/gem/icons/<name>.rsc` | Exact folder name first; Home, Programs, Documents and Library also map to lowercase names |
 | File-type icon | `<prefix>/share/gem/icons/.<ext>.rsc` | Leading dot, lowercase extension; used for every file with that extension, e.g. `.txt.rsc` |
 | Location | `[locations]` in `desktop.cfg` | Shows the program folder on the desktop |
 
@@ -55,6 +56,18 @@ resgen icons -o blaise.rsc BLAISE.PNG
 install -m 0644 blaise.rsc <prefix>/share/gem/icons/blaise.rsc
 ```
 
+Additional location artwork is available in `samples/data/artwork/icons/`:
+`HOME.PNG` (house), `PROGRAMS.PNG` (application windows), `DOCUMENTS.PNG`
+(folder with papers) and `LIBRARY.PNG` (books on a shelf). The normal build
+converts these to `home.rsc`, `programs.rsc`, `documents.rsc` and `library.rsc`
+in `bin/resources/icons/`. Runtime packages install them alongside program
+icons in `<prefix>/share/gem/icons/`, using the same resource search path.
+Folders named Home, Programs, Documents or Library use these icons automatically,
+ignoring ASCII case for this mapping only. Exact-name resources (for example
+`Documents.rsc`) take precedence over the mapped `documents.rsc`. Desktop
+folder shortcuts use the folder's actual name, not their configured display
+label; File Manager and Trash use the same mapping. Linux paths are unchanged.
+
 Desktop searches for `icons/<name>.rsc` in this order and uses the first match:
 
 1. `$GEM_RESOURCE_DIR/icons/`, for development and tests.
@@ -84,8 +97,9 @@ icons. The GEM package ships `.txt.rsc`, `.md.rsc` and `.pdf.rsc`; a user icon
 of the same name overrides them. If no icon is found, or it is invalid, they
 try the common
 `folder.rsc`, `document.rsc` or `program.rsc`, then the built-in artwork.
-The parent-directory entry uses `folder.rsc`. Desktop locations use
-`folder.rsc` or `disk.rsc`; Trash uses `trash.rsc`. The Files launcher tries
+The parent-directory entry uses `folder.rsc`. Desktop folder locations use the
+same named-icon lookup before `folder.rsc`; disk locations use `disk.rsc`.
+Trash uses `trash.rsc`. The Files launcher tries
 `filemanager.rsc`, then `folder.rsc`. These resources all live in the same
 `icons/` directory and use the same XDG override order and validation as
 program icons. Browser refresh reloads common icons as well as per-entry
@@ -99,6 +113,9 @@ lookups. Launcher artwork is loaded when the desktop launchers are created.
   show its own icon.
 - Opening the Programs folder in icon view shows the program's icon. Programs
   without an icon file show the standard icon.
+- Folders named Home, Programs, Documents and Library show their matching
+  artwork in File Manager and when added to Desktop. A shortcut's display
+  label can differ from its folder name without changing the selected icon.
 
 Desktop's own details are in its
 [README](../../src/apps/desktop/README.md#program-icons). The full install

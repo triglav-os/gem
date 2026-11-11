@@ -14,6 +14,7 @@ add_executable(test_desktop_icon_lookup test_desktop_icon_lookup.c
     ${PROJECT_SOURCE_DIR}/src/apps/desktop/desktop_icon_lookup.c
     ${PROJECT_SOURCE_DIR}/src/apps/desktop/desktop_icon_rsc.c
     ${PROJECT_SOURCE_DIR}/src/apps/desktop/desktop_assets.c
+    ${PROJECT_SOURCE_DIR}/src/apps/desktop/disks.c
     ${PROJECT_SOURCE_DIR}/src/apps/desktop/browser_view.c)
 target_include_directories(test_desktop_icon_lookup PRIVATE
     ${PROJECT_SOURCE_DIR}/include

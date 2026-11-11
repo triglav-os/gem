@@ -122,7 +122,7 @@ typedef struct desktop_icon_entry {
     WORD is_file;
     WORD is_app;
     WORD launcher;
-    /* Artwork for is_file icons; rebound after entries move. */
+    /* Artwork for file/folder/disk locations; rebound after entries move. */
     desktop_custom_icon_t custom;
 } desktop_icon_entry_t;
 
@@ -314,8 +314,8 @@ void desktop_refresh_locations(void);
 void desktop_choose_location(void);
 /* Remove the selected configured desktop location. */
 void desktop_delete_selected_location(void);
-/* Point a file icon at its own artwork after the entry was copied. */
-void desktop_bind_file_icon(desktop_icon_entry_t *entry);
+/* Point a location icon at its own artwork after the entry was copied. */
+void desktop_bind_location_icon(desktop_icon_entry_t *entry);
 /* Place the active File Manager selection on the desktop as icons. */
 void desktop_add_selection_to_desktop(void);
 /* Nonzero when a File Manager name denotes a program (PRG or executable). */

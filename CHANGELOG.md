@@ -6,6 +6,13 @@ Unreleased.
 
 ## Unreleased
 
+- Added matching 32x32 monochrome artwork for Home, Programs, Documents and
+  Library in `samples/data/artwork/icons/`. The normal build generates their
+  icon resources in `bin/resources/icons/` and installs them in
+  `share/gem/icons/` alongside the program icons.
+  Desktop shortcuts and File Manager select them by folder name, regardless
+  of ASCII case, while preserving exact-name custom icon overrides.
+
 - Desktop icons can be dragged. They snap to the icon grid and keep their
   position across restarts (`desktop-icons.cfg`). Moving one leaves its cell
   empty; the other icons stay where they are.

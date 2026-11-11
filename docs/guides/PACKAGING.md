@@ -57,7 +57,9 @@ resource. Built-in Desktop icons are compiled in as fallbacks; optional folder, 
 document, program and trash resources in share/gem/icons override them. Each bundled program except
 Desktop, Stout and gemd has a small icon-only `<program>.rsc` in
 share/gem/icons, which Desktop uses for that program's launcher and File
-Manager entry. [Program deployment](PROGRAM_DEPLOYMENT.md) describes how
+Manager entry. Home, Programs, Documents and Library artwork is installed in
+the same directory as `home.rsc`, `programs.rsc`, `documents.rsc` and
+`library.rsc`. [Program deployment](PROGRAM_DEPLOYMENT.md) describes how
 distributions add further programs and icons.
 No demonstration disk is needed to run GEM, so no sample disks, extracted disk
 contents or historical IMGVIEW sources are included. Stout accepts user-supplied

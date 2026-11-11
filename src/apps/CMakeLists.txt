@@ -13,14 +13,14 @@ foreach(target clock clock_gemd gemscape gemscape_hosted)
     target_link_libraries(${target} PRIVATE sample_resources)
 endforeach()
 
-# Desktop program icons: icon-only resources in the shared icon directory
-# (share/gem/icons/<program>.rsc), built by resgen from the 32x32 reference
+# Shared program and location icons: icon-only resources in the shared icon
+# directory (share/gem/icons/<name>.rsc), built by resgen from the 32x32 reference
 # artwork like the built-in icons.
 set(gem_launcher_icons)
-foreach(program gemscape terminal clock calc gemread ted)
-    string(TOUPPER ${program} artwork)
+foreach(icon gemscape terminal clock calc gemread ted home programs documents library)
+    string(TOUPPER ${icon} artwork)
     set(source ${PROJECT_SOURCE_DIR}/samples/data/artwork/icons/${artwork}.PNG)
-    set(output ${GEM_RESOURCES_DIR}/icons/${program}.rsc)
+    set(output ${GEM_RESOURCES_DIR}/icons/${icon}.rsc)
     add_custom_command(OUTPUT ${output}
         COMMAND ${CMAKE_COMMAND} -E make_directory ${GEM_RESOURCES_DIR}/icons
         COMMAND ${CMAKE_COMMAND} -E env
@@ -28,7 +28,7 @@ foreach(program gemscape terminal clock calc gemread ted)
             $<TARGET_FILE:resgen> icons -o ${output}
             ${source}
         DEPENDS resgen ${source}
-        COMMENT "Generating ${program} desktop icon resource"
+        COMMENT "Generating ${icon} desktop icon resource"
         VERBATIM)
     list(APPEND gem_launcher_icons ${output})
 endforeach()

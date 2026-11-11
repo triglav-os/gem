@@ -235,5 +235,77 @@ int main(void)
                ->data_bits[0] == 3);
     invalid_name = NULL;
     assert(desktop_extension_icon(NULL) == NULL);
+
+    /* Linux folder names map to the shipped lowercase resources. */
+    {
+        const char *folders[] = {"Home", "Programs", "Documents", "Library"};
+        const char *resources[] = {"icons/home.rsc", "icons/programs.rsc",
+                                   "icons/documents.rsc", "icons/library.rsc"};
+        desktop_icon_entry_t location = {0};
+        desktop_icon_entry_t moved;
+
+        for (size_t i = 0; i < 4; ++i)
+            available[12 + i] = resources[i];
+        desktop_program_icons_forget();
+        entry.is_dir = 1;
+        entry.is_parent = entry.is_app = 0;
+        for (size_t i = 0; i < 4; ++i) {
+            char path[80];
+
+            strcpy(entry.name, folders[i]);
+            for (int backend = DESKTOP_BROWSER_FILES;
+                 backend <= DESKTOP_BROWSER_TRASH; ++backend) {
+                browser.backend = (WORD)backend;
+                assert(desktop_browser_entry_asset(&browser, &entry)
+                           ->data_bits[0] == 13 + i);
+            }
+            snprintf(path, sizeof(path), "/srv/%s", folders[i]);
+            (void)desktop_icon_copy(path, &desktop_folder_icon_asset,
+                                    &location.custom);
+            desktop_bind_location_icon(&location);
+            assert(location.asset->data_bits[0] == 13 + i);
+        }
+        assert(desktop_named_icon("hOmE", &desktop_folder_icon_asset)
+                   ->data_bits[0] == 13);
+        assert(desktop_named_icon("DOCUMENTS", &desktop_folder_icon_asset)
+                   ->data_bits[0] == 15);
+        assert(desktop_named_icon("Documents.old", &desktop_folder_icon_asset)
+                   ->data_bits[0] == 1);
+        assert(desktop_named_icon(".Home", &desktop_folder_icon_asset)
+                   ->data_bits[0] == 1);
+        assert(
+            desktop_named_icon("Home", &desktop_doc_icon_asset)->data_bits[0] ==
+            3);
+
+        /* Exact spelling overrides the built-in name mapping. */
+        available[5] = "icons/Home.rsc";
+        desktop_program_icons_forget();
+        assert(desktop_named_icon("Home", &desktop_folder_icon_asset)
+                   ->data_bits[0] == 6);
+        assert(desktop_named_icon("home", &desktop_folder_icon_asset)
+                   ->data_bits[0] == 13);
+        invalid_name = "icons/Home.rsc";
+        desktop_program_icons_forget();
+        assert(desktop_named_icon("Home", &desktop_folder_icon_asset)
+                   ->data_bits[0] == 13);
+        invalid_name = "icons/library.rsc";
+        desktop_program_icons_forget();
+        assert(desktop_named_icon("Library", &desktop_folder_icon_asset)
+                   ->data_bits[0] == 1);
+        available[13] = NULL;
+        desktop_program_icons_forget();
+        assert(desktop_named_icon("Programs", &desktop_folder_icon_asset)
+                   ->data_bits[0] == 1);
+
+        /* Location copies survive refresh and moving the owning entry. */
+        moved = location;
+        memset(&location, 0, sizeof(location));
+        desktop_bind_location_icon(&moved);
+        assert(moved.asset == &moved.custom.asset);
+        assert(moved.asset->data_bits == moved.custom.bitmap.data);
+        assert(moved.asset->mask_bits == moved.custom.bitmap.mask);
+        assert(moved.asset->data_bits[0] == 16);
+        invalid_name = NULL;
+    }
     return 0;
 }

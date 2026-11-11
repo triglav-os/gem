@@ -127,6 +127,36 @@ const desktop_icon_asset_t *desktop_program_icon(const char *program)
     return desktop_cached_icon(name);
 }
 
+/* Map only the four well-known folder names to lowercase resource names.
+ * Exact entry-name resources are tried first; Linux paths stay unchanged. */
+static const desktop_icon_asset_t *desktop_folder_name_icon(const char *name)
+{
+    static const char *const names[] = {"home", "programs", "documents",
+                                        "library"};
+    const char *leaf;
+
+    if (name == NULL)
+        return NULL;
+    leaf = strrchr(name, '/');
+    leaf = leaf != NULL ? leaf + 1 : name;
+    for (size_t i = 0; i < sizeof(names) / sizeof(names[0]); ++i) {
+        size_t j = 0;
+
+        while (leaf[j] != '\0' && names[i][j] != '\0') {
+            unsigned char ch = (unsigned char)leaf[j];
+
+            if (ch >= 'A' && ch <= 'Z')
+                ch = (unsigned char)(ch - 'A' + 'a');
+            if (ch != (unsigned char)names[i][j])
+                break;
+            ++j;
+        }
+        if (leaf[j] == '\0' && names[i][j] == '\0')
+            return desktop_cached_icon(names[i]);
+    }
+    return NULL;
+}
+
 const desktop_icon_asset_t *desktop_extension_icon(const char *file)
 {
     char key[DESKTOP_ICON_NAME_MAX];
@@ -231,6 +261,11 @@ desktop_named_icon(const char *name, const desktop_icon_asset_t *fallback)
 
     if (own != NULL)
         return own;
+    if (fallback == &desktop_folder_icon_asset) {
+        own = desktop_folder_name_icon(name);
+        if (own != NULL)
+            return own;
+    }
     /* Extension icons describe files, never folders, disks or Trash. */
     if (fallback == &desktop_doc_icon_asset ||
         fallback == &desktop_prg_icon_asset) {

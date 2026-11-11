@@ -30,8 +30,9 @@ void desktop_program_icons_forget(void);
  * Returned common assets have stable addresses across cache refreshes. */
 const desktop_icon_asset_t *
 desktop_standard_icon(const desktop_icon_asset_t *fallback);
-/* Try a named icon, then (for documents and programs) an extension icon,
- * then its common type icon, then built-in artwork.
+/* Try a named icon, then a well-known folder name (Home, Programs, Documents,
+ * Library, ignoring ASCII case) or a file extension, then its common type
+ * icon, then built-in artwork.
  * Use the result immediately, before another lookup or cache refresh. */
 const desktop_icon_asset_t *
 desktop_named_icon(const char *name, const desktop_icon_asset_t *fallback);
