@@ -7,6 +7,32 @@
 #include "ted.h"
 #include <stdio.h>
 #include <string.h>
+#include <strings.h>
+
+/* Nonzero for a Markdown document name (.md or .markdown, any case). */
+static int ted_is_markdown(const char *path)
+{
+    const char *dot = path != NULL ? strrchr(path, '.') : NULL;
+
+    return dot != NULL && strchr(dot, '/') == NULL &&
+           (strcasecmp(dot, ".md") == 0 || strcasecmp(dot, ".markdown") == 0);
+}
+
+/* Nonzero when the line starting at pos is an ATX heading: one to six '#'
+ * characters followed by a space, a tab or the end of the line. */
+static int ted_markdown_heading(const ted_document_t *doc, size_t pos)
+{
+    size_t hashes = 0;
+
+    while (pos + hashes < doc->length && doc->text[pos + hashes] == '#')
+        ++hashes;
+    if (hashes == 0 || hashes > 6)
+        return 0;
+    pos += hashes;
+    return pos >= doc->length || doc->text[pos] == ' ' ||
+           doc->text[pos] == '\t' || doc->text[pos] == '\n' ||
+           doc->text[pos] == '\r';
+}
 
 void ted_layout(ted_state_t *s)
 {
@@ -108,6 +134,10 @@ void ted_draw(ted_state_t *s)
         if (bodyclip[1] <= bodyclip[3]) {
             vs_clip(s->vdi, 1, bodyclip);
             size_t pos = ted_document_line(&s->doc, s->top), col = 0;
+            /* Markdown ATX headings (# to ######, then a space) are bold. */
+            int markdown = ted_is_markdown(s->path);
+            int bold = markdown && ted_markdown_heading(&s->doc, pos);
+            vst_effects(s->vdi, bold);
             WORD y = s->body.g_y;
             size_t first =
                 s->doc.cursor < s->doc.anchor ? s->doc.cursor : s->doc.anchor;
@@ -148,10 +178,16 @@ void ted_draw(ted_state_t *s)
                 if (c == '\n') {
                     y += s->ch;
                     col = 0;
+                    if (markdown &&
+                        ted_markdown_heading(&s->doc, pos) != bold) {
+                        bold = !bold;
+                        vst_effects(s->vdi, bold);
+                    }
                 } else
                     col += cells;
             }
         }
+        vst_effects(s->vdi, 0);
         vs_clip(s->vdi, 0, xy);
         wind_get(s->window, WF_NEXTXYWH, &clip.g_x, &clip.g_y, &clip.g_w,
                  &clip.g_h);

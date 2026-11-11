@@ -164,6 +164,22 @@ void desktop_open_selected_icon(void)
     }
     if (selected->is_trash != 0) {
         desktop_open_trash();
+    } else if (selected->is_file != 0) {
+        char status[96];
+        gem_os_file_info_t info;
+        const char *leaf = strrchr(selected->path, '/');
+
+        leaf = leaf != NULL ? leaf + 1 : selected->path;
+        if (gem_os_stat_path(selected->path, &info) == 0) {
+            form_alert(1, "[1][ This desktop item no longer | exists. ][ OK ]");
+            desktop_set_status("Item not found.");
+        } else {
+            (void)desktop_launch_path(leaf, selected->path,
+                                      info.is_executable != 0, status,
+                                      sizeof(status));
+            desktop_set_status(status);
+        }
+        desktop_redraw(NULL);
     } else if (selected->launcher >= 2) {
         char program[GEM_OS_PATH_MAX], tail[2] = {0};
         if (desktop_launcher_program(selected->launcher, program,
@@ -174,52 +190,6 @@ void desktop_open_selected_icon(void)
             form_alert(1, "[1][ Unable to launch application. ][ OK ]");
     } else {
         desktop_open_disk_path(selected->path, selected->label);
-    }
-}
-
-void desktop_layout_icons(void)
-{
-    WORD i;
-    WORD column = 0;
-    WORD row = 0;
-    WORD max_rows;
-
-    max_rows = (WORD)((g_desktop.work.g_h - DESKTOP_ICON_MARGIN_Y) /
-                      DESKTOP_ICON_STEP_Y);
-    if (max_rows < 1) {
-        max_rows = 1;
-    }
-
-    for (i = 0; i < g_desktop.icon_count; ++i) {
-        desktop_icon_entry_t *entry = &g_desktop.icons[i];
-        WORD x;
-        WORD y;
-
-        if (entry->is_trash != 0) {
-            continue;
-        }
-
-        x = (WORD)(DESKTOP_ICON_MARGIN_X + column * DESKTOP_ICON_STEP_X);
-        y = (WORD)(DESKTOP_ICON_MARGIN_Y + row * DESKTOP_ICON_STEP_Y);
-        g_desktop.desktop_tree[entry->object_id].ob_x = x;
-        g_desktop.desktop_tree[entry->object_id].ob_y = y;
-        ++row;
-        if (row >= max_rows) {
-            row = 0;
-            ++column;
-        }
-    }
-
-    for (i = 0; i < g_desktop.icon_count; ++i) {
-        desktop_icon_entry_t *entry = &g_desktop.icons[i];
-
-        if (entry->is_trash == 0) {
-            continue;
-        }
-        g_desktop.desktop_tree[entry->object_id].ob_x =
-            (WORD)(g_desktop.work.g_w - DESKTOP_ICON_OBJECT_W - 12);
-        g_desktop.desktop_tree[entry->object_id].ob_y =
-            (WORD)(g_desktop.work.g_h - DESKTOP_ICON_OBJECT_H - 10);
     }
 }
 
@@ -414,7 +384,7 @@ static void desktop_status_for_icon(const desktop_icon_entry_t *entry)
         return;
     }
 
-    if (entry->launcher) {
+    if (entry->launcher || entry->is_file) {
         snprintf(text, sizeof(text), "Open %s.", entry->label);
         desktop_set_status(text);
         return;
@@ -436,7 +406,9 @@ void desktop_handle_icon_click(WORD object_id)
     uint32_t now = gem_os_ticks_ms();
     int is_double_click = 0;
 
-    if (g_desktop.last_desktop_click_object == object_id &&
+    if ((g_desktop.last_desktop_click_object == object_id ||
+         (entry != NULL && g_desktop.last_desktop_click_object != NIL &&
+          strcmp(g_desktop.last_desktop_click_path, entry->path) == 0)) &&
         (uint32_t)(now - g_desktop.last_desktop_click_ms) <=
             DESKTOP_DOUBLE_CLICK_MS) {
         is_double_click = 1;
@@ -477,6 +449,9 @@ void desktop_handle_icon_click(WORD object_id)
         desktop_open_selected_icon();
     } else {
         g_desktop.last_desktop_click_object = object_id;
+        snprintf(g_desktop.last_desktop_click_path,
+                 sizeof(g_desktop.last_desktop_click_path), "%s",
+                 entry != NULL ? entry->path : "");
         g_desktop.last_desktop_click_ms = now;
     }
 }

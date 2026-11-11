@@ -138,8 +138,9 @@ static int desktop_resolve_program(const char *program, char *resolved,
     return 1;
 }
 
-static int desktop_launch_tail(const desktop_browser_window_t *browser,
-                               const desktop_browser_entry_t *entry,
+/* `disk_root` is the extracted image root for disk-browser entries, or NULL
+ * for host files. */
+static int desktop_launch_tail(const char *disk_root, const char *path,
                                const char *program, int pass_entry,
                                char tail[128])
 {
@@ -151,20 +152,19 @@ static int desktop_launch_tail(const desktop_browser_window_t *browser,
         tail[1] = '\0';
         return 1;
     }
-    if (browser->backend == DESKTOP_BROWSER_DISK &&
-        desktop_program_is_stout(program)) {
-        size_t root_length = strlen(browser->disk_root);
-        const char *relative = entry->path;
+    if (disk_root != NULL && desktop_program_is_stout(program)) {
+        size_t root_length = strlen(disk_root);
+        const char *relative = path;
 
-        if (strncmp(relative, browser->disk_root, root_length) == 0) {
+        if (strncmp(relative, disk_root, root_length) == 0) {
             relative += root_length;
             while (*relative == '/')
                 ++relative;
         }
         length = snprintf(text, sizeof(text), "\"A:/%s\" \"%s\"", relative,
-                          browser->disk_root);
+                          disk_root);
     } else {
-        length = snprintf(text, sizeof(text), "\"%s\"", entry->path);
+        length = snprintf(text, sizeof(text), "\"%s\"", path);
     }
     if (length <= 0 || (size_t)length >= sizeof(text))
         return 0;
@@ -185,11 +185,13 @@ int desktop_browser_entry_is_launchable(const desktop_browser_window_t *browser,
            entry->is_app != 0;
 }
 
-int desktop_browser_launch_entry(const desktop_browser_window_t *browser,
-                                 const desktop_browser_entry_t *entry,
-                                 char *status, size_t status_size)
+/* `run_directly` permits launching `path` itself when no association
+ * applies; `disk_root` is set only for entries inside an opened disk image. */
+static int desktop_launch(const char *name, const char *path, int run_directly,
+                          const char *disk_root, char *status,
+                          size_t status_size)
 {
-    const char *associated = desktop_associated_program(entry->name);
+    const char *associated = desktop_associated_program(name);
     const char *program = associated;
     char resolved[GEM_OS_PATH_MAX];
     char tail[128];
@@ -197,20 +199,34 @@ int desktop_browser_launch_entry(const desktop_browser_window_t *browser,
 
     if (status == NULL || status_size == 0u)
         return 0;
-    if (program == NULL && entry->is_executable != 0 &&
-        browser->backend == DESKTOP_BROWSER_FILES)
-        program = entry->path;
+    if (program == NULL && run_directly)
+        program = path;
     if (program == NULL ||
         !desktop_resolve_program(program, resolved, sizeof(resolved)) ||
-        !desktop_launch_tail(browser, entry, program, associated != NULL,
+        !desktop_launch_tail(disk_root, path, program, associated != NULL,
                              tail)) {
-        (void)snprintf(status, status_size, "Cannot launch %.*s", 470,
-                       entry->name);
+        (void)snprintf(status, status_size, "Cannot launch %.*s", 470, name);
         return 0;
     }
     okay = shel_write(1, 1, 0, resolved, tail) != 0;
     (void)snprintf(status, status_size,
-                   okay ? "Launched %.*s" : "Launch failed: %.*s", 470,
-                   entry->name);
+                   okay ? "Launched %.*s" : "Launch failed: %.*s", 470, name);
     return okay;
+}
+
+int desktop_browser_launch_entry(const desktop_browser_window_t *browser,
+                                 const desktop_browser_entry_t *entry,
+                                 char *status, size_t status_size)
+{
+    return desktop_launch(
+        entry->name, entry->path,
+        entry->is_executable != 0 && browser->backend == DESKTOP_BROWSER_FILES,
+        browser->backend == DESKTOP_BROWSER_DISK ? browser->disk_root : NULL,
+        status, status_size);
+}
+
+int desktop_launch_path(const char *name, const char *path, int executable,
+                        char *status, size_t status_size)
+{
+    return desktop_launch(name, path, executable, NULL, status, status_size);
 }

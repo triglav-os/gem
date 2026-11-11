@@ -40,7 +40,7 @@ int aes_window_closer_rect(const aes_window_t *window, GRECT *rect);
 int aes_window_fuller_rect(const aes_window_t *window, GRECT *rect);
 /* Rectangle of the draggable title area; 0 when absent. */
 int aes_window_title_rect(const aes_window_t *window, GRECT *rect);
-/* Bounds of the size grip; compact grips exclude the client within them.
+/* Bounds of the size grip, excluded from client visible rectangles.
  * Returns 0 when the kind lacks SIZER. */
 int aes_window_sizer_rect(const aes_window_t *window, GRECT *rect);
 /* Rectangle of the up arrow; 0 when absent. */

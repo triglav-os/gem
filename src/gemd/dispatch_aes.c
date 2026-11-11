@@ -72,6 +72,15 @@ static int gemd_location_is_image(const char *path)
            (strcasecmp(dot, ".st") == 0 || strcasecmp(dot, ".msa") == 0);
 }
 
+/* A program or document placed on the desktop: any other regular file. */
+static int gemd_location_is_file(const char *path)
+{
+    gem_os_file_info_t info;
+
+    return path != NULL && path[0] == '/' && !gemd_location_is_image(path) &&
+           gem_os_stat_path(path, &info) != 0 && info.is_directory == 0;
+}
+
 static int gemd_location_list(void *response, uint32_t *response_size)
 {
     gem_rpc_location_list_t *list = response;
@@ -91,7 +100,7 @@ static int gemd_location_list(void *response, uint32_t *response_size)
 
         if (section == NULL || strcmp(section, "locations") != 0 ||
             (!gemd_location_valid_directory(path) &&
-             !gemd_location_is_image(path))) {
+             !gemd_location_is_image(path) && !gemd_location_is_file(path))) {
             continue;
         }
         gemd_copy_text(entry->path, sizeof(entry->path), path);
@@ -101,8 +110,9 @@ static int gemd_location_list(void *response, uint32_t *response_size)
             gemd_location_label(entry->path, entry->label,
                                 sizeof(entry->label));
         }
-        entry->type = gemd_location_is_image(path)
-                          ? GEM_RPC_LOCATION_DISK_IMAGE
+        entry->type = gemd_location_is_image(path) ? GEM_RPC_LOCATION_DISK_IMAGE
+                      : gemd_location_is_file(path)
+                          ? GEM_RPC_LOCATION_FILE
                           : GEM_RPC_LOCATION_FOLDER;
         ++list->count;
     }
@@ -115,7 +125,8 @@ static int gemd_location_add(const gem_rpc_location_req_t *req)
     char label[GEM_RPC_LOCATION_LABEL_MAX];
 
     if (!gemd_location_valid_directory(req->path) &&
-        !gemd_location_is_image(req->path)) {
+        !gemd_location_is_image(req->path) &&
+        !gemd_location_is_file(req->path)) {
         return -1;
     }
     gemd_location_label(req->path, label, sizeof(label));

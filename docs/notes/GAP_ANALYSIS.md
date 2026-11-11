@@ -155,7 +155,9 @@ drawing, but these areas still need tightening:
 - `vst_rotation()` is stored, but rotated text is not yet real text
   rendering.
 - Text effects and alignment need ST-faithful behavior, especially for
-  UI labels, alerts, and form text.
+  UI labels, alerts, and form text. Thickened text (bit 0) overstrikes each
+  glyph one pixel right without widening its advance; light, skewed,
+  underlined, outlined and shadowed text are still ignored.
 - Font selection should match the set and numbering that classic GEM
   software expects as closely as practical.
 

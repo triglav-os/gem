@@ -177,6 +177,11 @@ VOID v_gtext(VDI_HANDLE handle, WORD x, WORD y, CONST BYTE *text)
 
     while (*cursor != '\0') {
         vdi_draw_glyph(pen_x, top_y, *cursor, vdi_state.text_color);
+        /* Thickened text (effect bit 0) overstrikes one pixel to the right.
+         * The advance is unchanged, so fixed-pitch layouts stay aligned. */
+        if ((vdi_compat.text_effects & 1) != 0)
+            vdi_draw_glyph((WORD)(pen_x + 1), top_y, *cursor,
+                           vdi_state.text_color);
         pen_x = (WORD)(pen_x + vdi_char_cell_width(*cursor));
         ++cursor;
     }

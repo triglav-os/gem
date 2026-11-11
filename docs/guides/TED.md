@@ -26,6 +26,11 @@ redo snapshot. Arrow keys, Home/End and Page Up/Down move the caret; Ctrl+Home/E
 to the beginning/end of the document. The vertical
 scrollbar tracks document lines, and caret movement pans long lines horizontally.
 The status bar shows line, byte column, length and modification status.
+The pointer becomes the I-beam over the text area and the arrow elsewhere.
+
+In `.md` and `.markdown` files, ATX heading lines (one to six `#` followed by a
+space, a tab or the end of the line) are drawn bold across the whole row. The
+emphasis is display-only: the saved file is unchanged plain text.
 
 Ted accepts text up to 1 MiB and rejects NUL-containing input. Existing UTF-8
 bytes are preserved; cursor movement skips continuation bytes. The current GEM

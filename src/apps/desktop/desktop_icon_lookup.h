@@ -20,13 +20,18 @@ typedef struct desktop_custom_icon {
 /* Look up a leaf name without its extension; NULL means absent or invalid.
  * Cached pointers are valid only until the next lookup or cache refresh. */
 const desktop_icon_asset_t *desktop_program_icon(const char *program);
+/* Look up `icons/.<ext>.rsc` for a file name's extension, lowercased; the
+ * longest multi-part extension wins. NULL when none exists or is valid.
+ * Cached pointers are valid only until the next lookup or cache refresh. */
+const desktop_icon_asset_t *desktop_extension_icon(const char *file);
 /* Reload common icons and discard cached per-entry lookups. */
 void desktop_program_icons_forget(void);
 /* Resolve folder, disk, document, program or trash before built-in artwork.
  * Returned common assets have stable addresses across cache refreshes. */
 const desktop_icon_asset_t *
 desktop_standard_icon(const desktop_icon_asset_t *fallback);
-/* Try a named icon, then its common type icon, then built-in artwork.
+/* Try a named icon, then (for documents and programs) an extension icon,
+ * then its common type icon, then built-in artwork.
  * Use the result immediately, before another lookup or cache refresh. */
 const desktop_icon_asset_t *
 desktop_named_icon(const char *name, const desktop_icon_asset_t *fallback);

@@ -159,7 +159,7 @@ Evidence is under `<build-dir>/rasta_startup/demo17_proxy/`.
 
 
 `test_gemd_host` also checks scrollbar-free `SIZER` geometry: work/border
-round trips, compact frame widths, corner hit testing outside the client,
+round trips, compact frame widths, corner hit testing including the reserved work-area corner,
 and unchanged frame geometry when any scroll-control flag is present.
 
 The compact-frame change updates the reviewed references for demos 20, 21,
@@ -185,3 +185,20 @@ cache refresh and retained icon storage across cache replacement.
 oversized labels/graphs and active-tree preservation. `test_gemd_security`
 checks protocol-2 refusal by protocol 3, payload size, terminated and unique
 strings, and malformed topology while other application sessions remain live.
+
+The compact-frame edge follow-up adds `test_window_frame`: it checks single-pixel
+right/bottom edges, work/border round trips, resize hit testing, visible-region
+coverage and preservation of the resize glyph during client painting. It runs
+with no scrollbars, each axis, both axes and no SIZER at two window sizes.
+The focused debug run uses the protocol-3 latest Gemix image
+`sha256:891f7938bf7b468f8c2342fb2bb66d0dd1c2cce91ae10a6026b8c92628be6c09`.
+`test_window_frame`, `test_gemd_host` and `test_menu_limits` pass with
+ASan/UBSan. Blaise also passes its 207 desktop checks against that server;
+real Rasta pointer input shrinks its scrollbar-free window while pixel checks
+confirm joined right/bottom edges and the grip's top/left borders. This focused
+run does not replace the dated full-suite report above.
+
+`test_gemd_host` also checks window placement below a reserved menu bar:
+`wind_open()` and `wind_set(WF_CURRXYWH)` at y = 0 or within the bar clamp the
+outer top edge to the bar, keep x, width and height, and leave a position below
+the bar unchanged.

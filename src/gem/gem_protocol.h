@@ -198,7 +198,12 @@ typedef struct gem_rpc_location_entry {
     uint16_t reserved;
 } gem_rpc_location_entry_t;
 
-enum { GEM_RPC_LOCATION_FOLDER = 0, GEM_RPC_LOCATION_DISK_IMAGE = 1 };
+/* Older Desktop clients skip entry types they do not know. */
+enum {
+    GEM_RPC_LOCATION_FOLDER = 0,
+    GEM_RPC_LOCATION_DISK_IMAGE = 1,
+    GEM_RPC_LOCATION_FILE = 2
+};
 
 #define GEM_RPC_DESKTOP_SHOW_HIDDEN 0x00000001u
 

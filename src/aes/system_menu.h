@@ -16,6 +16,8 @@
 enum {
     AES_SYSTEM_MENU_NONE = 0,
     AES_SYSTEM_MENU_SHUTDOWN = 1,
+    /* The pointer moved onto an application menu title. */
+    AES_SYSTEM_MENU_HANDOFF = 2,
     AES_SYSTEM_MENU_REGISTERED = 100
 };
 
@@ -38,11 +40,15 @@ void aes_system_menu_draw(void);
 /* Nonzero when (x, y) is within the system title on the bar. */
 int aes_system_menu_hit(WORD x, WORD y);
 
-/* Track a press that hit the system title: open the popup, follow the
- * pointer to its release and act on the chosen item. "Shutdown" runs the
- * installed hook after a confirmation. Returns the chosen item, or
- * AES_SYSTEM_MENU_NONE. Poll HID directly, like the classic menu tracker. */
-WORD aes_system_menu_track(const gem_hid_event_t *first_evt);
+/* Open the system popup, follow the pointer and act on the item chosen by
+ * a release. Pass latched = 0 for the press that opened it: under
+ * menu_click, the release completing that click keeps the popup open.
+ * Pass 1 when the button is already up. "Shutdown" runs the installed hook
+ * after a confirmation. When handoff_x/handoff_y are given and the pointer
+ * moves onto an application menu title, the popup closes and that position
+ * is stored with AES_SYSTEM_MENU_HANDOFF. Otherwise returns the chosen
+ * item or AES_SYSTEM_MENU_NONE. Polls HID directly, like the menu tracker. */
+WORD aes_system_menu_track(int latched, WORD *handoff_x, WORD *handoff_y);
 
 /* Hook gemd installs so "Shutdown" can stop the server. Returns nonzero
  * when the shutdown was accepted. */

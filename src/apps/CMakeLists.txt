@@ -32,4 +32,20 @@ foreach(program gemscape terminal clock calc gemread ted)
         VERBATIM)
     list(APPEND gem_launcher_icons ${output})
 endforeach()
+# File-type icons: icons/.<ext>.rsc applies to every file with that extension.
+foreach(extension txt md pdf)
+    string(TOUPPER ${extension} artwork)
+    set(source ${PROJECT_SOURCE_DIR}/samples/data/artwork/icons/${artwork}.PNG)
+    set(output ${GEM_RESOURCES_DIR}/icons/.${extension}.rsc)
+    add_custom_command(OUTPUT ${output}
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${GEM_RESOURCES_DIR}/icons
+        COMMAND ${CMAKE_COMMAND} -E env
+            ASAN_OPTIONS=detect_leaks=0 LSAN_OPTIONS=detect_leaks=0
+            $<TARGET_FILE:resgen> icons -o ${output}
+            ${source}
+        DEPENDS resgen ${source}
+        COMMENT "Generating .${extension} file-type icon resource"
+        VERBATIM)
+    list(APPEND gem_launcher_icons ${output})
+endforeach()
 add_custom_target(gem_launcher_icons ALL DEPENDS ${gem_launcher_icons})

@@ -65,6 +65,14 @@ monochrome GEM frame. The presenter reapplies the software cursor's masked
 monochrome pixels after overlay composition, so opaque application content
 cannot cover the GEM pointer.
 
+gemd moves each mapped layer with its window whenever the window stack or
+geometry changes, before the AES repaints the area a move exposed. Both
+presenters then recomposite the layer's previous rectangle, so a moved window
+never leaves browser or page pixels behind while its owner is still handling
+`WM_MOVED`. A layer is hidden while its window is closed or iconified.
+Applications may still call `gem_overlay_map()` after `WM_MOVED`; it is then a
+no-op for position.
+
 AES object trees use at most 128 objects and a 48 KiB copied data arena. Graphs,
 string termination, aligned descriptors and nonoverlapping referenced regions
 are checked before pointer relocation. Edited text is copied back into the
@@ -227,11 +235,13 @@ this does not qualify every host keyboard layout or viewer focus-loss path.
 `wind_create(NAME | CLOSER | FULLER | MOVER | SIZER, ...)` creates an
 ordinary overlapping, resizable window without frame scrollbars. When none
 of `UPARROW`, `DNARROW`, `VSLIDE`, `LFARROW`, `RTARROW` or `HSLIDE` is set,
-AES reserves a four-pixel right/bottom resize frame instead of full scrollbar
-strips. Its L-shaped grip is confined to the frame at the bottom-right
-corner: the client rectangle remains rectangular and receives every click
-inside it. Sizing still uses the standard `WM_SIZED` message. Applications
-must use `wind_calc` or the work rectangle rather than fixed border sizes.
+AES uses single-pixel right/bottom edges and reserves a standard size grip
+at the bottom-right corner. Its top/left rules meet the outer frame, which
+supplies the other two edges. The work rectangle extends to the thin frame,
+while visible-region enumeration and hit testing exclude the resize corner
+from the client. Sizing still uses the standard `WM_SIZED` message.
+Applications must use `wind_calc` and enumerate visible rectangles rather
+than assume fixed borders or paint the whole work rectangle unconditionally.
 Windows that request scroll controls keep the existing scrollbar geometry.
 
 This is a hosted AES geometry policy, with unchanged public flags and wire
@@ -253,3 +263,33 @@ This changes the private request layout from protocol 2 to 3. Deploy matching
 libgem and gemd together and restart existing clients/servers. Older peers
 are disconnected at envelope validation, before their payload is interpreted.
 Public GEM signatures and direct AES menus are unchanged.
+
+### Compact resizable window edges
+
+A window with `SIZER` and no scrollbar parts uses one-pixel side and bottom
+borders. `wind_calc` and `WF_WORKXYWH` include the area up to those borders.
+The standard resize glyph occupies the bottom-right corner even when neither
+scrollbar exists. Its top and left rules separate the grip from application
+content; the window frame supplies its right and bottom edges. `WF_FIRSTXYWH`
+and `WF_NEXTXYWH` exclude that corner from client painting as well as clipping overlapping windows and modal forms. Pointer hit
+testing reserves the same corner for resizing. Applications must follow the
+visible-rectangle enumeration rather than paint the complete work rectangle
+unconditionally. Windows without `SIZER` have no reserved resize corner;
+windows with scrollbar parts retain their existing tracks and corner geometry.
+
+### Desktop file locations
+
+`GEM_RPC_LOCATION_ADD` also accepts an existing regular file. Location lists
+report it with type `GEM_RPC_LOCATION_FILE` (2), alongside folders (0) and
+`.st`/`.msa` disk images (1). The entry layout and wire size are unchanged.
+An older Desktop ignores the new type instead of misreading it.
+
+### Window placement below the menu bar
+
+When a desktop reserves the menu bar, `wind_open()` and
+`wind_set(WF_CURRXYWH)` move a window's outer top edge down to the bar's
+lower edge, keeping x, width and height. Classic GEM applications, Atari
+programs started through Stout and the Clock place windows from fixed
+coordinates that otherwise left their title bars under the menu. Read the
+actual position back with `wind_get(WF_CURRXYWH)`. A standalone application
+without a desktop has no reserved bar and may still open at y = 0.

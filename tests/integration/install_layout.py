@@ -47,7 +47,8 @@ libraries = {'lib' + name + '.so' for name in ('gem', 'aes', 'vdi', 'platform_li
 if cache['GEM_PLATFORM'] == 'linux':
     programs.remove('rasta')
     libraries.remove('librasta.so')
-program_icons = {'icons/' + name + '.rsc' for name in ('gemscape', 'terminal', 'clock', 'calc', 'gemread', 'ted')}
+program_icons = {'icons/' + name + '.rsc' for name in ('gemscape', 'terminal', 'clock', 'calc', 'gemread', 'ted',
+                                                       '.txt', '.md', '.pdf')}
 assert {p.name for p in (relocated/bindir).iterdir()} == programs
 assert {p.name for p in (relocated/libdir).iterdir()} == libraries | {'gem'}
 assert {p.relative_to(relocated).parts[0] for p in relocated.iterdir()} == {bindir.split('/')[0], libdir.split('/')[0], datadir.split('/')[0]}

@@ -89,13 +89,12 @@ static void aes_draw_sizer_glyph(const aes_window_t *window)
 
     x1 = (WORD)(rect.g_x + rect.g_w - 2);
     y1 = (WORD)(rect.g_y + rect.g_h - 2);
-    if (aes_window_has_compact_sizer(window) != 0) {
-        /* A visible L-shaped grip stays within the thin resize frame. */
-        aes_draw_hline(rect.g_x, x1, y1, aes_dark_color());
-        aes_draw_vline(x1, rect.g_y, y1, aes_dark_color());
-        return;
-    }
     aes_fill_rect(rect.g_x, rect.g_y, x1, y1, aes_light_color());
+    if (aes_window_has_compact_sizer(window) != 0) {
+        /* The outer window frame supplies the right and bottom edges. */
+        vsl_color(aes_state.vdi_handle, aes_dark_color());
+        aes_draw_rect_edges(rect.g_x, rect.g_y, x1, y1, 1, 0, 0, 1);
+    }
     aes_draw_window_icon(rect.g_x, rect.g_y, x1, y1, 6);
 }
 
@@ -380,8 +379,7 @@ void aes_draw_window_frame(const aes_window_t *window)
     }
 
     if (window->work.g_w > 0 && window->work.g_h > 0 &&
-        ((window->kind & SIZER) == 0u ||
-         aes_window_has_compact_sizer(window) != 0)) {
+        (window->kind & SIZER) == 0u) {
         v_pline(aes_state.vdi_handle, 5, work_box);
     }
     aes_draw_window_title(window, outer_box, aes_window_title_height(window));

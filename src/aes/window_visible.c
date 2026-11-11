@@ -70,6 +70,27 @@ WORD aes_build_visible_rects(WORD handle, GRECT out[], WORD max_rects)
         base = window->work;
     }
 
+    if (aes_window_has_compact_sizer(target) != 0) {
+        GRECT grip;
+        GRECT fragments[4];
+        WORD count;
+        WORD index;
+        WORD written = 0;
+
+        if (out == NULL || max_rects <= 0) {
+            return 0;
+        }
+        max_rects = aes_min_word(max_rects, 64);
+        if (aes_window_sizer_rect(target, &grip) != 0) {
+            count = aes_subtract_rect(&base, &grip, fragments);
+            for (index = 0; index < count && written < max_rects; ++index) {
+                written += aes_clip_visible_rects(target, &fragments[index],
+                                                   out + written,
+                                                   max_rects - written);
+            }
+            return written;
+        }
+    }
     return aes_clip_visible_rects(target, &base, out, max_rects);
 }
 

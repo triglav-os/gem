@@ -1483,16 +1483,13 @@ static int stout_handle_aes(void)
             WORD w4;
             WORD status;
 
-            if (intin0 == 0 && (intin1 == 4 || intin1 == 5)) {
-                w1 = 0;
-                w2 = 0;
-                w3 = STOUT_SCREEN_WIDTH;
-                w4 = STOUT_SCREEN_HEIGHT;
-                status = 1;
-            } else {
-                status = wind_get(intin0, stout_wind_field(intin1), &w1, &w2,
-                                  &w3, &w4);
-            }
+            /* Guest windows are host windows, so the desktop rectangle
+             * (handle 0) is the host's work area below the menu bar. A fixed
+             * 640x400 answer made guests clip their redraws to that corner
+             * once a window moved or grew beyond it. Only screen memory and
+             * VDI extents keep the 640x400 Atari geometry. */
+            status = wind_get(intin0, stout_wind_field(intin1), &w1, &w2, &w3,
+                              &w4);
 
             stout_write_u16(pb.intout + 0u, (uint16_t)status);
             stout_write_u16(pb.intout + 2u, (uint16_t)w1);

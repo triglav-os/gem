@@ -140,7 +140,9 @@ in the container's `/run/user/<uid>/gem/session-<checkout-id>/`: `session.env`,
 application. GDB breakpoints apply to gemd.
 
 The Stop button terminates the session supervisor, clients and viewer. Closing
-the desktop or Rasta also ends the session. Cleanup checks process identity
+the desktop or Rasta also ends the session. The launch configuration tells GDB
+to pass SIGTERM to gemd without stopping, so gemd shuts down and the debug
+session ends instead of pausing on the signal. Cleanup checks process identity
 and the owned socket inode; it does not kill unrelated GEM or Rasta sessions.
 
 The supervisor is `tools/scripts/sample_session.py`; the pipe transport uses

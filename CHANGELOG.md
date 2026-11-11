@@ -6,6 +6,57 @@ Unreleased.
 
 ## Unreleased
 
+- Desktop icons can be dragged. They snap to the icon grid and keep their
+  position across restarts (`desktop-icons.cfg`). Moving one leaves its cell
+  empty; the other icons stay where they are.
+
+- Closing Rasta during a VS Code debug session now ends gemd and the session;
+  GDB no longer pauses on the SIGTERM sent at shutdown.
+
+- Atari programs run through Stout repaint windows moved or enlarged beyond
+  the first 640x400 pixels. Stout now reports the host desktop work area to
+  `wind_get(0, WF_WORKXYWH)`; screen memory and VDI extents stay 640x400.
+
+- `.txt`, `.md` and `.pdf` files have their own File Manager and desktop icons
+  (`icons/.txt.rsc` and so on), built from `samples/data/artwork/icons/`.
+
+- The File Manager right-click menu groups its commands with separators.
+
+- Ted shows the I-beam pointer over text and draws Markdown `#` to `######`
+  heading lines in bold. The VDI now renders thickened text (`vst_effects`
+  bit 0).
+
+- File Manager's File menu and right-click menu have `Add to Desktop`. It
+  places the selected folders, disk images, programs and documents on the
+  desktop. Programs launch and documents open with their associated
+  application, and `Remove Location...` or Delete removes them again.
+  Adding any location no longer hides the Trash icon until Desktop restarts.
+
+- Icons can be assigned by file extension. An icon whose name starts with a
+  dot, such as `icons/.txt.rsc`, is used for every `.txt` file in File
+  Manager and Trash, regardless of case (`README.TXT` too). An icon named
+  after the entry itself still takes precedence; folders are unaffected.
+
+- The three-line system menu now stays open after a click, like application
+  menus. Click an entry to choose it, or click elsewhere to close the menu.
+  Pressing, dragging to an entry and releasing still works. It is part of the
+  menu bar: moving right from it opens the next title, such as Desk, and
+  moving back from an application menu reopens it.
+
+- Windows no longer open or move under the menu bar. Programs that request a
+  position over the bar, such as the Clock and Atari programs started through
+  Stout, open with their title bar just below it.
+
+- Gemscape waits up to ten seconds for a closing Gemscape to release the
+  browser profile instead of failing an immediate relaunch. The startup alert
+  now gives the actual reason (profile in use, profile not creatable, or
+  browser engine failure) rather than always suggesting the profile is in use.
+
+- Moving a browser or document window no longer leaves stale page pixels in
+  the area it uncovered until the pointer passes over it. gemd moves overlays
+  with their window before repainting, and the Linux presenter now repaints
+  areas an overlay leaves, hides or exposes.
+
 - Rejected menu replacements (including negative RPC status) preserve the
   active client tree. Menu labels are rejected when oversized or unterminated
   instead of silently shortened; bounded iterative graph validation avoids
@@ -22,6 +73,11 @@ Unreleased.
   menu was cut short and silently refused, leaving no menu bar. `menu_bar()`
   now returns 0 for a tree over the limits and keeps the current bar. The
   private RPC protocol is now version 3; rebuild clients with the server.
+
+- Resizable windows without scrollbars use single-pixel right and bottom
+  borders, allowing toolbars, panes and status dividers to meet the frame.
+  The bottom-right corner retains the standard size grip and resize hit area;
+  client visible rectangles exclude it so application painting cannot erase it.
 
 - Desktop starts empty apart from Trash. The Files, Gemscape and Terminal
   launchers appear only with `[desktop] show_launchers = true` in

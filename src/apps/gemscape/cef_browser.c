@@ -796,6 +796,22 @@ static void gem_settings_path(cef_string_t *value, const char *path)
     gem_string(value, path);
 }
 
+/* Longest wait for a closing Gemscape to release the profile lock. */
+static const unsigned int gemscape_profile_lock_wait_ms = 10000u;
+/* Alert-ready reason for the latest start failure; '|' separates lines. */
+static const char *gemscape_cef_error = "";
+
+static void gemscape_cef_fail(const char *reason)
+{
+    gemscape_cef_error = reason;
+    fprintf(stderr, "Gemscape: %s\n", reason);
+}
+
+extern const char *gemscape_cef_start_error(void)
+{
+    return gemscape_cef_error;
+}
+
 extern int gemscape_cef_start(int argc, char **argv, uint16_t width,
                               uint16_t height, const char *url,
                               const struct gemscape_preferences *preferences)
@@ -813,6 +829,8 @@ extern int gemscape_cef_start(int argc, char **argv, uint16_t width,
     char locales[1024];
 
     memset(&g_state, 0, sizeof(g_state));
+    gemscape_cef_error = "The browser engine failed to start.|"
+                         "See the browser profile log.";
     memset(&settings, 0, sizeof(settings));
     settings.size = sizeof(settings);
     settings.no_sandbox = 1;
@@ -826,19 +844,33 @@ extern int gemscape_cef_start(int argc, char **argv, uint16_t width,
     g_state.preferences = *preferences;
     g_state.profile_lock = -1;
     if (!gemscape_profile_path(cache_root, sizeof(cache_root))) {
-        fprintf(stderr, "Gemscape: cannot create the browser profile\n");
+        gemscape_cef_fail("Cannot create the browser profile.");
         return 0;
     }
     snprintf(lock_path, sizeof(lock_path), "%s/gemscape.lock", cache_root);
     g_state.profile_lock =
         open(lock_path, O_CREAT | O_RDWR | O_CLOEXEC | O_NOFOLLOW, 0600);
-    if (g_state.profile_lock < 0 ||
-        flock(g_state.profile_lock, LOCK_EX | LOCK_NB) != 0) {
-        if (g_state.profile_lock >= 0)
-            close(g_state.profile_lock);
-        g_state.profile_lock = -1;
-        fprintf(stderr, "Gemscape: profile is already in use or unavailable\n");
+    if (g_state.profile_lock < 0) {
+        gemscape_cef_fail("Cannot open the browser profile lock.");
         return 0;
+    }
+    /* A Gemscape that was just closed keeps the lock while CEF flushes the
+     * profile, which can take several seconds after its window has gone.
+     * Wait for that owner instead of failing a prompt relaunch. */
+    for (unsigned int waited = 0u;
+         flock(g_state.profile_lock, LOCK_EX | LOCK_NB) != 0; waited += 100u) {
+        int busy = (errno == EWOULDBLOCK || errno == EINTR);
+
+        if (!busy || waited >= gemscape_profile_lock_wait_ms) {
+            close(g_state.profile_lock);
+            g_state.profile_lock = -1;
+            gemscape_cef_fail(busy
+                         ? "The browser profile is in use by|"
+                           "another Gemscape window."
+                         : "Cannot lock the browser profile.");
+            return 0;
+        }
+        gem_os_sleep_ms(100u);
     }
     /* The cross-container flock is authoritative for this dedicated profile.
      * Chromium's hostname/PID symlinks can outlive a killed Docker namespace.
@@ -854,6 +886,7 @@ extern int gemscape_cef_start(int argc, char **argv, uint16_t width,
             unlink(lock_path);
     }
     if (!gemscape_log_path(cache_path, sizeof(cache_path))) {
+        gemscape_cef_fail("Cannot create the browser log.");
         close(g_state.profile_lock);
         g_state.profile_lock = -1;
         return 0;
@@ -893,6 +926,8 @@ extern int gemscape_cef_start(int argc, char **argv, uint16_t width,
     cef_string_clear(&settings.resources_dir_path);
     cef_string_clear(&settings.locales_dir_path);
     if (!initialized) {
+        gemscape_cef_fail("The browser engine failed to start.|"
+                          "See the browser profile log.");
         close(g_state.profile_lock);
         g_state.profile_lock = -1;
         return 0;

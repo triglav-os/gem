@@ -58,7 +58,7 @@ static int desktop_browser_entry_cmp(const void *left, const void *right)
     return strcmp(a->name, b->name);
 }
 
-static int desktop_browser_name_is_app(const char *name, int executable)
+int desktop_entry_name_is_app(const char *name, int executable)
 {
     const char *ext;
     prg_file_kind_t program_kind;
@@ -184,7 +184,7 @@ static int desktop_browser_load_directory(desktop_browser_window_t *browser,
         }
         item->is_dir = source.info.is_directory;
         item->is_executable = source.info.is_executable;
-        item->is_app = desktop_browser_name_is_app(
+        item->is_app = desktop_entry_name_is_app(
             item->name, source.info.is_executable);
         item->size_bytes = source.info.size_bytes;
         item->mtime = (int64_t)(source.info.mtime_ms / 1000u);
@@ -230,7 +230,7 @@ static int desktop_browser_add_disk_entry(const fat12_dirent_t *source,
     item->is_dir = (source->attr & FAT12_ATTR_DIRECTORY) != 0u;
     /* FAT attributes do not contain a Unix-style executable bit. Only the
      * registered Atari executable suffixes are programs on a disk image. */
-    item->is_app = desktop_browser_name_is_app(item->name, 0);
+    item->is_app = desktop_entry_name_is_app(item->name, 0);
     item->is_executable = item->is_app;
     item->size_bytes = source->size;
     return 1;

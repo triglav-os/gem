@@ -13,6 +13,7 @@ see the [packaging contract](PACKAGING.md) for their contents.
 | Executable | `<prefix>/bin/<name>` | Any GEM client or Linux program Desktop may launch |
 | Program entry | A folder that Desktop shows as a location, e.g. `<prefix>/Programs/<name>` | Lowercase name; usually a relative symlink to `../bin/<name>` |
 | Icon | `<prefix>/share/gem/icons/<name>.rsc` | Same `<name>` as the entry, without any extension |
+| File-type icon | `<prefix>/share/gem/icons/.<ext>.rsc` | Leading dot, lowercase extension; used for every file with that extension, e.g. `.txt.rsc` |
 | Location | `[locations]` in `desktop.cfg` | Shows the program folder on the desktop |
 
 `<name>` is the entry's file name without its extension. Desktop looks for an
@@ -73,7 +74,15 @@ is open appears once that window is refreshed or opened again.
 
 Desktop, File Manager and Trash share the same lookup rules. File Manager
 and Trash entries first try `<entry-name-without-extension>.rsc`, including
-folders and documents. If that icon is absent or invalid, they try the common
+folders and documents. Documents and programs then try an extension icon: a
+name that starts with a dot, such as `.txt.rsc`, is used for every file with
+that extension. Extensions match without regard to case, so `README.TXT` uses
+`.txt.rsc`. Name extension icons in lowercase. A multi-part extension
+is tried longest first, so `backup.tar.gz` uses `.tar.gz.rsc` before
+`.gz.rsc`. Folders and hidden files such as `.profile` never use extension
+icons. The GEM package ships `.txt.rsc`, `.md.rsc` and `.pdf.rsc`; a user icon
+of the same name overrides them. If no icon is found, or it is invalid, they
+try the common
 `folder.rsc`, `document.rsc` or `program.rsc`, then the built-in artwork.
 The parent-directory entry uses `folder.rsc`. Desktop locations use
 `folder.rsc` or `disk.rsc`; Trash uses `trash.rsc`. The Files launcher tries

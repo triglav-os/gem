@@ -108,6 +108,28 @@ def check(session):
     session.event(3, 630, 380)
     session.event(11, 630, 380)
     session.pause()
+    # The system title is part of the bar. After a click opens it, sliding
+    # right opens Desk exactly as a direct press would, and sliding back
+    # reopens the system popup; one click outside closes the whole bar.
+    session.event(3, 12, 10)
+    session.event(10, 12, 10)
+    session.event(11, 12, 10)
+    session.event(3, 30, 10)
+    session.event(3, 52, 10)
+    handoff = session.frame('system_to_desk')
+    assert crop(handoff, 0, 0, 300, 180) == crop(populated, 0, 0, 300, 180), \
+        'Sliding from the system menu did not open Desk'
+    session.event(3, 12, 10)
+    back = session.frame('desk_to_system')
+    assert crop(back, 0, 18, 110, 50) != crop(opened, 0, 18, 110, 50), \
+        'Sliding back from Desk did not reopen the system menu'
+    session.event(3, 630, 380)
+    session.event(10, 630, 380)
+    session.event(11, 630, 380)
+    session.pause()
+    restored = session.frame('bar_closed')
+    assert crop(restored, 0, 0, 300, 180) == crop(opened, 0, 0, 300, 180), \
+        'Closing the menu bar left a popup behind'
     double_click(session, 300, 108)  # First child directory, below header and parent.
     child = session.frame('child_open')
     assert crop(child, 240, 42, 280, 16) != crop(opened, 240, 42, 280, 16), 'Folder navigation did not change title'

@@ -18,3 +18,5 @@ add_subdirectory(paths)
 
 add_subdirectory(ted)
 add_subdirectory(desktop)
+
+add_subdirectory(windows)

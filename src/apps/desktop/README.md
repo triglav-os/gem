@@ -13,7 +13,10 @@ the desktop. Build and directory rules are linked from
 
 Desktop menus expose implemented actions only: Desk lists open file-manager
 windows, File has Open, Delete, Restore, Empty Trash, Rename, Cut, Copy, Paste,
-New Folder, text/Markdown/HTML/CSV creation and Select All. Arrange switches
+New Folder, text/Markdown/HTML/CSV creation, Select All and Add to Desktop.
+Add to Desktop saves the selected folders, disk images, programs and documents
+as `[locations]` entries; program and document icons use the normal icon
+lookup and open as they do in File Manager. Arrange switches
 between list and icon views and sorts by name, date, size or type. The list is a
 details view with system-font rows and clickable system-font Name, Date, Size and
 Type headers on the normal background. The header matches Gemscape's
@@ -41,6 +44,14 @@ while Move and Trash operations are rejected.
 Unused browser slots take no space. A single click selects a configured
 folder/disk icon; double-click its image or label, or choose File → Open, to
 browse it.
+Drag a desktop icon to move it. It snaps to the icon grid (the nearest free
+cell when the target is taken) and keeps that cell in
+`~/.config/gem/desktop-icons.cfg`, `[positions]` `<path> = column,row`; paths
+over 127 bytes use a hashed key. A move also pins every other gridded icon
+at its current cell, so the vacated cell stays empty and nothing shifts. New
+icons fill the free cells in column order, and an unmoved Trash keeps the
+bottom-right corner. Saved cells
+beyond a smaller screen are ignored until the icon is moved again.
 Other application windows may cover the icon and must be moved to expose the intended
 click target.
 
@@ -131,7 +142,13 @@ appear after the folder is reopened or refreshed.
 
 Desktop, File Manager and Trash share the same lookup rules. File Manager
 and Trash entries first try `<entry-name-without-extension>.rsc`, including
-folders and documents. If that icon is absent or invalid, they try the common
+folders and documents. Documents and programs then try an extension icon: a
+name that starts with a dot, such as `.txt.rsc`, is used for every file with
+that extension. Extensions match without regard to case, so `README.TXT` uses
+`.txt.rsc`. Name extension icons in lowercase. A multi-part extension
+is tried longest first, so `backup.tar.gz` uses `.tar.gz.rsc` before
+`.gz.rsc`. Folders and hidden files such as `.profile` never use extension
+icons. If no icon is found, or it is invalid, they try the common
 `folder.rsc`, `document.rsc` or `program.rsc`, then the built-in artwork.
 The parent-directory entry uses `folder.rsc`. Desktop locations use
 `folder.rsc` or `disk.rsc`; Trash uses `trash.rsc`. The Files launcher tries

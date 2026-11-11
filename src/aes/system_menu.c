@@ -9,6 +9,7 @@
  */
 
 #include "system_menu.h"
+#include "menu_private.h"
 #include "window_internal.h"
 
 #include "../vdi/vdi_internal.h"
@@ -297,7 +298,22 @@ static void system_draw_popup(const GRECT *popup, WORD highlight)
     }
 }
 
-WORD aes_system_menu_track(const gem_hid_event_t *first_evt)
+/* Nonzero when (x, y) is an application menu title with a popup, which
+ * takes over tracking from the system popup. */
+static int system_application_title_at(WORD x, WORD y)
+{
+    WORD title;
+
+    if (aes_state.menu_visible == 0 || aes_state.menu_tree == NULL ||
+        aes_state.modal_form_owner_app_id != 0) {
+        return 0;
+    }
+    title = aes_menu_title_at(aes_state.menu_tree, x, y);
+    return title != NIL &&
+           aes_menu_popup_for_title(aes_state.menu_tree, title) != NIL;
+}
+
+WORD aes_system_menu_track(int latched, WORD *handoff_x, WORD *handoff_y)
 {
     GRECT popup;
     GRECT title = {0, 0, 0, 0};
@@ -305,9 +321,10 @@ WORD aes_system_menu_track(const gem_hid_event_t *first_evt)
     uint8_t *title_saved = NULL;
     WORD highlight = -1;
     WORD chosen = AES_SYSTEM_MENU_NONE;
+    int sticky = (aes_state.menu_click != 0);
     gem_hid_event_t evt;
 
-    if (first_evt == NULL || aes_ensure_vdi() == 0) {
+    if (aes_ensure_vdi() == 0) {
         return AES_SYSTEM_MENU_NONE;
     }
 
@@ -345,6 +362,15 @@ WORD aes_system_menu_track(const gem_hid_event_t *first_evt)
             continue;
         }
         aes_store_mouse_state(&evt);
+        /* The system title belongs to the menu bar: sliding onto an
+         * application title closes this popup and opens that menu. */
+        if (handoff_x != NULL && handoff_y != NULL &&
+            system_application_title_at((WORD)evt.x, (WORD)evt.y) != 0) {
+            *handoff_x = (WORD)evt.x;
+            *handoff_y = (WORD)evt.y;
+            chosen = AES_SYSTEM_MENU_HANDOFF;
+            break;
+        }
         hovered = system_item_at(&popup, (WORD)evt.x, (WORD)evt.y);
         if (hovered != highlight) {
             highlight = hovered;
@@ -358,7 +384,16 @@ WORD aes_system_menu_track(const gem_hid_event_t *first_evt)
         if (evt.type == GEM_HID_MOUSE_BUTTON &&
             evt.button == GEM_HID_BUTTON_LEFT &&
             (evt.flags & GEM_HID_BUTTON_LEFT) == 0u) {
-            chosen = highlight;
+            /* Match application menus under menu_click: the release that
+             * completes the opening click keeps the popup open, and a later
+             * release chooses an item or closes the popup. */
+            if (sticky != 0 && latched == 0 &&
+                aes_system_menu_hit((WORD)evt.x, (WORD)evt.y) != 0) {
+                latched = 1;
+                continue;
+            }
+            chosen = (hovered > AES_SYSTEM_MENU_NONE) ? hovered
+                                                       : AES_SYSTEM_MENU_NONE;
             break;
         }
     }

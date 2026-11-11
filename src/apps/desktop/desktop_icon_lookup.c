@@ -1,6 +1,7 @@
 /*
- * Resolves shared Desktop, File Manager and Trash icon resources, with
- * bounded caching and stable storage for built-in icon replacements.
+ * Resolves shared Desktop, File Manager and Trash icon resources by entry
+ * name, file extension (icons/.txt.rsc) and type, with bounded caching
+ * and stable storage for built-in icon replacements.
  *
  * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
@@ -91,14 +92,16 @@ static int desktop_load_program_icon(const char *name,
     return ok;
 }
 
-const desktop_icon_asset_t *desktop_program_icon(const char *program)
+/*
+ * Returns the cached or freshly loaded icon for a validated lookup key: an
+ * entry stem or a lowercase extension key such as ".txt". Keys starting with
+ * '.' never collide with stems, which cannot start with one.
+ */
+static const desktop_icon_asset_t *desktop_cached_icon(const char *name)
 {
-    char name[DESKTOP_ICON_NAME_MAX];
     desktop_icon_cache_slot_t *slot;
     size_t i;
 
-    if (!desktop_program_icon_name(program, name, sizeof(name)))
-        return NULL;
     for (i = 0; i < DESKTOP_ICON_CACHE_SLOTS; ++i) {
         slot = &desktop_icon_cache[i];
         if (slot->used != 0 && strcmp(slot->name, name) == 0)
@@ -113,6 +116,58 @@ const desktop_icon_asset_t *desktop_program_icon(const char *program)
     slot->used = 1;
     slot->found = (WORD)desktop_load_program_icon(name, &slot->icon);
     return slot->found != 0 ? &slot->icon.asset : NULL;
+}
+
+const desktop_icon_asset_t *desktop_program_icon(const char *program)
+{
+    char name[DESKTOP_ICON_NAME_MAX];
+
+    if (!desktop_program_icon_name(program, name, sizeof(name)))
+        return NULL;
+    return desktop_cached_icon(name);
+}
+
+const desktop_icon_asset_t *desktop_extension_icon(const char *file)
+{
+    char key[DESKTOP_ICON_NAME_MAX];
+    const char *leaf;
+    const char *dot;
+
+    if (file == NULL)
+        return NULL;
+    leaf = strrchr(file, '/');
+    leaf = leaf != NULL ? leaf + 1 : file;
+    if (leaf[0] == '\0')
+        return NULL;
+    /* A leading dot marks a hidden file, not an extension. Try the longest
+     * extension first, so "a.tar.gz" uses ".tar.gz" before ".gz". */
+    for (dot = strchr(leaf + 1, '.'); dot != NULL;
+         dot = strchr(dot + 1, '.')) {
+        size_t length = strlen(dot);
+        size_t i;
+        int usable = length > 1u && length < sizeof(key);
+        const desktop_icon_asset_t *asset;
+
+        for (i = 0; usable && i < length; ++i) {
+            unsigned char ch = (unsigned char)dot[i];
+
+            /* Extension keys are file names; reject separators and empty
+             * components such as "a..txt" or a trailing dot. */
+            if (ch < 32u || ch == '\\' ||
+                (ch == '.' && (i + 1u == length || dot[i + 1u] == '.'))) {
+                usable = 0;
+                break;
+            }
+            key[i] = (char)(ch >= 'A' && ch <= 'Z' ? ch - 'A' + 'a' : ch);
+        }
+        if (!usable)
+            continue;
+        key[length] = '\0';
+        asset = desktop_cached_icon(key);
+        if (asset != NULL)
+            return asset;
+    }
+    return NULL;
 }
 
 void desktop_program_icons_forget(void)
@@ -174,7 +229,16 @@ desktop_named_icon(const char *name, const desktop_icon_asset_t *fallback)
 {
     const desktop_icon_asset_t *own = desktop_program_icon(name);
 
-    return own != NULL ? own : desktop_standard_icon(fallback);
+    if (own != NULL)
+        return own;
+    /* Extension icons describe files, never folders, disks or Trash. */
+    if (fallback == &desktop_doc_icon_asset ||
+        fallback == &desktop_prg_icon_asset) {
+        own = desktop_extension_icon(name);
+        if (own != NULL)
+            return own;
+    }
+    return desktop_standard_icon(fallback);
 }
 
 const desktop_icon_asset_t *

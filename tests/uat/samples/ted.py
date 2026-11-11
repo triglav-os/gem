@@ -136,6 +136,60 @@ def check(session, document):
     assert session.demo.returncode == 0
 
 
+def check_markdown(session):
+    # "# Heading" is an ATX heading; "  Heading" is not. After the first two
+    # columns both lines hold identical text, so bold shows as extra ink.
+    frame = session.frame('ted_markdown')
+    x, y, w, _ = field(session, 1, 5)
+    cell = 8
+    left = x + 4 + 2 * cell
+    heading = sum(crop(frame, left, y + BAND, 7 * cell, 16))
+    plain = sum(crop(frame, left, y + BAND + 16, 7 * cell, 16))
+    assert plain > 20, 'Markdown body text is missing'
+    assert heading > plain * 1.3, f'Heading is not bold ({heading} vs {plain})'
+    # Over the text the pointer is the I-beam, centred on its hotspot; the
+    # arrow's hotspot is its top-left tip, so it never inks pixels left of it.
+    px, py = x + 120, y + BAND + 80
+    session.event(3, px, py)
+    session.pause(.3)
+    ibeam = session.frame('ted_ibeam')
+    assert sum(crop(ibeam, px - 4, py - 6, 4, 12)) > 0, 'Text area does not use the I-beam'
+    session.event(3, x + 10, y + 10)  # Toolbar: the arrow returns.
+    session.pause(.3)
+    session.event(3, px, py - 40)
+    session.click(x + 40, y + BAND + 60)  # Give Ted keyboard focus, then quit.
+    shortcut(session, 20)
+    session.wait(lambda: session.demo.poll() is not None, 'Ted clean shutdown')
+
+
+def run(args, name, document, checker):
+    session = Session(args)
+    session.path = Path(args.artifacts).resolve()/name
+    session.path.mkdir(parents=True, exist_ok=True)
+    session.env['GEM_RASTA_FRAMEBUFFER'] = str(session.path/'framebuffer')
+    session.env['GEMD_SOCKET'] = str(session.path/'socket')
+    args.binary_args = [str(document(session.path))]
+    result = {'passed': False}
+    try:
+        try:
+            session.run()
+            checker(session)
+        finally:
+            session.close()
+        result['passed'] = True
+    except Exception as error:
+        result['error'] = str(error)
+        raise
+    finally:
+        (session.path/'result.json').write_text(json.dumps(result, indent=2)+'\n')
+
+
+def markdown_document(directory):
+    document = directory/'heading.md'
+    document.write_text('# Heading\n  Heading\n')
+    return document
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ('binary', 'gemd', 'artifacts', 'resources'):
@@ -164,6 +218,7 @@ def main():
         raise
     finally:
         (session.path/'result.json').write_text(json.dumps(result, indent=2)+'\n')
+    run(args, 'ted_markdown', markdown_document, check_markdown)
 
 
 if __name__ == '__main__':
