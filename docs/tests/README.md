@@ -18,8 +18,9 @@ permissions. `test_runtime_paths` checks Docker mounts and non-overwriting
 settings/profile migration, including shared XDG bases. `test_install_layout`
 checks exact contents, strips/dependency closure, removes stale files and
 launches relocated installed applications without checkout resource overrides.
-Its icon allowlist includes `home.rsc`, `programs.rsc`, `documents.rsc` and
-`library.rsc`. `test_desktop_icon_lookup` checks the four folder-name mappings,
+Its icon allowlist covers all 21 approved artwork resources: program, location,
+generic Desktop and extension icons. `test_desktop_icon_lookup` checks the four
+folder-name mappings,
 ASCII case variants, exact-name overrides, missing/invalid-resource fallback,
 and retained artwork after a Desktop location entry moves. It exercises the
 shared File Manager and Trash selection code with real resource decoding.

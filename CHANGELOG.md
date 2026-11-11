@@ -6,6 +6,13 @@ Unreleased.
 
 ## Unreleased
 
+- Removed offset shadows from the shaded application and location icons,
+  retaining their outlines. Home has an opaque black roof with a white
+  outline. Terminal and Disk retain their original artwork. Generated
+  resources and Desktop's built-in folder/program icons match the artwork.
+  All 21 approved icons now build and install as individual `.rsc` files,
+  including the generic Desktop icons and Blaise, Fyodor and Isaac artwork.
+
 - Added matching 32x32 monochrome artwork for Home, Programs, Documents and
   Library in `samples/data/artwork/icons/`. The normal build generates their
   icon resources in `bin/resources/icons/` and installs them in

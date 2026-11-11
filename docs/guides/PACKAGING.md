@@ -53,13 +53,15 @@ outputs remain available for debugging.
 
 Fonts, cursor/alert resources and Gemscape toolbar artwork live in share/gem.
 Clock's installed proxy variant draws its own numerals and needs no numeral
-resource. Built-in Desktop icons are compiled in as fallbacks; optional folder, disk,
-document, program and trash resources in share/gem/icons override them. Each bundled program except
-Desktop, Stout and gemd has a small icon-only `<program>.rsc` in
+resource. Built-in Desktop icons are compiled in as fallbacks; the bundled
+folder, disk, document, program and trash resources in share/gem/icons override
+them. Each bundled program except Desktop, Stout and gemd has a small icon-only `<program>.rsc` in
 share/gem/icons, which Desktop uses for that program's launcher and File
 Manager entry. Home, Programs, Documents and Library artwork is installed in
 the same directory as `home.rsc`, `programs.rsc`, `documents.rsc` and
-`library.rsc`. [Program deployment](PROGRAM_DEPLOYMENT.md) describes how
+`library.rsc`. All 21 approved artwork files have individual resources,
+including `blaise.rsc`, `fyodor.rsc`, `isaac.rsc` and the three extension icons.
+[Program deployment](PROGRAM_DEPLOYMENT.md) describes how
 distributions add further programs and icons.
 No demonstration disk is needed to run GEM, so no sample disks, extracted disk
 contents or historical IMGVIEW sources are included. Stout accepts user-supplied

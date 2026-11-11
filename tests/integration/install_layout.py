@@ -49,6 +49,8 @@ if cache['GEM_PLATFORM'] == 'linux':
     libraries.remove('librasta.so')
 program_icons = {'icons/' + name + '.rsc' for name in ('gemscape', 'terminal', 'clock', 'calc', 'gemread', 'ted',
                                                        'home', 'programs', 'documents', 'library',
+                                                       'blaise', 'fyodor', 'isaac', 'disk', 'document',
+                                                       'folder', 'program', 'trash',
                                                        '.txt', '.md', '.pdf')}
 assert {p.name for p in (relocated/bindir).iterdir()} == programs
 assert {p.name for p in (relocated/libdir).iterdir()} == libraries | {'gem'}

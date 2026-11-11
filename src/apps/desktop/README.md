@@ -169,10 +169,9 @@ ink, white paper) and convert it with `resgen`:
 resgen icons -o gemscape.rsc samples/data/artwork/icons/GEMSCAPE.PNG
 ```
 
-The build does this for Gemscape, Terminal, Clock, Calculator, Gemread, Ted,
-Home, Programs, Documents and Library. It writes each resource with a lowercase
-name to `bin/resources/icons/` and installs it in
-`share/gem/icons/`. `FYODOR.PNG`,
-`ISAAC.PNG` and `BLAISE.PNG` are ready for the planned word processor,
-spreadsheet and email client.
+The build does this for all 21 PNGs in `samples/data/artwork/icons/`, including
+the generic Desktop icons and the planned Fyodor, Isaac and Blaise programs.
+It writes lowercase names to `bin/resources/icons/` and installs them in
+`share/gem/icons/`. `DOC.PNG` maps to `document.rsc`, `PRG.PNG` to `program.rsc`,
+and TXT/MD/PDF use the extension names `.txt.rsc`, `.md.rsc` and `.pdf.rsc`.
 Configured locations and the bottom-right Trash icon retain their positions.

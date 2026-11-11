@@ -56,6 +56,18 @@ resgen icons -o blaise.rsc BLAISE.PNG
 install -m 0644 blaise.rsc <prefix>/share/gem/icons/blaise.rsc
 ```
 
+Keep icon outlines, including contrasting white outlines around black fills.
+Avoid offset drop shadows and raised or beveled borders; a flat outline is
+not shading. Black fills must be opaque, not transparent.
+
+The normal build generates an individual resource for every PNG in
+`samples/data/artwork/icons/`, including Blaise, Fyodor and Isaac. Names are
+lowercase, except that `DOC.PNG` and `PRG.PNG` become `document.rsc` and
+`program.rsc` to match Desktop's generic icon lookup. `TXT.PNG`, `MD.PNG` and
+`PDF.PNG` become `.txt.rsc`, `.md.rsc` and `.pdf.rsc` for extension lookup.
+All 21 resources are generated in `bin/resources/icons/` and installed in
+`<prefix>/share/gem/icons/`.
+
 Additional location artwork is available in `samples/data/artwork/icons/`:
 `HOME.PNG` (house), `PROGRAMS.PNG` (application windows), `DOCUMENTS.PNG`
 (folder with papers) and `LIBRARY.PNG` (books on a shelf). The normal build
