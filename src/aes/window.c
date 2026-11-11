@@ -49,6 +49,13 @@ WORD wind_create(UWORD kind, WORD x, WORD y, WORD w, WORD h)
     return 0;
 }
 
+/* Keep a window's top edge at or below the menu bar so its title and
+ * upper work area are never covered. Classic GEM limits y the same way. */
+static WORD aes_window_clamp_top(WORD y)
+{
+    return aes_max_word(y, aes_menu_bar_height());
+}
+
 WORD wind_open(WORD handle, WORD x, WORD y, WORD w, WORD h)
 {
     aes_window_t *window = aes_find_window(handle);
@@ -67,6 +74,7 @@ WORD wind_open(WORD handle, WORD x, WORD y, WORD w, WORD h)
         aes_set_rect(&previous_outer, 0, 0, 0, 0);
         aes_raise_window(window);
     }
+    y = aes_window_clamp_top(y);
     aes_set_rect(&window->outer, x, y, w, h);
     window->restored_outer = window->outer;
     window->iconified = 0;
@@ -324,6 +332,7 @@ WORD wind_set(WORD handle, WORD field, WORD w1, WORD w2, WORD w3, WORD w4)
                             &w3, &w4);
             /* fall through */
         case WF_WXYWH:
+            w2 = aes_window_clamp_top(w2);
             window->previous_outer = window->outer;
             aes_set_rect(&window->outer, w1, w2, w3, w4);
             if (window->outer.g_x == window->previous_outer.g_x &&

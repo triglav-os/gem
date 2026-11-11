@@ -275,6 +275,13 @@ clicks and keyboard input to create folders and all four file templates, rename,
 reject collisions and parent traversal, copy/paste across navigation, reject a
 repeat paste, cut/move, select all, cancel and confirm deletion, and cut out of
 Trash. They assert file contents and Trash metadata, not only screenshots.
+They first drag the Workspace icon off its cell: the drop snaps to the grid,
+is saved in `desktop-icons.cfg`, and dragging back restores the original
+desktop pixels. Moving the top icon of a column later checks that the icon
+below is pinned in place and the vacated cell shows only the desktop.
+Add to Desktop places a document as a saved location and a visible desktop icon
+without duplicating it on repeat. Trash is opened afterwards, proving the
+rebuilt desktop tree still contains every icon.
 The Desktop icon check also requires the File Manager and Gemscape launchers.
 `test_gem_trash` covers exclusive creation, existing and dangling symlinks,
 Trash export copy/move, collision preservation and metadata removal.

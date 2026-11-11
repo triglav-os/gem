@@ -37,6 +37,11 @@ symbol layouts are skipped using the byte count in the executable header, so
 they do not prevent the following relocation stream from being applied.
 
 Stout presents a monochrome 640x400 Atari screen at the top of guest RAM.
+That geometry applies to screen memory, Line-A and VDI workstation extents.
+Guest windows are host AES windows, so `wind_get(0, WF_WORKXYWH)` reports the
+host desktop work area below the menu bar. Programs that clip redraws to the
+desktop, such as the bundled demo, then repaint windows moved or resized
+beyond the first 640x400 pixels.
 XBIOS `Physbase`, `Logbase`, `Getrez` and `Setscreen` expose that screen,
 `Setpalette` and `Setcolor` retain the guest palette, `Iorec`, `Kbdvbase` and
 `Keytbl` return stable guest-memory records, and `Supexec` temporarily enters

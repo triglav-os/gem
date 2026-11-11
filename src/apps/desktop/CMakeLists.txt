@@ -14,6 +14,7 @@ add_executable(desktop
     file_dialog.c
     disks.c
     icons.c
+    icon_layout.c
     desk_redraw.c
 )
 
@@ -65,6 +66,7 @@ add_executable(desktop_hosted
     file_dialog.c
     disks.c
     icons.c
+    icon_layout.c
     desk_redraw.c
 )
 

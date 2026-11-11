@@ -1,6 +1,6 @@
 /*
- * Verify shared icon precedence, invalid-resource fallback, browser and Trash
- * selection, cache refresh and the lifetime of retained desktop assets.
+ * Verify shared icon precedence, extension icons, invalid-resource fallback,
+ * browser and Trash selection, cache refresh and retained asset lifetime.
  *
  * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
@@ -195,5 +195,45 @@ int main(void)
                ->data_bits[0] == 6);
     assert(desktop_program_icon("../.hidden") == NULL);
     assert(desktop_program_icon(NULL) == NULL);
+
+    /* Extension icons (".txt.rsc") sit between entry and type icons. */
+    available[8] = "icons/.txt.rsc";
+    available[9] = "icons/.gz.rsc";
+    available[10] = "icons/.tar.gz.rsc";
+    available[11] = "icons/.prg.rsc";
+    desktop_program_icons_forget();
+    assert(desktop_named_icon("unknown.txt", &desktop_doc_icon_asset)
+               ->data_bits[0] == 9);
+    assert(desktop_named_icon("README.TXT", &desktop_doc_icon_asset)
+               ->data_bits[0] == 9);
+    assert(desktop_named_icon("dir/a..txt", &desktop_doc_icon_asset)
+               ->data_bits[0] == 9);
+    assert(desktop_named_icon("report.txt", &desktop_doc_icon_asset)
+               ->data_bits[0] == 6);
+    assert(desktop_named_icon("backup.tar.gz", &desktop_doc_icon_asset)
+               ->data_bits[0] == 11);
+    assert(desktop_named_icon("log.gz", &desktop_doc_icon_asset)
+               ->data_bits[0] == 10);
+    assert(desktop_named_icon(".txt", &desktop_doc_icon_asset)
+               ->data_bits[0] == 3);
+    assert(desktop_named_icon("file.", &desktop_doc_icon_asset)
+               ->data_bits[0] == 3);
+    assert(desktop_named_icon("notes.txt", &desktop_folder_icon_asset)
+               ->data_bits[0] == 1);
+    browser.backend = DESKTOP_BROWSER_FILES;
+    strcpy(entry.name, "GAME.PRG");
+    entry.is_dir = entry.is_parent = 0;
+    entry.is_app = 1;
+    assert(desktop_browser_entry_asset(&browser, &entry)->data_bits[0] == 12);
+    strcpy(entry.name, "notes.txt");
+    entry.is_app = 0;
+    entry.is_dir = 1;
+    assert(desktop_browser_entry_asset(&browser, &entry)->data_bits[0] == 1);
+    invalid_name = "icons/.txt.rsc";
+    desktop_program_icons_forget();
+    assert(desktop_named_icon("unknown.txt", &desktop_doc_icon_asset)
+               ->data_bits[0] == 3);
+    invalid_name = NULL;
+    assert(desktop_extension_icon(NULL) == NULL);
     return 0;
 }

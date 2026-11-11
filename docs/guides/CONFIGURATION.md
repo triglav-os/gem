@@ -56,14 +56,24 @@ bytes respectively.
 
 gemd owns the Desktop configuration in the hosted build. Every valid absolute
 directory key in `[locations]` becomes a folder shortcut, with its value used
-as the label. Desktop does not add mounted volumes, the root directory, the
+as the label. A `.st` or `.msa` key becomes a disk icon, and any other existing
+regular file becomes a program or document icon that opens as it would in File
+Manager. Entries whose path no longer exists are not shown. Desktop does not add mounted volumes, the root directory, the
 current working directory or other automatically discovered folders. Use
-`Add Location...` to add entries immediately. Select a folder icon and use
-`Remove Location...` or press Delete to remove it; gemd persists the change
+`Add Location...` to add entries immediately, or select files and folders
+in File Manager and choose `Add to Desktop` from the File menu or the
+right-click menu. Desktop shows at most 12 location icons. Select a location
+icon and use `Remove Location...` or press Delete to remove it; gemd persists the change
 and tells Desktop to refresh. The direct hosted Desktop reads and writes the
 same file locally. gemd watches the atomically replaced user `desktop.cfg` and
 reloads it within 100 ms, so a save made through `libgemconf` also refreshes a
 running proxy Desktop.
+
+Desktop also writes `desktop-icons.cfg` itself: `[positions]` maps each icon
+the user has dragged (by path, or `launcher:N` for a launcher) to a grid
+`column,row`. It is separate from gemd-owned `desktop.cfg`, so moving icons
+never rewrites locations. Delete an entry to return that icon to automatic
+placement.
 
 A new Desktop is empty apart from Trash. `[desktop] show_launchers = true`
 adds the Files, Gemscape and Terminal launcher icons; it defaults to `false`.

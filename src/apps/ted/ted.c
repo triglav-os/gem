@@ -400,8 +400,18 @@ int main(int argc, char **argv)
             }
         }
         WORD hover = ted_toolbar_action(&s, mx, my);
-        if (hover && wind_find(mx, my) != s.window)
+        int over_window = wind_find(mx, my) == s.window;
+        if (hover && !over_window)
             hover = 0;
+        /* The text area uses the I-beam; everything else the arrow. Only
+         * changes are sent, so other applications keep their own pointer. */
+        int over_text = over_window && mx >= s.body.g_x &&
+                        mx < s.body.g_x + s.body.g_w && my >= s.body.g_y &&
+                        my < s.body.g_y + s.body.g_h;
+        if (over_text != s.text_pointer) {
+            s.text_pointer = over_text;
+            (void)graf_mouse(over_text ? TEXT_CRSR : ARROW, NULL);
+        }
         if (hover != s.hover_action) {
             s.hover_action = hover;
             redraw = 1;

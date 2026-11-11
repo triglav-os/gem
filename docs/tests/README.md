@@ -185,3 +185,8 @@ cache refresh and retained icon storage across cache replacement.
 oversized labels/graphs and active-tree preservation. `test_gemd_security`
 checks protocol-2 refusal by protocol 3, payload size, terminated and unique
 strings, and malformed topology while other application sessions remain live.
+
+`test_gemd_host` also checks window placement below a reserved menu bar:
+`wind_open()` and `wind_set(WF_CURRXYWH)` at y = 0 or within the bar clamp the
+outer top edge to the bar, keep x, width and height, and leave a position below
+the bar unchanged.

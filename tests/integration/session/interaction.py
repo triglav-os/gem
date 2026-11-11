@@ -159,6 +159,38 @@ class Interaction:
         assert before != after, f'{name}: framebuffer did not redraw'
         print(f'PASS {name}: {expected}', flush=True)
 
+    def stout_resize(self, handle):
+        # The guest clips redraws to the desktop rectangle it was given. Grow
+        # its window from the size grip: the newly exposed work area, far
+        # beyond 640x400, must be repainted with the demo's black background.
+        x, y, w, h = self.rect(handle)
+        # The resize target is the corner of the one-pixel outer border.
+        gx, gy = x + w - 1, y + h - 1
+        for kind, ex, ey in ((3, gx, gy), (10, gx, gy),
+                             (3, gx + 300, gy + 150), (11, gx + 300, gy + 150)):
+            self.event(kind, ex, ey)
+        self.session.wait(lambda: self.rect(handle)[2] == w + 300,
+                          'Stout window to grow from its size grip', 3)
+        self.session.pause(.8)
+        frame = self.snapshot('stout_resized')
+        nx, ny, nw, nh = self.rect(handle)
+        pitch = (self.width + 7) // 8
+        def block(left, top):
+            # Screen-aligned 16x16 blocks share the fill pattern's phase.
+            left, top = left // 16 * 16, top // 16 * 16
+            return bytes(frame[row * pitch + col // 8] & (0x80 >> (col % 8))
+                         for row in range(top, top + 16)
+                         for col in range(left, left + 16))
+        # The demo's background fill, sampled near the original work corner.
+        fill = block(x + 32, y + 48)
+        assert any(fill), 'Stout background sample is blank'
+        # Random triangles may cover any one block; require two matches.
+        blocks = [(x + w + 48, y + 64), (x + w + 200, y + h + 48),
+                  (x + 48, y + h + 80), (nx + nw - 64, ny + nh - 64)]
+        painted = sum(block(bx, by) == fill for bx, by in blocks)
+        assert painted >= 2, f'Stout did not repaint its enlarged window ({painted}/4)'
+        print(f'PASS stout_resize: {nw}x{nh} repainted', flush=True)
+
     def workspace(self):
         assets = (Path(__file__).resolve().parents[3] /
                   'src/apps/desktop/desktop_assets.c').read_text()
@@ -290,6 +322,7 @@ class Interaction:
         assert self.rect(stout)[2] > 0
         for index in range(3):
             self.drag(stout, 100, 80, f'stout_drag_{index + 1}')
+        self.stout_resize(stout)
         x, y, _, _ = self.rect(stout)
         for kind in (3, 10, 11):
             self.event(kind, x + 10, y + 10)

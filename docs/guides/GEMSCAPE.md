@@ -97,7 +97,11 @@ to the state directory's `cef.log` (or the explicit profile override) and Chromi
 One browser process owns each profile. An advisory lock prevents concurrent
 owners; stale Chromium singleton links from a killed container are recovered
 only after this lock has been acquired. Close the window normally to flush
-profile data. Tests use separate profiles and configuration directories.
+profile data. Gemscape keeps the lock while CEF finishes flushing after its
+window has closed, so a new launch waits up to ten seconds for the lock before
+it reports the profile as in use by another Gemscape. Startup alerts name the
+failing step: profile creation, the profile lock, the log or the browser
+engine. Tests use separate profiles and configuration directories.
 
 ## Coverage and limits
 

@@ -8,6 +8,7 @@
  */
 
 #include "menu_private.h"
+#include "system_menu.h"
 
 #include "../vdi/vdi_internal.h"
 
@@ -239,39 +240,42 @@ WORD aes_menu_key_event(OBJECT *tree, const gem_hid_event_t *evt,
     return 0;
 }
 
-WORD aes_menu_event(OBJECT *tree, const gem_hid_event_t *first_evt,
-                    WORD mepbuff[8])
+WORD aes_menu_title_at(OBJECT *tree, WORD x, WORD y)
 {
-    int latched;
+    return aes_menu_hit_title(tree, x, y);
+}
+
+/* Close the application popup without choosing anything. */
+static void aes_menu_close(OBJECT *tree, WORD highlighted_item)
+{
+    if (highlighted_item != NIL) {
+        aes_menu_set_item_selected(tree, highlighted_item, 0);
+    }
+    aes_menu_hide_popups(tree);
+    aes_menu_clear_title_selection(tree);
+    aes_menu_redraw_tree(tree);
+}
+
+/*
+ * Track an open application menu from `title`. `latched` is 0 for the press
+ * that opened it and 1 when the menu was entered with the button up. The
+ * system title is part of the same bar: sliding onto it runs the system
+ * popup, which may hand tracking back at an application title.
+ */
+static WORD aes_menu_track(OBJECT *tree, WORD title, int latched,
+                           WORD mepbuff[8])
+{
     int sticky;
-    WORD title;
     WORD popup;
     WORD item = NIL;
     WORD highlighted_item = NIL;
 
-    if (tree == NULL || first_evt == NULL || mepbuff == NULL ||
-        first_evt->type != GEM_HID_MOUSE_BUTTON ||
-        (first_evt->flags & GEM_HID_BUTTON_LEFT) == 0u) {
-        return 0;
-    }
-
     memset(mepbuff, 0, sizeof(WORD) * 8u);
-
-    title = aes_menu_hit_title(tree, (WORD)first_evt->x, (WORD)first_evt->y);
-    if (title == NIL) {
-        return 0;
-    }
-
     popup = aes_menu_popup_for_title(tree, title);
-    if (popup == NIL) {
-        return 0;
-    }
-
-    if (!aes_menu_show_popup(tree, title, popup)) {
+    if (popup == NIL || !aes_menu_show_popup(tree, title, popup)) {
         return 0;
     }
     sticky = (aes_state.menu_click != 0);
-    latched = 0;
 
     FOREVER
     {
@@ -285,6 +289,31 @@ WORD aes_menu_event(OBJECT *tree, const gem_hid_event_t *first_evt,
         if (evt.type == GEM_HID_MOUSE_MOVE ||
             evt.type == GEM_HID_MOUSE_BUTTON) {
             aes_store_mouse_state(&evt);
+        }
+
+        if (evt.type == GEM_HID_MOUSE_MOVE &&
+            aes_system_menu_hit((WORD)evt.x, (WORD)evt.y) != 0) {
+            WORD x = 0;
+            WORD y = 0;
+            int held = (evt.flags & GEM_HID_BUTTON_LEFT) != 0u;
+            WORD next;
+
+            aes_menu_close(tree, highlighted_item);
+            if (aes_system_menu_track(held ? 0 : 1, &x, &y) !=
+                AES_SYSTEM_MENU_HANDOFF) {
+                return 0;
+            }
+            next = aes_menu_hit_title(tree, x, y);
+            popup = next != NIL ? aes_menu_popup_for_title(tree, next) : NIL;
+            if (popup == NIL) {
+                return 0;
+            }
+            title = next;
+            item = NIL;
+            highlighted_item = NIL;
+            latched = (vdi_state.mouse_status & GEM_HID_BUTTON_LEFT) == 0;
+            (void)aes_menu_show_popup(tree, title, popup);
+            continue;
         }
 
         if (evt.type == GEM_HID_MOUSE_BUTTON &&
@@ -380,12 +409,7 @@ WORD aes_menu_event(OBJECT *tree, const gem_hid_event_t *first_evt,
                 }
             }
 
-            if (highlighted_item != NIL) {
-                aes_menu_set_item_selected(tree, highlighted_item, 0);
-            }
-            aes_menu_hide_popups(tree);
-            aes_menu_clear_title_selection(tree);
-            aes_menu_redraw_tree(tree);
+            aes_menu_close(tree, highlighted_item);
 
             if (item == NIL) {
                 return 0;
@@ -398,6 +422,40 @@ WORD aes_menu_event(OBJECT *tree, const gem_hid_event_t *first_evt,
             return 1;
         }
     }
+}
+
+WORD aes_menu_event(OBJECT *tree, const gem_hid_event_t *first_evt,
+                    WORD mepbuff[8])
+{
+    WORD title;
+
+    if (tree == NULL || first_evt == NULL || mepbuff == NULL ||
+        first_evt->type != GEM_HID_MOUSE_BUTTON ||
+        (first_evt->flags & GEM_HID_BUTTON_LEFT) == 0u) {
+        return 0;
+    }
+    memset(mepbuff, 0, sizeof(WORD) * 8u);
+    title = aes_menu_hit_title(tree, (WORD)first_evt->x, (WORD)first_evt->y);
+    if (title == NIL) {
+        return 0;
+    }
+    return aes_menu_track(tree, title, 0, mepbuff);
+}
+
+WORD aes_menu_track_at(OBJECT *tree, WORD x, WORD y, WORD mepbuff[8])
+{
+    WORD title;
+
+    if (tree == NULL || mepbuff == NULL) {
+        return 0;
+    }
+    memset(mepbuff, 0, sizeof(WORD) * 8u);
+    title = aes_menu_hit_title(tree, x, y);
+    if (title == NIL) {
+        return 0;
+    }
+    return aes_menu_track(tree, title, (vdi_state.mouse_status & GEM_HID_BUTTON_LEFT) == 0,
+                          mepbuff);
 }
 
 static int aes_menu_item_selectable(OBJECT *tree, WORD item)

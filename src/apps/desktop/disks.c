@@ -1,7 +1,7 @@
 /*
- * Discovers the disks shown on the desktop: filters mount types and
- * paths, derives labels and free space, and builds the disk, folder and
- * sorted icon list.
+ * Discovers the locations shown on the desktop: folders, disk images and
+ * programs or documents placed there from File Manager. Derives labels and
+ * free space, builds the sorted icon list and edits the configured set.
  *
  * SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (C) 2026 tomaz stih
@@ -122,6 +122,48 @@ static void desktop_add_folder_icon(const char *path, const char *label)
     ++g_desktop.icon_count;
 }
 
+void desktop_bind_file_icon(desktop_icon_entry_t *entry)
+{
+    entry->custom.asset.mask_bits = entry->custom.bitmap.mask;
+    entry->custom.asset.data_bits = entry->custom.bitmap.data;
+    entry->asset = &entry->custom.asset;
+}
+
+/* A program or document location: open it like File Manager would. */
+static void desktop_add_file_icon(const char *path, const char *label)
+{
+    desktop_icon_entry_t *entry;
+    gem_os_file_info_t info;
+    const char *leaf;
+
+    if (g_desktop.icon_count >= DESKTOP_MAX_ICONS - 4 || path == NULL ||
+        desktop_has_path(path, 0) != 0 || gem_os_stat_path(path, &info) == 0 ||
+        info.is_directory != 0) {
+        return;
+    }
+    leaf = strrchr(path, '/');
+    leaf = leaf != NULL ? leaf + 1 : path;
+    entry = &g_desktop.icons[g_desktop.icon_count];
+    memset(entry, 0, sizeof(*entry));
+    desktop_copy_text(entry->path, sizeof(entry->path), path);
+    desktop_copy_text(entry->label, sizeof(entry->label),
+                      label != NULL && label[0] != '\0' ? label : leaf);
+    entry->is_file = 1;
+    entry->is_app =
+        (WORD)desktop_entry_name_is_app(leaf, info.is_executable != 0);
+    (void)desktop_icon_copy(leaf,
+                            entry->is_app != 0 ? &desktop_prg_icon_asset
+                                               : &desktop_doc_icon_asset,
+                            &entry->custom);
+    desktop_bind_file_icon(entry);
+    entry->draw_info.asset = entry->asset;
+    entry->draw_info.label = entry->label;
+    entry->userblk.ab_code = (LONG)(intptr_t)desktop_user_draw;
+    entry->userblk.ab_parm = (LONG)(intptr_t)&entry->draw_info;
+    entry->object_id = (WORD)(DESKTOP_ICON_BASE + g_desktop.icon_count);
+    ++g_desktop.icon_count;
+}
+
 static void desktop_mark_disk_icon(const char *path)
 {
     WORD i;
@@ -158,6 +200,9 @@ static void desktop_add_configured_locations(void)
                                     locations.entries[i].label);
             if (locations.entries[i].type == GEM_RPC_LOCATION_DISK_IMAGE)
                 desktop_mark_disk_icon(locations.entries[i].path);
+        } else if (locations.entries[i].type == GEM_RPC_LOCATION_FILE) {
+            desktop_add_file_icon(locations.entries[i].path,
+                                  locations.entries[i].label);
         }
     }
 #else
@@ -188,6 +233,9 @@ static void desktop_add_configured_locations(void)
                 (strcasecmp(strrchr(path, '.'), ".st") == 0 ||
                  strcasecmp(strrchr(path, '.'), ".msa") == 0))
                 desktop_mark_disk_icon(path);
+        } else if (section != NULL && strcmp(section, "locations") == 0 &&
+                   path != NULL && path[0] == '/') {
+            desktop_add_file_icon(path, label);
         }
     }
 #endif
@@ -205,7 +253,9 @@ void desktop_publish_location_selection(void)
     const desktop_icon_entry_t *selected =
         desktop_find_icon(g_desktop.selected_icon);
 
-    (void)gem_location_select(selected != NULL && selected->is_folder != 0 &&
+    (void)gem_location_select(selected != NULL &&
+                                      (selected->is_folder != 0 ||
+                                       selected->is_file != 0) &&
                                       selected->is_trash == 0
                                   ? selected->path
                                   : "");
@@ -225,6 +275,9 @@ void desktop_refresh_locations(void)
     desktop_install_trash_icon();
     desktop_install_launchers();
     desktop_refresh_icon_bindings();
+    /* The icon count may have changed: an icon left outside the object tree
+     * would be neither drawn nor clickable (Trash, appended last, first). */
+    desktop_init_desktop_tree();
     desktop_layout_icons();
     if (old_show_hidden != g_desktop.show_hidden) {
         for (index = 0; index < DESKTOP_BROWSER_MAX_WINDOWS; ++index) {
@@ -314,13 +367,62 @@ void desktop_choose_location(void)
     desktop_redraw(NULL);
 }
 
+/* Persist one host path as a desktop location; nonzero on success. */
+static int desktop_save_location(const char *path)
+{
+#ifndef GEM_DESKTOP_HOSTED
+    return gem_location_add(path) > 0;
+#else
+    char label[24];
+
+    desktop_location_label(path, label, sizeof(label));
+    return gemconf_set(&g_desktop.config, "locations", path, label) != 0 &&
+           gemconf_save(&g_desktop.config) != 0;
+#endif
+}
+
+void desktop_add_selection_to_desktop(void)
+{
+    desktop_browser_window_t *browser =
+        desktop_find_browser_by_handle(g_desktop.active_browser_handle);
+    int added = 0;
+    int failed = 0;
+    char text[96];
+
+    if (browser == NULL || browser->backend != DESKTOP_BROWSER_FILES)
+        return;
+    for (WORD i = 0; i < browser->entry_count; ++i) {
+        const desktop_browser_entry_t *entry = &browser->entries[i];
+
+        if (entry->selected == 0 || entry->is_parent != 0)
+            continue;
+        if (desktop_has_path(entry->path, entry->is_dir != 0) ||
+            desktop_save_location(entry->path))
+            ++added;
+        else
+            ++failed;
+    }
+    if (failed != 0)
+        form_alert(1, "[3][ Unable to place every selected | item on the "
+                      "desktop. ][ OK ]");
+    desktop_refresh_locations();
+    if (failed != 0)
+        (void)snprintf(text, sizeof(text), "%d added to the desktop, %d failed.",
+                       added, failed);
+    else
+        (void)snprintf(text, sizeof(text), "%d added to the desktop.", added);
+    desktop_set_status(text);
+    desktop_redraw(NULL);
+}
+
 void desktop_delete_selected_location(void)
 {
     const desktop_icon_entry_t *selected =
         desktop_find_icon(g_desktop.selected_icon);
     char alert[192];
 
-    if (selected == NULL || selected->is_folder == 0 ||
+    if (selected == NULL ||
+        (selected->is_folder == 0 && selected->is_file == 0) ||
         selected->is_trash != 0) {
         desktop_set_status("Select a configured location first.");
         desktop_redraw(NULL);

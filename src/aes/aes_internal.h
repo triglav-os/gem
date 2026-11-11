@@ -304,6 +304,11 @@ WORD aes_menu_key_event(OBJECT *tree, const gem_hid_event_t *evt,
                         WORD mepbuff[8]);
 WORD aes_menu_event(OBJECT *tree, const gem_hid_event_t *first_evt,
                     WORD mepbuff[8]);
+/* Application title under (x, y) in a menu-bar tree, or NIL. */
+WORD aes_menu_title_at(OBJECT *tree, WORD x, WORD y);
+/* Open and track the application title under (x, y), entered from the system
+ * popup; returns 1 with MN_SELECTED in mepbuff when an item was chosen. */
+WORD aes_menu_track_at(OBJECT *tree, WORD x, WORD y, WORD mepbuff[8]);
 /* Track a chrome press to its release; returns MU_MESAG when a resulting
  * window message was dequeued into mepbuff, otherwise 0. */
 WORD aes_track_window_interaction(const gem_hid_event_t *first_evt, WORD flags,

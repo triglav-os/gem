@@ -33,6 +33,11 @@
                 {
                     "text": "-gdb-set pagination off",
                     "ignoreFailures": true
+                },
+                {
+                    "description": "Closing Rasta or Stop sends SIGTERM; let gemd shut down instead of pausing",
+                    "text": "-interpreter-exec console \"handle SIGTERM nostop noprint pass\"",
+                    "ignoreFailures": true
                 }
             ]
         }

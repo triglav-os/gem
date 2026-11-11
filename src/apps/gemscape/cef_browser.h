@@ -31,6 +31,9 @@ typedef struct gemscape_browser_info {
 int gemscape_cef_start(int argc, char **argv, uint16_t width, uint16_t height,
                        const char *url,
                        const struct gemscape_preferences *preferences);
+/* Reason for the latest gemscape_cef_start failure, formatted for an alert
+ * body with '|' line breaks. Valid until the next start attempt. */
+const char *gemscape_cef_start_error(void);
 /* Runs CEF subprocesses; returns -1 when this is the main application. */
 int gemscape_cef_execute_process(int argc, char **argv);
 /* Services Chromium and periodically requests CSS layout metrics. */

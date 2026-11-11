@@ -39,13 +39,21 @@ def popup(session, row, x=300, y=108, capture=None):
     session.event(3, x, y)
     session.event(30, x, y)
     session.event(31, x, y)
-    px, py = min(x, 404), min(y, 116)
+    # 15 command rows and three 8-pixel group separators (after Empty Trash,
+    # Paste and New CSV File) are clamped to the 400-pixel screen bottom.
+    px, py = min(x, 404), min(y, 72)
     if capture:
         for index in range(3):
             frame = session.frame(capture + (f'_{index}' if index else ''))
             assert all(pixel(frame, px+i, py) for i in range(236)), 'Popup top border missing'
-            assert all(pixel(frame, px, py+i) for i in range(284)), 'Popup left border missing'
-    session.click(px + 80, py + row * 20 + 10)
+            assert all(pixel(frame, px, py+i) for i in range(304)), 'Popup left border missing'
+    separators = sum(row > last for last in (3, 7, 12))
+    session.click(px + 80, py + row * 20 + separators * 8 + 12)
+
+
+def region(frame, x, y, w, h):
+    return bytes(pixel(frame, x + col, y + row)
+                 for row in range(h) for col in range(w))
 
 
 def name(session, text):
@@ -53,7 +61,31 @@ def name(session, text):
     session.key(40)
 
 
+def drag_icon(session, x, y, tx, ty):
+    for kind, ex, ey in ((3, x, y), (10, x, y), (3, x + 8, y + 8),
+                         (3, tx, ty), (11, tx, ty)):
+        session.event(kind, ex, ey)
+    session.pause(.5)
+
+
 def check(session, work, data):
+    # Desktop icons drag onto the grid and keep their cell. Dropping a little
+    # off a cell snaps to it; the icon is then dragged back home.
+    before = session.frame('icon_drag_before')
+    drag_icon(session, 52, 54, 52 + 3 * 78 + 9, 54 + 2 * 66 - 7)
+    moved = session.frame('icon_dragged')
+    positions = session.path/'config/gem/desktop-icons.cfg'
+    assert f'{work} = 3,2' in positions.read_text(), 'Icon cell was not saved'
+    assert region(moved, 16, 36, 72, 58) != region(before, 16, 36, 72, 58), \
+        'Dragged icon left its old cell drawn'
+    assert region(moved, 16 + 3 * 78, 36 + 2 * 66, 72, 58) != \
+        region(before, 16 + 3 * 78, 36 + 2 * 66, 72, 58), 'Icon not drawn in its new cell'
+    drag_icon(session, 52 + 3 * 78, 54 + 2 * 66, 50, 50)
+    assert f'{work} = 0,0' in positions.read_text(), 'Icon did not return home'
+    session.click(400, 300)  # Deselect, then park the pointer off the icons.
+    session.event(3, 639, 399)
+    assert region(session.frame('icon_home'), 0, 20, 640, 380) == \
+        region(before, 0, 20, 640, 380), 'Desktop differs after dragging back'
     double_click(session, 52, 54)
     session.click(300, 108)  # First file, using only normal left-click selection.
     session.key(76)
@@ -78,6 +110,33 @@ def check(session, work, data):
     popup(session, 4, 300, 144, 'rename_context')
     name(session, 'renamed.txt')
     assert not (work/'note.txt').exists() and (work/'renamed.txt').exists(), 'Rename failed'
+    # Add to Desktop (last row) places note.md below the Workspace icon and
+    # persists it as a location. A second request does not duplicate it.
+    before = session.frame('add_desktop_before')
+    popup(session, 14, 300, 126, 'add_desktop_context')
+    session.pause(.5)
+    added = session.frame('add_desktop_after')
+    config = (session.path/'config/gem/desktop.cfg').read_text()
+    assert config.count(str(work/'note.md')) == 1, 'Add to Desktop did not save note.md'
+    assert region(added, 0, 96, 96, 70) != region(before, 0, 96, 96, 70), \
+        'Add to Desktop did not show a desktop icon'
+    popup(session, 14, 300, 126)
+    session.pause(.5)
+    config = (session.path/'config/gem/desktop.cfg').read_text()
+    assert config.count(str(work/'note.md')) == 1, 'Add to Desktop duplicated note.md'
+    # Moving the top icon leaves its cell empty: note.md below must not move
+    # up, and no stale copy of either icon may remain.
+    stacked = session.frame('icons_stacked')
+    drag_icon(session, 52, 54, 52 + 2 * 78, 54)
+    session.event(3, 639, 399)
+    spaced = session.frame('icons_spaced')
+    layout = (session.path/'config/gem/desktop-icons.cfg').read_text()
+    assert f'{work} = 2,0' in layout and f"{work/'note.md'} = 0,1" in layout, \
+        'Moving an icon did not pin the others'
+    assert region(spaced, 16, 102, 72, 58) == region(stacked, 16, 102, 72, 58), \
+        'The icon below moved into the vacated cell'
+    assert region(spaced, 16, 36, 72, 58) == region(spaced, 16, 168, 72, 58), \
+        'The vacated cell still shows an icon'
     # Collision and traversal rejection leave the source and destination intact.
     popup(session, 4, 300, 162)
     name(session, 'page.html')

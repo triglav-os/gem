@@ -87,7 +87,7 @@ void desktop_update_desk_menu_labels(void)
                       g_desktop.sort_mode == DESKTOP_SORT_SIZE);
     (void)menu_icheck(tree, MENU_ARRANGE_SORT_TYPE,
                       g_desktop.sort_mode == DESKTOP_SORT_TYPE);
-    for (WORD command = MENU_FILE_OPEN; command <= MENU_FILE_SELECT_ALL;
+    for (WORD command = MENU_FILE_OPEN; command <= MENU_FILE_LAST;
          ++command)
         (void)menu_ienable(tree, command,
                            desktop_file_command_enabled(command));
@@ -124,6 +124,8 @@ void desktop_refresh_icon_bindings(void)
     WORD i;
 
     for (i = 0; i < g_desktop.icon_count; ++i) {
+        if (g_desktop.icons[i].is_file != 0)
+            desktop_bind_file_icon(&g_desktop.icons[i]);
         g_desktop.icons[i].draw_info.asset = g_desktop.icons[i].asset;
         g_desktop.icons[i].draw_info.label = g_desktop.icons[i].label;
         g_desktop.icons[i].userblk.ab_code = (LONG)(intptr_t)desktop_user_draw;
@@ -212,14 +214,15 @@ static void desktop_init_menu_tree(void)
                                          "  New Markdown File",
                                          "  New HTML File",
                                          "  New CSV File",
-                                         "  Select All"};
+                                         "  Select All",
+                                         "  Add to Desktop"};
+    enum { file_rows = MENU_FILE_LAST - MENU_FILE_OPEN + 1 };
     desktop_init_object(&tree[MENU_FILE_BOX], MENU_ARRANGE_BOX, MENU_FILE_OPEN,
-                        MENU_FILE_SELECT_ALL, G_BOX, NONE, NORMAL, 0x1100L, 0,
-                        0, 24, 14);
-    for (WORD item = MENU_FILE_OPEN; item <= MENU_FILE_SELECT_ALL; ++item)
+                        MENU_FILE_LAST, G_BOX, NONE, NORMAL, 0x1100L, 0, 0, 24,
+                        file_rows);
+    for (WORD item = MENU_FILE_OPEN; item <= MENU_FILE_LAST; ++item)
         desktop_init_object(&tree[item],
-                            item == MENU_FILE_SELECT_ALL ? MENU_FILE_BOX
-                                                         : item + 1,
+                            item == MENU_FILE_LAST ? MENU_FILE_BOX : item + 1,
                             NIL, NIL, G_STRING, NONE, NORMAL,
                             (LONG)(intptr_t)labels[item - MENU_FILE_OPEN], 0,
                             item - MENU_FILE_OPEN, 24, 1);
@@ -248,7 +251,7 @@ static void desktop_init_menu_tree(void)
                         (LONG)(intptr_t)"  Sort by type", 0, 5, 20, 1);
 }
 
-static void desktop_init_desktop_tree(void)
+void desktop_init_desktop_tree(void)
 {
     WORD i;
     WORD last_object = DESKTOP_ROOT;
@@ -331,7 +334,7 @@ static void desktop_handle_menu_item(WORD item)
 {
     char text[96];
 
-    if (item >= MENU_FILE_OPEN && item <= MENU_FILE_SELECT_ALL) {
+    if (item >= MENU_FILE_OPEN && item <= MENU_FILE_LAST) {
         desktop_file_command(item);
         return;
     }
@@ -470,6 +473,7 @@ static void desktop_shutdown(void)
         appl_exit();
     }
     gemconf_clear(&g_desktop.config);
+    desktop_icon_layout_release();
     gem_os_shutdown();
 }
 
@@ -541,7 +545,7 @@ int main(void)
 #ifndef GEM_DESKTOP_HOSTED
             else if (msg[0] == GEM_MSG_LOCATION_CHANGED) {
                 desktop_refresh_locations();
-                desktop_set_status("Location removed.");
+                desktop_set_status("Desktop locations updated.");
             }
 #endif
             else if (msg[0] == MN_SELECTED) {
@@ -580,7 +584,19 @@ int main(void)
                 continue;
             if (object >= DESKTOP_ICON_BASE &&
                 object < DESKTOP_ICON_BASE + g_desktop.icon_count) {
-                desktop_handle_icon_click(object);
+                WORD dx = mx;
+                WORD dy = my;
+
+                /* Holding and moving the pointer drags the icon to another
+                 * grid cell; a plain click selects or opens it. */
+                if (desktop_wait_for_drag(mx, my, &dx, &dy, NULL)) {
+                    if (g_desktop.selected_icon != object)
+                        desktop_handle_icon_click(object);
+                    g_desktop.last_desktop_click_object = NIL;
+                    (void)desktop_drag_icon(object, dx, dy);
+                } else {
+                    desktop_handle_icon_click(object);
+                }
             } else {
                 GRECT dirty;
 

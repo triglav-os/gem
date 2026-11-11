@@ -17,6 +17,8 @@ typedef struct gemd_overlay {
     uint32_t id;
     WORD owner;
     WORD window;
+    WORD x;
+    WORD y;
     uint16_t width;
     uint16_t height;
     uint8_t *pixels;
@@ -36,9 +38,20 @@ void gemd_overlay_window_top_changed(void)
         if (overlay->id == 0u || overlay->window == 0)
             continue;
         target = aes_find_window(overlay->window);
-        if (target == NULL || target->open == 0) {
+        if (target == NULL || target->open == 0 || target->iconified != 0) {
             gem_raster_overlay_set_visible(overlay->id, 0);
             continue;
+        }
+        /* Follow a moved window before the AES repaints the area it exposed.
+         * Waiting for the owner's WM_MOVED would composite the overlay over
+         * that area at its old origin until something presented it again. */
+        if (target->work.g_x != overlay->x || target->work.g_y != overlay->y) {
+            if (gem_raster_overlay_create(overlay->id, target->work.g_x,
+                                          target->work.g_y, overlay->width,
+                                          overlay->height)) {
+                overlay->x = target->work.g_x;
+                overlay->y = target->work.g_y;
+            }
         }
         for (size_t w = 0; w < AES_MAX_WINDOWS && count < 16u; ++w) {
             aes_window_t *cover = &aes_state.windows[w];
@@ -111,6 +124,8 @@ static int map_overlay(gemd_overlay_t *overlay, WORD window)
                                    window_state->work.g_y, overlay->width,
                                    overlay->height))
         return 0;
+    overlay->x = window_state->work.g_x;
+    overlay->y = window_state->work.g_y;
     gemd_overlay_window_top_changed();
     return 1;
 }

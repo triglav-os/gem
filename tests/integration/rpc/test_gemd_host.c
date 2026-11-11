@@ -388,6 +388,39 @@ static void background_window_title(void)
     assert(unlink(path) == 0 && rmdir(directory) == 0);
 }
 
+/* Opening or moving a window keeps its title below the menu bar. */
+static void window_below_menu_bar(void)
+{
+    char directory[] = "/tmp/gem-menu-test.XXXXXXXX";
+    char path[128];
+    WORD app, handle, bar, x, y, w, h;
+
+    assert(mkdtemp(directory));
+    snprintf(path, sizeof(path), "%s/framebuffer", directory);
+    assert(setenv("GEM_RASTA_FRAMEBUFFER", path, 1) == 0);
+    app = appl_init();
+    assert(app > 0);
+    assert(graf_handle(NULL, NULL, NULL, NULL) > 0);
+    aes_state.desktop_owner_app_id = app;
+    bar = aes_menu_bar_height();
+    assert(bar > 0);
+    handle = wind_create(NAME | MOVER | CLOSER, 0, 0, 640, 400);
+    assert(handle > 0);
+    assert(wind_open(handle, 30, 0, 200, 120));
+    assert(wind_get(handle, WF_WXYWH, &x, &y, &w, &h));
+    assert(x == 30 && y == bar && w == 200 && h == 120);
+    assert(wind_set(handle, WF_WXYWH, 50, (WORD)(bar - 5), 210, 130));
+    assert(wind_get(handle, WF_WXYWH, &x, &y, &w, &h));
+    assert(x == 50 && y == bar && w == 210 && h == 130);
+    assert(wind_set(handle, WF_WXYWH, 60, (WORD)(bar + 40), 210, 130));
+    assert(wind_get(handle, WF_WXYWH, &x, &y, &w, &h));
+    assert(x == 60 && y == bar + 40);
+    assert(wind_close(handle) && wind_delete(handle));
+    aes_state.desktop_owner_app_id = 0;
+    assert(appl_exit());
+    assert(unlink(path) == 0 && rmdir(directory) == 0);
+}
+
 /* SIZER alone keeps a thin frame and never steals a client-area click. */
 static void compact_window_geometry(void)
 {
@@ -460,6 +493,7 @@ int main(void)
     text_editor_hid_collisions();
     physical_keyboard_extension();
     background_window_title();
+    window_below_menu_bar();
     puts("hostile framebuffer paths, viewer replacement and app-id rollover "
          "passed");
     return 0;

@@ -58,6 +58,7 @@ enum {
     MENU_FILE_NEW_HTML,
     MENU_FILE_NEW_CSV,
     MENU_FILE_SELECT_ALL,
+    MENU_FILE_ADD_DESKTOP,
     MENU_ARRANGE_BOX,
     MENU_ARRANGE_SHOW_AS_ICONS,
     MENU_ARRANGE_SEPARATOR,
@@ -67,6 +68,9 @@ enum {
     MENU_ARRANGE_SORT_TYPE,
     MENU_OBJECT_COUNT
 };
+
+/* Last command of the shared File menu and File Manager context menu. */
+enum { MENU_FILE_LAST = MENU_FILE_ADD_DESKTOP };
 
 enum {
     DESKTOP_MAX_DISKS = 12,
@@ -114,7 +118,12 @@ typedef struct desktop_icon_entry {
     WORD object_id;
     WORD is_trash;
     WORD is_folder;
+    /* A program or document placed on the desktop from File Manager. */
+    WORD is_file;
+    WORD is_app;
     WORD launcher;
+    /* Artwork for is_file icons; rebound after entries move. */
+    desktop_custom_icon_t custom;
 } desktop_icon_entry_t;
 
 typedef struct desktop_browser_entry {
@@ -182,6 +191,8 @@ typedef struct desktop_state {
     gemconf_t config;
     uint32_t last_desktop_click_ms;
     WORD last_desktop_click_object;
+    /* Path of that icon: location refreshes renumber icon objects. */
+    char last_desktop_click_path[GEM_OS_PATH_MAX];
     WORD drag_browser_handle;
     WORD drag_entry_index;
     WORD drag_started;
@@ -273,6 +284,15 @@ void desktop_init_object(OBJECT *object, WORD next, WORD head, WORD tail,
 void desktop_install_trash_icon(void);
 /* Place desktop icons in a grid within the work area. */
 void desktop_layout_icons(void);
+/* Drag a pressed desktop icon to another grid cell and remember it there.
+ * Returns nonzero when the icon moved. Call while the button is held. */
+int desktop_drag_icon(WORD object_id, WORD mx, WORD my);
+/* Release the saved icon-position configuration. */
+void desktop_icon_layout_release(void);
+/* Wait while the left button is held: nonzero once the pointer leaves the
+ * drag threshold around (x, y), zero when the button is released first. */
+int desktop_wait_for_drag(WORD x, WORD y, WORD *mouse_x, WORD *mouse_y,
+                          WORD *key_state);
 /* Absolute rectangle of a desktop tree object. */
 void desktop_object_rect(WORD object_id, GRECT *rect);
 /* Open a browser window on a disk or folder path. */
@@ -294,10 +314,22 @@ void desktop_refresh_locations(void);
 void desktop_choose_location(void);
 /* Remove the selected configured desktop location. */
 void desktop_delete_selected_location(void);
+/* Point a file icon at its own artwork after the entry was copied. */
+void desktop_bind_file_icon(desktop_icon_entry_t *entry);
+/* Place the active File Manager selection on the desktop as icons. */
+void desktop_add_selection_to_desktop(void);
+/* Nonzero when a File Manager name denotes a program (PRG or executable). */
+int desktop_entry_name_is_app(const char *name, int executable);
+/* Open a host file as File Manager does: launch a program or open a document
+ * with its associated program. Writes a status message either way. */
+int desktop_launch_path(const char *name, const char *path, int executable,
+                        char *status, size_t status_size);
 /* Repaint the desktop background and icons within dirty. */
 void desktop_redraw(const GRECT *dirty);
 /* Repaint desktop areas uncovered by a window change. */
 void desktop_redraw_window_change(const GRECT *before, const GRECT *after);
+/* Rebuild the desktop object tree from the current icon list. */
+void desktop_init_desktop_tree(void);
 /* Point every icon object at its USERBLK draw record. */
 void desktop_refresh_icon_bindings(void);
 /* Change the selected icon and repaint both icons. */

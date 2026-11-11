@@ -35,28 +35,50 @@ int desktop_name_dialog(const char *title, char *text, size_t capacity)
                          title, "Name", text, capacity);
 }
 
+/* Context rows in display order; a zero command is a group separator. */
+static const struct {
+    const char *label;
+    WORD command;
+} file_popup_rows[] = {
+    {"  Open", MENU_FILE_OPEN},
+    {"  Delete", MENU_FILE_DELETE},
+    {"  Restore", MENU_FILE_RESTORE},
+    {"  Empty Trash", MENU_FILE_EMPTY_TRASH},
+    {NULL, 0},
+    {"  Rename       F2", MENU_FILE_RENAME},
+    {"  Cut          ^X", MENU_FILE_CUT},
+    {"  Copy         ^C", MENU_FILE_COPY},
+    {"  Paste        ^V", MENU_FILE_PASTE},
+    {NULL, 0},
+    {"  New Folder", MENU_FILE_NEW_FOLDER},
+    {"  New Text File", MENU_FILE_NEW_TEXT},
+    {"  New Markdown File", MENU_FILE_NEW_MARKDOWN},
+    {"  New HTML File", MENU_FILE_NEW_HTML},
+    {"  New CSV File", MENU_FILE_NEW_CSV},
+    {NULL, 0},
+    {"  Select All   ^A", MENU_FILE_SELECT_ALL},
+    {"  Add to Desktop", MENU_FILE_ADD_DESKTOP},
+};
+
 void desktop_file_popup(WORD handle, WORD x, WORD y)
 {
-    static const char *const labels[] = {"  Open",
-                                         "  Delete",
-                                         "  Restore",
-                                         "  Empty Trash",
-                                         "  Rename       F2",
-                                         "  Cut          ^X",
-                                         "  Copy         ^C",
-                                         "  Paste        ^V",
-                                         "  New Folder",
-                                         "  New Text File",
-                                         "  New Markdown File",
-                                         "  New HTML File",
-                                         "  New CSV File",
-                                         "  Select All   ^A"};
-    enum { count = sizeof(labels) / sizeof(labels[0]), row_height = 20 };
+    enum {
+        count = sizeof(file_popup_rows) / sizeof(file_popup_rows[0]),
+        row_height = 20,
+        separator_height = 8,
+        width = 236
+    };
     OBJECT tree[count + 1];
     desktop_browser_window_t *browser = desktop_find_browser_by_handle(handle);
     WORD hit, chosen = NIL, hovered = NIL, window;
+    WORD height = 4;
+
     if (browser == NULL)
         return;
+    for (int i = 0; i < count; ++i)
+        height = (WORD)(height + (file_popup_rows[i].command != 0
+                                      ? row_height
+                                      : separator_height));
     desktop_browser_sync_work(browser);
     if (x < browser->work.g_x || y < browser->work.g_y ||
         x >= browser->work.g_x + browser->work.g_w ||
@@ -74,23 +96,35 @@ void desktop_file_popup(WORD handle, WORD x, WORD y)
     browser->last_click_ms = 0;
     desktop_browser_redraw(browser, NULL);
     desktop_update_desk_menu_labels();
-    if (x + 236 > g_desktop.screen_width)
-        x = g_desktop.screen_width - 236;
-    if (y + count * row_height + 4 > g_desktop.screen_height)
-        y = g_desktop.screen_height - count * row_height - 4;
+    if (x + width > g_desktop.screen_width)
+        x = g_desktop.screen_width - width;
+    if (y + height > g_desktop.screen_height)
+        y = g_desktop.screen_height - height;
     if (y < g_desktop.work.g_y)
         y = g_desktop.work.g_y;
     desktop_init_object(&tree[0], NIL, 1, count, G_BOX, NONE, NORMAL,
-                        0x00011170L, x, y, 236, count * row_height + 4);
-    for (int i = 1; i <= count; ++i)
-        desktop_init_object(
-            &tree[i], i == count ? 0 : (WORD)(i + 1), NIL, NIL, G_STRING,
-            i == count ? LASTOB : NONE,
-            desktop_file_command_enabled((WORD)(MENU_FILE_OPEN + i - 1))
-                ? NORMAL
-                : DISABLED,
-            (LONG)(intptr_t)labels[i - 1], 2, (WORD)(2 + (i - 1) * row_height),
-            232, row_height);
+                        0x00011170L, x, y, width, height);
+    {
+        WORD top = 2;
+
+        for (int i = 1; i <= count; ++i) {
+            WORD command = file_popup_rows[i - 1].command;
+            WORD rows = command != 0 ? row_height : separator_height;
+
+            /* Separators are inert, invisible boxes; the rule is drawn
+             * below so it spans the popup without a text glyph row. */
+            desktop_init_object(
+                &tree[i], i == count ? 0 : (WORD)(i + 1), NIL, NIL,
+                command != 0 ? G_STRING : G_IBOX, i == count ? LASTOB : NONE,
+                command != 0 && desktop_file_command_enabled(command)
+                    ? NORMAL
+                    : DISABLED,
+                command != 0 ? (LONG)(intptr_t)file_popup_rows[i - 1].label
+                             : 0L,
+                2, top, width - 4, rows);
+            top = (WORD)(top + rows);
+        }
+    }
     window = dialog_open(tree);
     if (!window)
         return;
@@ -101,22 +135,29 @@ void desktop_file_popup(WORD handle, WORD x, WORD y)
                   tree[0].ob_height);
         WORD outline[10] = {x,
                             y,
-                            (WORD)(x + 235),
+                            (WORD)(x + width - 1),
                             y,
-                            (WORD)(x + 235),
-                            (WORD)(y + count * row_height + 3),
+                            (WORD)(x + width - 1),
+                            (WORD)(y + height - 1),
                             x,
-                            (WORD)(y + count * row_height + 3),
+                            (WORD)(y + height - 1),
                             x,
                             y};
-        WORD clip[4] = {x, y, (WORD)(x + 235),
-                        (WORD)(y + count * row_height + 3)};
+        WORD clip[4] = {x, y, (WORD)(x + width - 1), (WORD)(y + height - 1)};
         vs_clip(g_desktop.vdi_handle, 1, clip);
         vswr_mode(g_desktop.vdi_handle, MD_REPLACE);
         vsl_color(g_desktop.vdi_handle, WHITE);
         vsl_type(g_desktop.vdi_handle, 1);
         vsl_width(g_desktop.vdi_handle, 1);
         v_pline(g_desktop.vdi_handle, 5, outline);
+        for (int i = 1; i <= count; ++i) {
+            if (file_popup_rows[i - 1].command != 0)
+                continue;
+            WORD rule_y = (WORD)(y + tree[i].ob_y + separator_height / 2);
+            WORD rule[4] = {(WORD)(x + 4), rule_y, (WORD)(x + width - 5),
+                            rule_y};
+            v_pline(g_desktop.vdi_handle, 2, rule);
+        }
         vs_clip(g_desktop.vdi_handle, 0, clip);
         wind_update(END_UPDATE);
         WORD event = evnt_multi(MU_BUTTON | MU_KEYBD | MU_TIMER | MU_MESAG, 1,
@@ -143,5 +184,5 @@ void desktop_file_popup(WORD handle, WORD x, WORD y)
     }
     dialog_close(tree, window);
     if (chosen > 0)
-        desktop_file_command((WORD)(MENU_FILE_OPEN + chosen - 1));
+        desktop_file_command(file_popup_rows[chosen - 1].command);
 }

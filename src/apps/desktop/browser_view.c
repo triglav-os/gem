@@ -514,8 +514,8 @@ static void desktop_browser_scroll_to(desktop_browser_window_t *browser,
     desktop_browser_redraw(browser, NULL);
 }
 
-static int desktop_browser_wait_for_drag(WORD x, WORD y, WORD *mouse_x,
-                                         WORD *mouse_y, WORD *key_state)
+int desktop_wait_for_drag(WORD x, WORD y, WORD *mouse_x, WORD *mouse_y,
+                          WORD *key_state)
 {
     enum { DRAG_POLL_MS = 10 };
     WORD message[8] = {0};
@@ -807,7 +807,7 @@ int desktop_browser_begin_drag(WORD handle, WORD index, WORD x, WORD y)
         g_desktop.drag_entry_index = NIL;
         return 0;
     }
-    if (desktop_browser_wait_for_drag(x, y, &mouse_x, &mouse_y,
+    if (desktop_wait_for_drag(x, y, &mouse_x, &mouse_y,
                                       &key_state) == 0) {
         g_desktop.drag_browser_handle = NIL;
         g_desktop.drag_entry_index = NIL;

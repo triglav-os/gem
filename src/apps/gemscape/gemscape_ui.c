@@ -983,8 +983,14 @@ int gemscape_main(int argc, char **argv)
 #endif
 #if defined(GEMSCAPE_CEF) && GEMSCAPE_CEF
     if (!state.cef_started) {
-        form_alert(1, "[1][Browser startup failed.|Profile may already be in "
-                      "use.|See the browser profile log.][OK]");
+        const char *reason = gemscape_cef_start_error();
+        char alert[256];
+
+        if (reason == NULL || reason[0] == '\0')
+            reason = "The browser window could not be prepared.";
+        snprintf(alert, sizeof(alert), "[1][Browser startup failed.|%s][OK]",
+                 reason);
+        form_alert(1, alert);
         gemscape_quit_requested = 1;
         exit_status = 1;
     }

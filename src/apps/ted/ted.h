@@ -42,6 +42,8 @@ typedef struct ted_state {
     size_t top, left;
     int dragging, running, crlf;
     char path[GEM_OS_PATH_MAX], *clipboard;
+    /* Nonzero while Ted shows the I-beam over its text area. */
+    int text_pointer;
 } ted_state_t;
 
 /* Refresh the editable work rectangle after opening, moving or resizing. */

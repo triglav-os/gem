@@ -137,6 +137,10 @@ static void aes_activate_input_target(const gem_hid_event_t *evt)
 
 static int aes_track_system_menu_event(const gem_hid_event_t *evt)
 {
+    WORD x = 0;
+    WORD y = 0;
+    WORD mepbuff[8];
+
     if (evt == NULL || evt->type != GEM_HID_MOUSE_BUTTON ||
         evt->button != GEM_HID_BUTTON_LEFT ||
         (evt->flags & GEM_HID_BUTTON_LEFT) == 0u ||
@@ -144,7 +148,13 @@ static int aes_track_system_menu_event(const gem_hid_event_t *evt)
         return 0;
     }
     aes_store_mouse_state(evt);
-    (void)aes_system_menu_track(evt);
+    /* Moving right from the system title continues in the application bar;
+     * that tracker may revisit the system popup and returns once the whole
+     * bar interaction has closed. */
+    if (aes_system_menu_track(0, &x, &y) == AES_SYSTEM_MENU_HANDOFF &&
+        aes_menu_track_at(aes_state.menu_tree, x, y, mepbuff) != 0) {
+        aes_post_menu_selection(mepbuff);
+    }
     return 1;
 }
 

@@ -54,6 +54,8 @@ int desktop_file_command_enabled(WORD command)
             return files && clipboard.entry_count > 0;
         case MENU_FILE_SELECT_ALL:
             return browser != NULL && browser->entry_count > 0;
+        case MENU_FILE_ADD_DESKTOP:
+            return files && count > 0;
         default:
             return command >= MENU_FILE_NEW_FOLDER &&
                    command <= MENU_FILE_NEW_CSV && files;
@@ -264,6 +266,9 @@ void desktop_file_command(WORD command)
                     browser->selected_index = (WORD)i;
             }
             desktop_browser_redraw(browser, NULL);
+            break;
+        case MENU_FILE_ADD_DESKTOP:
+            desktop_add_selection_to_desktop();
             break;
         default:
             name_command(browser, command);

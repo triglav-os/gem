@@ -492,6 +492,10 @@ int gem_raster_overlay_create(uint32_t id, int x, int y, uint16_t width,
 {
     linux_overlay_t *overlay = find_overlay(id);
     size_t size = (size_t)width * height * 4u;
+    int old_x = 0;
+    int old_y = 0;
+    uint16_t old_width = 0;
+    uint16_t old_height = 0;
 
     if (width == 0u || height == 0u || size > linux_overlay_limit)
         return 0;
@@ -508,12 +512,19 @@ int gem_raster_overlay_create(uint32_t id, int x, int y, uint16_t width,
                 break;
             }
         }
-    } else if (overlay->width != width || overlay->height != height) {
-        uint8_t *pixels = realloc(overlay->pixels, size);
-        if (pixels == NULL)
-            return 0;
-        overlay->pixels = pixels;
-        memset(overlay->pixels, 0, size);
+    } else if (overlay->width != width || overlay->height != height ||
+               overlay->x != x || overlay->y != y) {
+        old_x = overlay->x;
+        old_y = overlay->y;
+        old_width = overlay->width;
+        old_height = overlay->height;
+        if (overlay->width != width || overlay->height != height) {
+            uint8_t *pixels = realloc(overlay->pixels, size);
+            if (pixels == NULL)
+                return 0;
+            overlay->pixels = pixels;
+            memset(overlay->pixels, 0, size);
+        }
     }
     if (overlay == NULL)
         return 0;
@@ -521,6 +532,9 @@ int gem_raster_overlay_create(uint32_t id, int x, int y, uint16_t width,
     overlay->y = y;
     overlay->width = width;
     overlay->height = height;
+    /* Restore the framebuffer where the overlay used to be composited. */
+    if (old_width != 0u && old_height != 0u)
+        gem_raster_present_rect(old_x, old_y, old_width, old_height);
     return 1;
 }
 
@@ -528,8 +542,11 @@ void gem_raster_overlay_set_visible(uint32_t id, int visible)
 {
     linux_overlay_t *overlay = find_overlay(id);
 
-    if (overlay != NULL)
-        overlay->visible = (visible != 0);
+    if (overlay == NULL || overlay->visible == (visible != 0))
+        return;
+    overlay->visible = (visible != 0);
+    gem_raster_present_rect(overlay->x, overlay->y, overlay->width,
+                            overlay->height);
 }
 
 void gem_raster_overlay_set_occlusion(uint32_t id, const int *rects,
@@ -544,6 +561,8 @@ void gem_raster_overlay_set_occlusion(uint32_t id, const int *rects,
     overlay->occlusion_count = limited;
     if (limited != 0u && rects != NULL)
         memcpy(overlay->occlusion, rects, (size_t)limited * 4u * sizeof(int));
+    gem_raster_present_rect(overlay->x, overlay->y, overlay->width,
+                            overlay->height);
 }
 
 int gem_raster_overlay_resize(uint32_t id, int x, int y, uint16_t width,
@@ -575,10 +594,18 @@ void gem_raster_overlay_destroy(uint32_t id)
     linux_overlay_t *overlay = find_overlay(id);
 
     if (overlay != NULL) {
+        int visible = overlay->visible;
+        int x = overlay->x;
+        int y = overlay->y;
+        int width = overlay->width;
+        int height = overlay->height;
+
         free(overlay->pixels);
         memset(overlay, 0, sizeof(*overlay));
         if (g_overlay_count != 0u)
             --g_overlay_count;
+        if (visible != 0)
+            gem_raster_present_rect(x, y, width, height);
     }
 }
 
