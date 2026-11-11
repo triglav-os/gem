@@ -1,9 +1,16 @@
 # Proposed work
 
-Updated 2026-11-06. These are follow-up proposals, not claims that untested GEM
+Updated 2026-11-11. These are follow-up proposals, not claims that untested GEM
 behavior is implemented. See the [audit](../tests/SECURITY_AUDIT.md) and
 [latest execution report](../tests/LATEST.md) for measured results.
 
+- Review and refresh the reference images for demos 20, 21, 22, 23, 25 and 26
+  after the one-pixel compact window border. Those UAT cases fail on pixel
+  comparison until the new chrome is accepted as the reference.
+- Extend desktop icon dragging to drop actions (moving a file icon onto Trash
+  or a folder). Icons currently only change grid cell.
+- Add focused acceptance for the Linux framebuffer overlay re-presentation;
+  the Rasta presenter path is covered, the Linux path is only compiled.
 - Add coverage-guided fuzzing for RSC relocation, RPC tree decoding, FAT12/MSA
   and PRG relocation. Keep minimized failures as regression fixtures.
 - Replace the temporary Files, Gemscape and Terminal desktop launcher artwork
