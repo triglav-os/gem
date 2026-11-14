@@ -1,6 +1,6 @@
 # Proposed work
 
-Updated 2026-11-11. These are follow-up proposals, not claims that untested GEM
+Updated 2026-11-14. These are follow-up proposals, not claims that untested GEM
 behavior is implemented. See the [audit](../tests/SECURITY_AUDIT.md) and
 [latest execution report](../tests/LATEST.md) for measured results.
 
@@ -46,10 +46,11 @@ behavior is implemented. See the [audit](../tests/SECURITY_AUDIT.md) and
   modules only if its distinct timings become part of a scenario.
 - Profile dirty-region merging and RPC batch sizes before further drawing
   optimizations. Preserve GEM update locking, write modes and clipping.
-- Establish a reviewed dependency-update procedure for Rasta, Musashi and the
-  Docker base/packages; add an SBOM and a scheduled dependency advisory scan.
-  Archive hashes pin inputs but do not establish dependency safety. Runtime
-  package dependency notices and exact-content checks are now implemented;
+- Establish dependency review for the automatically updated Rasta `main`,
+  pinned Musashi and Docker base/packages; add an SBOM and a scheduled
+  dependency advisory scan. Archive hashes pin inputs but do not establish
+  dependency safety. Runtime package dependency notices and exact-content
+  checks are now implemented;
   automated advisory/SBOM generation remains future work.
 - Isolate untrusted Atari programs in a separate restricted process if running
   arbitrary guest binaries becomes a supported use case. Musashi is an emulator,

@@ -4,10 +4,14 @@ add_subdirectory(session)
 add_subdirectory(security)
 
 add_test(NAME test_rasta_polarity
-    COMMAND ${CMAKE_BINARY_DIR}/deps/rasta-source/bin/test_rasta)
+    COMMAND ${GEM_RASTA_SOURCE_DIR}/bin/test_rasta)
 set_tests_properties(test_rasta_polarity PROPERTIES LABELS integration)
 
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
+add_test(NAME test_rasta_update
+    COMMAND ${Python3_EXECUTABLE} -B ${CMAKE_CURRENT_SOURCE_DIR}/rasta_update.py
+        ${CMAKE_BINARY_DIR})
+set_tests_properties(test_rasta_update PROPERTIES LABELS integration TIMEOUT 90)
 add_test(NAME test_container_identity
     COMMAND ${Python3_EXECUTABLE} -B ${CMAKE_CURRENT_SOURCE_DIR}/container_identity.py)
 set_tests_properties(test_container_identity PROPERTIES LABELS integration TIMEOUT 15)
@@ -20,7 +24,7 @@ add_test(NAME test_rasta_startup
         --rasta ${GEM_TOOLS_DIR}/rasta --binary $<TARGET_FILE:demo17_proxy>
         --gemd $<TARGET_FILE:gemd> --resources ${GEM_RESOURCES_DIR}
         --artifacts ${CMAKE_BINARY_DIR}/rasta_startup)
-set_tests_properties(test_rasta_startup PROPERTIES LABELS integration TIMEOUT 15
+set_tests_properties(test_rasta_startup PROPERTIES LABELS integration TIMEOUT 30
     ENVIRONMENT "RASTA_BIN=${GEM_TOOLS_DIR}/rasta")
 
 add_test(NAME test_runtime_paths COMMAND ${Python3_EXECUTABLE} -B

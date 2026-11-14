@@ -257,6 +257,11 @@ The viewer runs with `--inverse off --bpp 32` to display the GEM mono surface as
 on white paper. PBM checkpoints inspect the shared bits before display decoding;
 `test_rasta_polarity` separately verifies the viewer's RGB mapping and retention
 of inverse mode after subscriber reconfiguration.
+`test_rasta_startup` delays the original configuration until after the demo has
+drawn, then repeats it. Both matching and mismatched initial viewer settings
+must preserve scene pixels and all BGRA alpha bytes, followed by working window
+drag/close. Older viewer revisions without the upstream preservation fix fail
+this check by truncating the shared file.
 
 ### Opt-in held keyboard input
 

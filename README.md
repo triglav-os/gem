@@ -26,8 +26,10 @@ The [Gemscape guide](docs/guides/GEMSCAPE.md) covers browser controls and profil
 
 Requires Linux, Docker and GNU Make. All build and test targets use the
 Wischner SDL Docker toolchain, including the Rasta viewer. The first build
-needs internet access; later builds reuse the image and verified dependencies
-cached under `build/container-sdl/`.
+needs internet access; later builds reuse the image and dependency caches
+under `build/container-sdl/`. Every Rasta build checks GitHub for the latest
+`main` revision and compiles it locally inside Docker, so it needs internet
+access too.
 From the repository root:
 
 ```sh

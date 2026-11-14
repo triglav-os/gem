@@ -4,6 +4,24 @@ Reviewed 2026-09-06. This report distinguishes confirmed fixes, executable
 verification and remaining diagnostics. It does not certify the absence of
 vulnerabilities or complete Atari semantic compatibility.
 
+## Rasta update policy (2026-11-14)
+
+Every viewer build now fetches upstream `main` over verified HTTPS and compiles
+it inside Docker. Fetch failures stop the build. The local framebuffer patch
+was removed after confirming upstream contains the fix and its core tests.
+This intentionally replaces the pinned archive with a moving trusted input.
+The build logs the exact compiled commit; this run used
+`9ef662dd1c28718f23a9d0a7461f6b836029b316`.
+
+`test_rasta_update` passed against a local Git remote, covering incremental
+updates without parent reconfiguration, unchanged output reuse, restoration of
+a missing binary, rewritten history and failed fetches. Rasta core/polarity
+and delayed/repeated startup tests also passed. The full Docker run recorded
+106 passes and the same 12 pre-existing demo reference-image failures as the
+preceding run. See [the execution report](20261114T101707Z.md) and
+[Rasta build log](../../build/rasta-latest-build.log). No new static-analyzer
+run was performed for this build integration change.
+
 ## Package review (2026-11-06)
 
 Runtime/SDK boundaries now use explicit payloads. Regressions reject unexpected
@@ -178,8 +196,11 @@ desktop UAT in both modes, and the all-samples session with mouse/keyboard
 interaction and window-lifetime checks. These tests are automated and require
 no AI to run. See [the latest test report](LATEST.md) for each case's result.
 
-Rasta and CEF are downloaded from TLS-verified, SHA-256-pinned archives into
-`build/`; the default viewer is `bin/tools/rasta`, and Gemscape loads CEF from
+Rasta now follows upstream `main` over verified HTTPS on every viewer build;
+its compiled commit is printed and a failed fetch fails the build. This
+intentionally trusts moving upstream code instead of a SHA-256-pinned archive.
+CEF retains its TLS-verified, SHA-256-pinned archive. Both use ignored `build/`
+storage; the default viewer is `bin/tools/rasta`, and Gemscape loads CEF from
 the ignored build cache. A sibling checkout is never required. The normal
 compiler toolchain is local. `make container` supplies it through Docker and
 was tested with isolated container outputs. See the [development

@@ -20,9 +20,9 @@ editor backups, stray object files or temporary files in the tree.
 - `bin/`: final programs, final generated outputs and runtime resources.
 - `build/`: all intermediate build artifacts, including objects, dependency
   files, static libraries, maps, listings and temporary build products.
-  Detailed test logs and captured framebuffers also belong here. Pinned
-  dependency archives and extracted sources belong under the selected build
-  directory in `deps/`, never in a nested Git repository in the source tree.
+  Detailed test logs and captured framebuffers also belong here. Dependency
+  archives, extracted sources and the updating Rasta Git checkout belong under
+  the selected build directory in `deps/`, never elsewhere in the source tree.
 - `docs/`: documentation, organized into the subdirectories below.
 - `tests/`: automated tests, organized by scope as described below.
 - `tools/`: utility subdirectories only; no files directly at this level.

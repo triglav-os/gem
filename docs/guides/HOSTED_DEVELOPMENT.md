@@ -186,16 +186,26 @@ the separate `build/container-sdl/` directory.
 
 ## Independent dependencies and Docker
 
-`tools/scripts/rasta.cmake` pins upstream Rasta revision
-`5f1e1511e918e8b4dfa6f8b7a51272f66133ea0e` and verifies its archive with
-SHA-256 `c017b7e0884d8e94bf16a6ce549c62f2fbf2013aeaf3bf14ef1fb0cc4bc04e78`.
-Downloads, extracted sources and CMake intermediates remain under root `build/`.
-The viewer is installed into `bin/tools/rasta`. Use `make rasta` to prepare
-just the viewer and its core test executable. Every build checks these outputs
-incrementally and restores a missing viewer without downloading again.
-A fresh build needs GitHub
-access; subsequent unchanged builds reuse the verified download. Updating the
-revision requires updating the hash and rerunning the UAT suite.
+`tools/scripts/rasta.cmake` clones [upstream Rasta](https://github.com/tstih/rasta)
+and fetches the latest `origin/main` before every viewer build, including
+`make`, `make rasta`, `make tests`, `make run` and F5. The viewer and its core
+test executable are compiled locally with GCC/G++ inside the Docker toolchain;
+no prebuilt release is downloaded and no GEM patch is applied. Upstream already
+includes the framebuffer-preservation fix and its unit tests.
+
+The Git checkout is `<build-dir>/deps/rasta-source`, compiled objects are in
+`<build-dir>/deps/rasta-build`, and the installed viewer is `bin/tools/rasta`.
+These caches stay under root `build/`; no sibling checkout is used. Unchanged
+sources reuse compiled objects, and a missing installed viewer is restored.
+The build prints the exact upstream commit after installation; inspect it with
+`git -C build/container-sdl/deps/rasta-source rev-parse HEAD`.
+
+Every viewer build requires GitHub access over verified HTTPS. A failed fetch
+fails the build instead of silently using stale source. Rasta intentionally
+tracks a moving branch rather than a pinned archive, so rebuilding the same
+GEM revision can use newer Rasta code. Run `make tests` to verify compatibility
+after upstream updates. An explicit `RASTA_BIN` launcher override still selects
+that binary instead of the automatically built viewer.
 
 Musashi uses a pinned, verified archive and a checked-in safety patch, managed
 by `lib/musashi/CMakeLists.txt`. It is not a Git submodule. See the
@@ -269,7 +279,7 @@ GEM conformance or absence of vulnerabilities.
 
 GEM publishes display-ready BGRA pixels, so launchers pass `--inverse off`.
 The packed shadow's set bits are black ink and clear bits are white paper; the
-pinned upstream viewer leaves those BGRA channels unchanged. No local Rasta
+upstream viewer leaves those BGRA channels unchanged. No sibling Rasta
 checkout is used.
 
 Rasta uses its 32-bit BGRA framebuffer mode. The backend keeps a packed
@@ -284,7 +294,7 @@ Restart an existing F5 session to use the corrected viewer.
 
 ### Older Rasta binaries and manual startup
 
-The pinned viewer's `--help` must show `--inverse <on|off>`. A binary that
+The upstream viewer's `--help` must show `--inverse <on|off>`. A binary that
 accepts bare `--inverse` is incompatible with this checkout. Run `make rasta`
 to restore `bin/tools/rasta`, remove an outdated `RASTA_BIN` override, and
 restart the running viewer. Use `--inverse off --bpp 32` with current GEM;
@@ -298,6 +308,13 @@ Matching the initial paths manually is unnecessary. `test_rasta_startup`
 starts Rasta with a different path, 80×60 monochrome pixels and inverse mode
 enabled, then verifies GEM negotiates 640×400 BGRA with inverse disabled and
 completes a window drag and close.
+It also delays the actual startup subscription until GEM has drawn, both with
+matching viewer settings and with a different initial path/geometry. It checks
+all alpha bytes and the rendered scene after that subscription and a repeated
+request, then exercises window drag/close. This catches a viewer erasing a
+framebuffer whose inode and final size have not changed: GEM's file-identity
+checks cannot detect that destructive open reliably. Existing bytes must be
+preserved by the viewer; actual size changes still require writer coordination.
 
 ### Physical keyboard consumers
 

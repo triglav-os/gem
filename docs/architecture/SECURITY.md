@@ -317,9 +317,12 @@ See the [browser guide](../guides/GEMSCAPE.md) for supported controls and limits
 
 ### Dependency and disk audit
 
-The build obtains Rasta and CEF over verified TLS from pinned archives with
-checked SHA-256 hashes. Their downloaded and extracted files remain in ignored
-build storage. Default launchers use the downloaded Rasta binary and never kill
+The build fetches Rasta from upstream `main` over verified HTTPS on every
+viewer build and prints the compiled commit. A failed fetch fails the build;
+Rasta is deliberately not pinned and upstream changes are trusted build inputs.
+CEF remains a pinned archive with a checked SHA-256 hash over verified TLS.
+Their downloaded source and build products remain in ignored build storage.
+Default launchers use the locally built Rasta binary and never kill
 unrelated viewer or server processes. The optional Docker compiler runs with
 the caller's UID, no additional capabilities and no-new-privileges; its
 workspace bind remains writable because it is a build environment, not a

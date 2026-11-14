@@ -6,6 +6,15 @@ Unreleased.
 
 ## Unreleased
 
+- Rasta now follows the latest upstream `main` on every build and compiles
+  locally inside Docker. Builds require GitHub access to check for updates.
+  Removed GEM's framebuffer patch because upstream includes the fix and tests.
+
+- Fixed a Rasta startup race that could leave the screen black until pointer
+  movement revealed small patches of the desktop. Viewer configuration now
+  preserves existing framebuffer pixels and skips identical requests. GEM
+  uses the upstream fix and tests delayed/repeated configuration.
+
 - Removed offset shadows from the shaded application and location icons,
   retaining their outlines. Home has an opaque black roof with a white
   outline. Terminal and Disk retain their original artwork. Generated

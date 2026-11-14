@@ -13,6 +13,14 @@ with different build directories, because they can share `bin/` and reports.
 `test_container_lock` verifies waiting and lock release after command failure.
 `test_container_identity` checks passwd/group lookup, a writable owned home,
 and login-shell startup without missing-account diagnostics.
+`test_rasta_startup` covers ordinary geometry/path negotiation and deliberately
+delayed/repeated configuration after GEM has drawn, checking retained BGRA
+alpha, scene pixels and window drag/close. `test_rasta_polarity` also runs the
+upstream viewer's shared-mapping preservation and resize tests.
+`test_rasta_update` uses a local Git remote with the actual Rasta build recipe
+to check updates without parent reconfiguration, unchanged-build reuse,
+restoration of a missing viewer, rewritten upstream history and failure when
+the remote is unavailable. It requires no GitHub access itself.
 `test_paths` verifies XDG overrides, resource lookup and private runtime
 permissions. `test_runtime_paths` checks Docker mounts and non-overwriting
 settings/profile migration, including shared XDG bases. `test_install_layout`
