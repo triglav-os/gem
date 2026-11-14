@@ -1,7 +1,7 @@
-Rasta's pinned source headers declare the MIT License and the copyright below.
-The pinned archive omits the referenced LICENSE file. This is the MIT text
-corresponding to that declaration. Source: https://github.com/tstih/rasta
-Revision: 5f1e1511e918e8b4dfa6f8b7a51272f66133ea0e
+Rasta's source headers declare the MIT License and the copyright below.
+This is the MIT text corresponding to that declaration.
+Source: https://github.com/tstih/rasta (main, updated on every viewer build).
+The build log records the compiled upstream revision.
 
 MIT License
 

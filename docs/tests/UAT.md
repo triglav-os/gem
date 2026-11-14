@@ -260,7 +260,8 @@ of inverse mode after subscriber reconfiguration.
 `test_rasta_startup` delays the original configuration until after the demo has
 drawn, then repeats it. Both matching and mismatched initial viewer settings
 must preserve scene pixels and all BGRA alpha bytes, followed by working window
-drag/close. The unpatched viewer fails this check by truncating the shared file.
+drag/close. Older viewer revisions without the upstream preservation fix fail
+this check by truncating the shared file.
 
 ### Opt-in held keyboard input
 

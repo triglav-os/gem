@@ -8,6 +8,10 @@ add_test(NAME test_rasta_polarity
 set_tests_properties(test_rasta_polarity PROPERTIES LABELS integration)
 
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
+add_test(NAME test_rasta_update
+    COMMAND ${Python3_EXECUTABLE} -B ${CMAKE_CURRENT_SOURCE_DIR}/rasta_update.py
+        ${CMAKE_BINARY_DIR})
+set_tests_properties(test_rasta_update PROPERTIES LABELS integration TIMEOUT 90)
 add_test(NAME test_container_identity
     COMMAND ${Python3_EXECUTABLE} -B ${CMAKE_CURRENT_SOURCE_DIR}/container_identity.py)
 set_tests_properties(test_container_identity PROPERTIES LABELS integration TIMEOUT 15)

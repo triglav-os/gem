@@ -1,8 +1,8 @@
 # Automated GEM test report
 
-UTC: 2026-11-14T09:30:17+00:00 to 2026-11-14T09:33:35+00:00
+UTC: 2026-11-14T10:17:07+00:00 to 2026-11-14T10:20:26+00:00
 
-**105 passed, 12 failed, 0 skipped; CTest exit status 8.**
+**106 passed, 12 failed, 0 skipped; CTest exit status 8.**
 
 Command: `ctest --test-dir /home/tomaz/repos/triglav-os/gem/build/container-sdl --output-on-failure --parallel 4 --output-junit /home/tomaz/repos/triglav-os/gem/build/container-sdl/test-results.xml`
 
@@ -20,12 +20,12 @@ Passing these cases establishes the documented coverage, not every possible inpu
 
 | Test | Result | Seconds | Evidence |
 | --- | --- | ---: | --- |
-| test_report | PASS | 0.04 | [CTest log](../../build/container-sdl/tests.log) |
+| test_report | PASS | 0.05 | [CTest log](../../build/container-sdl/tests.log) |
 | test_vdi | PASS | 0.00 | [CTest log](../../build/container-sdl/tests.log) |
 | test_gem_header | PASS | 0.00 | [CTest log](../../build/container-sdl/tests.log) |
-| test_api_surface | PASS | 0.07 | [CTest log](../../build/container-sdl/tests.log) |
+| test_api_surface | PASS | 0.08 | [CTest log](../../build/container-sdl/tests.log) |
 | test_protocol | PASS | 0.00 | [CTest log](../../build/container-sdl/tests.log) |
-| test_aes_shell | PASS | 0.32 | [CTest log](../../build/container-sdl/tests.log) |
+| test_aes_shell | PASS | 0.30 | [CTest log](../../build/container-sdl/tests.log) |
 | test_gem_trash | PASS | 0.04 | [CTest log](../../build/container-sdl/tests.log) |
 | test_terminal_vt100 | PASS | 0.00 | [CTest log](../../build/container-sdl/tests.log) |
 | test_gemconf | PASS | 0.01 | [CTest log](../../build/container-sdl/tests.log) |
@@ -37,106 +37,107 @@ Passing these cases establishes the documented coverage, not every possible inpu
 | test_desktop_icon_rsc | PASS | 0.00 | [CTest log](../../build/container-sdl/tests.log) |
 | test_desktop_icon_lookup | PASS | 0.00 | [CTest log](../../build/container-sdl/tests.log) |
 | test_rasta_polarity | PASS | 0.00 | [CTest log](../../build/container-sdl/tests.log) |
-| test_container_identity | PASS | 0.03 | [CTest log](../../build/container-sdl/tests.log) |
+| test_rasta_update | PASS | 3.93 | [CTest log](../../build/container-sdl/tests.log) |
+| test_container_identity | PASS | 0.04 | [CTest log](../../build/container-sdl/tests.log) |
 | test_container_lock | PASS | 0.30 | [CTest log](../../build/container-sdl/tests.log) |
-| test_rasta_startup | PASS | 9.98 | [CTest log](../../build/container-sdl/tests.log) |
+| test_rasta_startup | PASS | 9.96 | [CTest log](../../build/container-sdl/tests.log) |
 | test_runtime_paths | PASS | 0.07 | [CTest log](../../build/container-sdl/tests.log) |
-| test_install_layout | PASS | 24.97 | [CTest log](../../build/container-sdl/tests.log) |
-| test_sdk_layout | PASS | 1.18 | [CTest log](../../build/container-sdl/tests.log) |
+| test_install_layout | PASS | 23.16 | [CTest log](../../build/container-sdl/tests.log) |
+| test_sdk_layout | PASS | 1.28 | [CTest log](../../build/container-sdl/tests.log) |
 | test_gem_rpc | PASS | 0.21 | [CTest log](../../build/container-sdl/tests.log) |
-| test_gemd_security | PASS | 6.45 | [CTest log](../../build/container-sdl/tests.log) |
+| test_gemd_security | PASS | 6.44 | [CTest log](../../build/container-sdl/tests.log) |
 | test_gemd_host | PASS | 0.28 | [CTest log](../../build/container-sdl/tests.log) |
 | test_vdi_rpc | PASS | 0.22 | [CTest log](../../build/container-sdl/tests.log) |
 | test_aes_rpc | PASS | 0.34 | [CTest log](../../build/container-sdl/tests.log) |
 | test_menu_limits | PASS | 0.23 | [CTest log](../../build/container-sdl/tests.log) |
-| test_sample_session | PASS | 40.36 | [Session state](../../build/container-sdl/sample_session_test/state.json) |
-| security_disk | PASS | 0.06 | [CTest log](../../build/container-sdl/tests.log) |
+| test_sample_session | PASS | 40.51 | [Session state](../../build/container-sdl/sample_session_test/state.json) |
+| security_disk | PASS | 0.05 | [CTest log](../../build/container-sdl/tests.log) |
 | security_guest | PASS | 0.15 | [CTest log](../../build/container-sdl/tests.log) |
 | uat_demo1_direct | PASS | 1.98 | [Artifacts](../../build/container-sdl/uat/demo1_direct/result.json) |
-| uat_demo1_proxy | PASS | 1.99 | [Artifacts](../../build/container-sdl/uat/demo1_proxy/result.json) |
-| uat_demo2_direct | PASS | 1.96 | [Artifacts](../../build/container-sdl/uat/demo2_direct/result.json) |
-| uat_demo2_proxy | PASS | 1.99 | [Artifacts](../../build/container-sdl/uat/demo2_proxy/result.json) |
-| uat_demo3_direct | PASS | 1.99 | [Artifacts](../../build/container-sdl/uat/demo3_direct/result.json) |
-| uat_demo3_proxy | PASS | 2.01 | [Artifacts](../../build/container-sdl/uat/demo3_proxy/result.json) |
-| uat_demo4_direct | PASS | 2.01 | [Artifacts](../../build/container-sdl/uat/demo4_direct/result.json) |
-| uat_demo4_proxy | PASS | 2.00 | [Artifacts](../../build/container-sdl/uat/demo4_proxy/result.json) |
-| uat_demo5_direct | PASS | 1.98 | [Artifacts](../../build/container-sdl/uat/demo5_direct/result.json) |
-| uat_demo5_proxy | PASS | 1.98 | [Artifacts](../../build/container-sdl/uat/demo5_proxy/result.json) |
-| uat_demo6_direct | PASS | 1.97 | [Artifacts](../../build/container-sdl/uat/demo6_direct/result.json) |
-| uat_demo6_proxy | PASS | 1.98 | [Artifacts](../../build/container-sdl/uat/demo6_proxy/result.json) |
+| uat_demo1_proxy | PASS | 2.01 | [Artifacts](../../build/container-sdl/uat/demo1_proxy/result.json) |
+| uat_demo2_direct | PASS | 1.95 | [Artifacts](../../build/container-sdl/uat/demo2_direct/result.json) |
+| uat_demo2_proxy | PASS | 1.97 | [Artifacts](../../build/container-sdl/uat/demo2_proxy/result.json) |
+| uat_demo3_direct | PASS | 1.97 | [Artifacts](../../build/container-sdl/uat/demo3_direct/result.json) |
+| uat_demo3_proxy | PASS | 1.99 | [Artifacts](../../build/container-sdl/uat/demo3_proxy/result.json) |
+| uat_demo4_direct | PASS | 1.99 | [Artifacts](../../build/container-sdl/uat/demo4_direct/result.json) |
+| uat_demo4_proxy | PASS | 2.02 | [Artifacts](../../build/container-sdl/uat/demo4_proxy/result.json) |
+| uat_demo5_direct | PASS | 1.99 | [Artifacts](../../build/container-sdl/uat/demo5_direct/result.json) |
+| uat_demo5_proxy | PASS | 1.99 | [Artifacts](../../build/container-sdl/uat/demo5_proxy/result.json) |
+| uat_demo6_direct | PASS | 1.96 | [Artifacts](../../build/container-sdl/uat/demo6_direct/result.json) |
+| uat_demo6_proxy | PASS | 1.99 | [Artifacts](../../build/container-sdl/uat/demo6_proxy/result.json) |
 | uat_demo7_direct | PASS | 1.98 | [Artifacts](../../build/container-sdl/uat/demo7_direct/result.json) |
 | uat_demo7_proxy | PASS | 2.02 | [Artifacts](../../build/container-sdl/uat/demo7_proxy/result.json) |
-| uat_demo8_direct | PASS | 1.99 | [Artifacts](../../build/container-sdl/uat/demo8_direct/result.json) |
-| uat_demo8_proxy | PASS | 2.00 | [Artifacts](../../build/container-sdl/uat/demo8_proxy/result.json) |
-| uat_demo9_direct | PASS | 1.99 | [Artifacts](../../build/container-sdl/uat/demo9_direct/result.json) |
-| uat_demo9_proxy | PASS | 2.01 | [Artifacts](../../build/container-sdl/uat/demo9_proxy/result.json) |
-| uat_demo10_direct | PASS | 1.96 | [Artifacts](../../build/container-sdl/uat/demo10_direct/result.json) |
-| uat_demo10_proxy | PASS | 1.99 | [Artifacts](../../build/container-sdl/uat/demo10_proxy/result.json) |
-| uat_demo11_direct | PASS | 2.00 | [Artifacts](../../build/container-sdl/uat/demo11_direct/result.json) |
-| uat_demo11_proxy | PASS | 1.99 | [Artifacts](../../build/container-sdl/uat/demo11_proxy/result.json) |
-| uat_demo12_direct | PASS | 1.96 | [Artifacts](../../build/container-sdl/uat/demo12_direct/result.json) |
-| uat_demo12_proxy | PASS | 2.00 | [Artifacts](../../build/container-sdl/uat/demo12_proxy/result.json) |
-| uat_demo13_direct | PASS | 1.95 | [Artifacts](../../build/container-sdl/uat/demo13_direct/result.json) |
-| uat_demo13_proxy | PASS | 1.99 | [Artifacts](../../build/container-sdl/uat/demo13_proxy/result.json) |
-| uat_demo14_direct | PASS | 1.93 | [Artifacts](../../build/container-sdl/uat/demo14_direct/result.json) |
-| uat_demo14_proxy | PASS | 1.97 | [Artifacts](../../build/container-sdl/uat/demo14_proxy/result.json) |
-| uat_demo15_direct | PASS | 1.96 | [Artifacts](../../build/container-sdl/uat/demo15_direct/result.json) |
-| uat_demo15_proxy | PASS | 2.01 | [Artifacts](../../build/container-sdl/uat/demo15_proxy/result.json) |
+| uat_demo8_direct | PASS | 1.97 | [Artifacts](../../build/container-sdl/uat/demo8_direct/result.json) |
+| uat_demo8_proxy | PASS | 2.01 | [Artifacts](../../build/container-sdl/uat/demo8_proxy/result.json) |
+| uat_demo9_direct | PASS | 1.98 | [Artifacts](../../build/container-sdl/uat/demo9_direct/result.json) |
+| uat_demo9_proxy | PASS | 2.03 | [Artifacts](../../build/container-sdl/uat/demo9_proxy/result.json) |
+| uat_demo10_direct | PASS | 1.97 | [Artifacts](../../build/container-sdl/uat/demo10_direct/result.json) |
+| uat_demo10_proxy | PASS | 1.98 | [Artifacts](../../build/container-sdl/uat/demo10_proxy/result.json) |
+| uat_demo11_direct | PASS | 1.96 | [Artifacts](../../build/container-sdl/uat/demo11_direct/result.json) |
+| uat_demo11_proxy | PASS | 2.01 | [Artifacts](../../build/container-sdl/uat/demo11_proxy/result.json) |
+| uat_demo12_direct | PASS | 1.97 | [Artifacts](../../build/container-sdl/uat/demo12_direct/result.json) |
+| uat_demo12_proxy | PASS | 1.99 | [Artifacts](../../build/container-sdl/uat/demo12_proxy/result.json) |
+| uat_demo13_direct | PASS | 1.96 | [Artifacts](../../build/container-sdl/uat/demo13_direct/result.json) |
+| uat_demo13_proxy | PASS | 1.98 | [Artifacts](../../build/container-sdl/uat/demo13_proxy/result.json) |
+| uat_demo14_direct | PASS | 1.96 | [Artifacts](../../build/container-sdl/uat/demo14_direct/result.json) |
+| uat_demo14_proxy | PASS | 1.98 | [Artifacts](../../build/container-sdl/uat/demo14_proxy/result.json) |
+| uat_demo15_direct | PASS | 1.95 | [Artifacts](../../build/container-sdl/uat/demo15_direct/result.json) |
+| uat_demo15_proxy | PASS | 2.00 | [Artifacts](../../build/container-sdl/uat/demo15_proxy/result.json) |
 | uat_demo16_direct | PASS | 1.96 | [Artifacts](../../build/container-sdl/uat/demo16_direct/result.json) |
-| uat_demo16_proxy | PASS | 1.99 | [Artifacts](../../build/container-sdl/uat/demo16_proxy/result.json) |
-| uat_demo17_direct | PASS | 2.76 | [Artifacts](../../build/container-sdl/uat/demo17_direct/result.json) |
-| uat_demo17_proxy | PASS | 2.76 | [Artifacts](../../build/container-sdl/uat/demo17_proxy/result.json) |
-| uat_demo18_direct | PASS | 2.63 | [Artifacts](../../build/container-sdl/uat/demo18_direct/result.json) |
-| uat_demo18_proxy | PASS | 5.69 | [Artifacts](../../build/container-sdl/uat/demo18_proxy/result.json) |
-| uat_demo19_direct | PASS | 19.49 | [Artifacts](../../build/container-sdl/uat/demo19_direct/result.json) |
+| uat_demo16_proxy | PASS | 1.97 | [Artifacts](../../build/container-sdl/uat/demo16_proxy/result.json) |
+| uat_demo17_direct | PASS | 2.73 | [Artifacts](../../build/container-sdl/uat/demo17_direct/result.json) |
+| uat_demo17_proxy | PASS | 2.78 | [Artifacts](../../build/container-sdl/uat/demo17_proxy/result.json) |
+| uat_demo18_direct | PASS | 2.60 | [Artifacts](../../build/container-sdl/uat/demo18_direct/result.json) |
+| uat_demo18_proxy | PASS | 5.72 | [Artifacts](../../build/container-sdl/uat/demo18_proxy/result.json) |
+| uat_demo19_direct | PASS | 19.53 | [Artifacts](../../build/container-sdl/uat/demo19_direct/result.json) |
 | uat_demo19_proxy | PASS | 19.54 | [Artifacts](../../build/container-sdl/uat/demo19_proxy/result.json) |
-| uat_demo20_direct | FAIL | 1.67 | [Artifacts](../../build/container-sdl/uat/demo20_direct/result.json) |
-| uat_demo20_proxy | FAIL | 1.70 | [Artifacts](../../build/container-sdl/uat/demo20_proxy/result.json) |
+| uat_demo20_direct | FAIL | 1.69 | [Artifacts](../../build/container-sdl/uat/demo20_direct/result.json) |
+| uat_demo20_proxy | FAIL | 1.69 | [Artifacts](../../build/container-sdl/uat/demo20_proxy/result.json) |
 | uat_demo21_direct | FAIL | 1.70 | [Artifacts](../../build/container-sdl/uat/demo21_direct/result.json) |
-| uat_demo21_proxy | FAIL | 1.70 | [Artifacts](../../build/container-sdl/uat/demo21_proxy/result.json) |
-| uat_demo22_direct | FAIL | 1.67 | [Artifacts](../../build/container-sdl/uat/demo22_direct/result.json) |
-| uat_demo22_proxy | FAIL | 1.70 | [Artifacts](../../build/container-sdl/uat/demo22_proxy/result.json) |
-| uat_demo23_direct | FAIL | 1.69 | [Artifacts](../../build/container-sdl/uat/demo23_direct/result.json) |
-| uat_demo23_proxy | FAIL | 1.71 | [Artifacts](../../build/container-sdl/uat/demo23_proxy/result.json) |
-| uat_demo24_direct | PASS | 3.48 | [Artifacts](../../build/container-sdl/uat/demo24_direct/result.json) |
-| uat_demo24_proxy | PASS | 3.53 | [Artifacts](../../build/container-sdl/uat/demo24_proxy/result.json) |
-| uat_demo25_direct | FAIL | 1.68 | [Artifacts](../../build/container-sdl/uat/demo25_direct/result.json) |
+| uat_demo21_proxy | FAIL | 1.71 | [Artifacts](../../build/container-sdl/uat/demo21_proxy/result.json) |
+| uat_demo22_direct | FAIL | 1.69 | [Artifacts](../../build/container-sdl/uat/demo22_direct/result.json) |
+| uat_demo22_proxy | FAIL | 1.71 | [Artifacts](../../build/container-sdl/uat/demo22_proxy/result.json) |
+| uat_demo23_direct | FAIL | 1.70 | [Artifacts](../../build/container-sdl/uat/demo23_direct/result.json) |
+| uat_demo23_proxy | FAIL | 1.70 | [Artifacts](../../build/container-sdl/uat/demo23_proxy/result.json) |
+| uat_demo24_direct | PASS | 3.46 | [Artifacts](../../build/container-sdl/uat/demo24_direct/result.json) |
+| uat_demo24_proxy | PASS | 3.50 | [Artifacts](../../build/container-sdl/uat/demo24_proxy/result.json) |
+| uat_demo25_direct | FAIL | 1.70 | [Artifacts](../../build/container-sdl/uat/demo25_direct/result.json) |
 | uat_demo25_proxy | FAIL | 1.71 | [Artifacts](../../build/container-sdl/uat/demo25_proxy/result.json) |
-| uat_demo26_direct | FAIL | 1.69 | [Artifacts](../../build/container-sdl/uat/demo26_direct/result.json) |
-| uat_demo26_proxy | FAIL | 1.71 | [Artifacts](../../build/container-sdl/uat/demo26_proxy/result.json) |
-| uat_demo27_direct | PASS | 2.01 | [Artifacts](../../build/container-sdl/uat/demo27_direct/result.json) |
-| uat_demo27_proxy | PASS | 2.04 | [Artifacts](../../build/container-sdl/uat/demo27_proxy/result.json) |
-| uat_demo28_direct | PASS | 2.73 | [Artifacts](../../build/container-sdl/uat/demo28_direct/result.json) |
-| uat_demo28_proxy | PASS | 2.80 | [Artifacts](../../build/container-sdl/uat/demo28_proxy/result.json) |
-| uat_demo29_direct | PASS | 2.73 | [Artifacts](../../build/container-sdl/uat/demo29_direct/result.json) |
-| uat_demo29_proxy | PASS | 2.78 | [Artifacts](../../build/container-sdl/uat/demo29_proxy/result.json) |
-| uat_demo30_direct | PASS | 2.72 | [Artifacts](../../build/container-sdl/uat/demo30_direct/result.json) |
-| uat_demo30_proxy | PASS | 2.79 | [Artifacts](../../build/container-sdl/uat/demo30_proxy/result.json) |
-| uat_demo31_direct | PASS | 14.87 | [Artifacts](../../build/container-sdl/uat/demo31_direct/result.json) |
-| uat_demo31_proxy | PASS | 14.94 | [Artifacts](../../build/container-sdl/uat/demo31_proxy/result.json) |
-| uat_demo32_direct | PASS | 3.23 | [Artifacts](../../build/container-sdl/uat/demo32_direct/result.json) |
-| uat_demo32_proxy | PASS | 3.29 | [Artifacts](../../build/container-sdl/uat/demo32_proxy/result.json) |
-| uat_demo33_direct | PASS | 3.89 | [Artifacts](../../build/container-sdl/uat/demo33_direct/result.json) |
-| uat_demo33_proxy | PASS | 3.93 | [Artifacts](../../build/container-sdl/uat/demo33_proxy/result.json) |
+| uat_demo26_direct | FAIL | 1.66 | [Artifacts](../../build/container-sdl/uat/demo26_direct/result.json) |
+| uat_demo26_proxy | FAIL | 1.72 | [Artifacts](../../build/container-sdl/uat/demo26_proxy/result.json) |
+| uat_demo27_direct | PASS | 2.02 | [Artifacts](../../build/container-sdl/uat/demo27_direct/result.json) |
+| uat_demo27_proxy | PASS | 2.01 | [Artifacts](../../build/container-sdl/uat/demo27_proxy/result.json) |
+| uat_demo28_direct | PASS | 2.72 | [Artifacts](../../build/container-sdl/uat/demo28_direct/result.json) |
+| uat_demo28_proxy | PASS | 2.76 | [Artifacts](../../build/container-sdl/uat/demo28_proxy/result.json) |
+| uat_demo29_direct | PASS | 2.74 | [Artifacts](../../build/container-sdl/uat/demo29_direct/result.json) |
+| uat_demo29_proxy | PASS | 2.79 | [Artifacts](../../build/container-sdl/uat/demo29_proxy/result.json) |
+| uat_demo30_direct | PASS | 2.71 | [Artifacts](../../build/container-sdl/uat/demo30_direct/result.json) |
+| uat_demo30_proxy | PASS | 2.76 | [Artifacts](../../build/container-sdl/uat/demo30_proxy/result.json) |
+| uat_demo31_direct | PASS | 14.94 | [Artifacts](../../build/container-sdl/uat/demo31_direct/result.json) |
+| uat_demo31_proxy | PASS | 14.96 | [Artifacts](../../build/container-sdl/uat/demo31_proxy/result.json) |
+| uat_demo32_direct | PASS | 3.25 | [Artifacts](../../build/container-sdl/uat/demo32_direct/result.json) |
+| uat_demo32_proxy | PASS | 3.27 | [Artifacts](../../build/container-sdl/uat/demo32_proxy/result.json) |
+| uat_demo33_direct | PASS | 3.86 | [Artifacts](../../build/container-sdl/uat/demo33_direct/result.json) |
+| uat_demo33_proxy | PASS | 3.92 | [Artifacts](../../build/container-sdl/uat/demo33_proxy/result.json) |
 | uat_demo34_direct | PASS | 3.23 | [Artifacts](../../build/container-sdl/uat/demo34_direct/result.json) |
-| uat_demo34_proxy | PASS | 3.23 | [Artifacts](../../build/container-sdl/uat/demo34_proxy/result.json) |
-| uat_file_drop_direct | PASS | 19.20 | [Artifacts](../../build/container-sdl/uat/file_drop_direct/result.json) |
-| uat_file_drop_proxy | PASS | 19.21 | [Artifacts](../../build/container-sdl/uat/file_drop_proxy/result.json) |
-| uat_file_commands_direct | PASS | 44.28 | [Artifacts](../../build/container-sdl/uat/file_commands_direct/result.json) |
-| uat_file_commands_proxy | PASS | 46.15 | [Artifacts](../../build/container-sdl/uat/file_commands_proxy/result.json) |
-| uat_trash_direct | PASS | 20.40 | [Artifacts](../../build/container-sdl/uat/trash_direct/result.json) |
-| uat_trash_proxy | PASS | 20.41 | [Artifacts](../../build/container-sdl/uat/trash_proxy/result.json) |
-| uat_calc_direct | PASS | 5.61 | [Artifacts](../../build/container-sdl/uat/calc_direct/result.json) |
-| uat_calc_proxy | PASS | 5.56 | [Artifacts](../../build/container-sdl/uat/calc_proxy/result.json) |
-| uat_gemread_direct | PASS | 19.67 | [Artifacts](../../build/container-sdl/uat/gemread_direct/result.json) |
-| uat_gemread_proxy | PASS | 19.76 | [Artifacts](../../build/container-sdl/uat/gemread_proxy/result.json) |
-| uat_gemread_pdf_proxy | PASS | 9.83 | [Artifacts](../../build/container-sdl/uat/gemread_pdf_proxy/result.json) |
-| uat_gemread_epub_proxy | PASS | 4.62 | [Artifacts](../../build/container-sdl/uat/gemread_epub_proxy/result.json) |
-| uat_gemscape_proxy | PASS | 45.86 | [Artifacts](../../build/container-sdl/uat/gemscape_proxy/result.json) |
-| uat_gemscape_browser | PASS | 123.10 | [Artifacts](../../build/container-sdl/uat/gemscape_browser/result.json) |
-| uat_desktop_direct | PASS | 23.13 | [Artifacts](../../build/container-sdl/uat/desktop_direct/result.json) |
-| uat_desktop_proxy | PASS | 23.04 | [Artifacts](../../build/container-sdl/uat/desktop_proxy/result.json) |
-| uat_ted_proxy | PASS | 29.86 | [Artifacts](../../build/container-sdl/uat/ted_proxy/result.json) |
+| uat_demo34_proxy | PASS | 3.25 | [Artifacts](../../build/container-sdl/uat/demo34_proxy/result.json) |
+| uat_file_drop_direct | PASS | 19.16 | [Artifacts](../../build/container-sdl/uat/file_drop_direct/result.json) |
+| uat_file_drop_proxy | PASS | 19.15 | [Artifacts](../../build/container-sdl/uat/file_drop_proxy/result.json) |
+| uat_file_commands_direct | PASS | 44.23 | [Artifacts](../../build/container-sdl/uat/file_commands_direct/result.json) |
+| uat_file_commands_proxy | PASS | 46.07 | [Artifacts](../../build/container-sdl/uat/file_commands_proxy/result.json) |
+| uat_trash_direct | PASS | 20.25 | [Artifacts](../../build/container-sdl/uat/trash_direct/result.json) |
+| uat_trash_proxy | PASS | 20.29 | [Artifacts](../../build/container-sdl/uat/trash_proxy/result.json) |
+| uat_calc_direct | PASS | 5.52 | [Artifacts](../../build/container-sdl/uat/calc_direct/result.json) |
+| uat_calc_proxy | PASS | 5.51 | [Artifacts](../../build/container-sdl/uat/calc_proxy/result.json) |
+| uat_gemread_direct | PASS | 19.71 | [Artifacts](../../build/container-sdl/uat/gemread_direct/result.json) |
+| uat_gemread_proxy | PASS | 19.77 | [Artifacts](../../build/container-sdl/uat/gemread_proxy/result.json) |
+| uat_gemread_pdf_proxy | PASS | 9.81 | [Artifacts](../../build/container-sdl/uat/gemread_pdf_proxy/result.json) |
+| uat_gemread_epub_proxy | PASS | 4.23 | [Artifacts](../../build/container-sdl/uat/gemread_epub_proxy/result.json) |
+| uat_gemscape_proxy | PASS | 45.81 | [Artifacts](../../build/container-sdl/uat/gemscape_proxy/result.json) |
+| uat_gemscape_browser | PASS | 122.97 | [Artifacts](../../build/container-sdl/uat/gemscape_browser/result.json) |
+| uat_desktop_direct | PASS | 23.02 | [Artifacts](../../build/container-sdl/uat/desktop_direct/result.json) |
+| uat_desktop_proxy | PASS | 23.00 | [Artifacts](../../build/container-sdl/uat/desktop_proxy/result.json) |
+| uat_ted_proxy | PASS | 29.85 | [Artifacts](../../build/container-sdl/uat/ted_proxy/result.json) |
 
 ## Proposed actions
 
