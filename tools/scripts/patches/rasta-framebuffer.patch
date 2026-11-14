@@ -1,0 +1,154 @@
+--- a/src/framebuffer_file.cpp
++++ b/src/framebuffer_file.cpp
+@@ -1,5 +1,5 @@
+ // Implements a memory-mapped framebuffer file for raster emulation.
+-// The file is recreated to the packed linear raster size and then mapped
++// The file is resized without discarding existing pixels and then mapped
+ // read-write so another process can update pixels without IPC copies.
+ //
+ // MIT License (see: LICENSE)
+@@ -31,7 +31,7 @@
+     std::size_t size_bytes)
+     : path_(path), fd_(-1), size_bytes_(size_bytes), data_(nullptr)
+ {
+-    fd_ = open(path_.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0644);
++    fd_ = open(path_.c_str(), O_RDWR | O_CREAT, 0644);
+     if (fd_ < 0) {
+         throw make_errno_error("unable to open framebuffer file " + path_);
+     }
+--- a/include/framebuffer_file.h
++++ b/include/framebuffer_file.h
+@@ -14,6 +14,9 @@
+ 
+ class framebuffer_file {
+ public:
++    // Opens or creates the file and resizes it to the requested byte count.
++    // Existing bytes in the retained range survive; added bytes are zeroed.
++    // Writers must coordinate actual size changes with their mappings.
+     framebuffer_file(const std::string &path, std::size_t size_bytes);
+     ~framebuffer_file();
+ 
+--- a/src/sdl_emulator.cpp
++++ b/src/sdl_emulator.cpp
+@@ -174,6 +174,18 @@
+     SDL_Window *window, SDL_Renderer *renderer, SDL_Texture *&texture,
+     std::uint32_t &zoom, int &pitch)
+ {
++    // A repeated subscription must not reset the window, texture or mapping.
++    // Compare against the live zoom, which keyboard input can change.
++    if (requested_options.width == active_options.width &&
++        requested_options.height == active_options.height &&
++        requested_options.bits_per_pixel == active_options.bits_per_pixel &&
++        requested_options.framebuffer_path == active_options.framebuffer_path &&
++        requested_options.window_scale == zoom &&
++        requested_options.show_cursor == active_options.show_cursor &&
++        requested_options.inverse_pixels == active_options.inverse_pixels) {
++        return;
++    }
++
+     const std::size_t framebuffer_size = calculate_framebuffer_size(
+         requested_options.width, requested_options.height,
+         requested_options.bits_per_pixel);
+--- a/tests/test_rasta.cpp
++++ b/tests/test_rasta.cpp
+@@ -9,10 +9,14 @@
+ #include "raster_decoder.h"
+ #include "rasta_options.h"
+ 
++#include <algorithm>
+ #include <cstdlib>
++#include <filesystem>
+ #include <iostream>
+ #include <string>
+ #include <vector>
++
++#include <unistd.h>
+ 
+ namespace {
+ 
+@@ -33,6 +37,60 @@
+             "3x1x2 should occupy 1 byte") &&
+         expect(calculate_framebuffer_size(5, 1, 3) == 2,
+             "5x1x3 should occupy 2 bytes");
++}
++
++// Exercise the real shared mappings: a late viewer must preserve a writer's
++// pixels, including alpha, when attaching, growing or shrinking the file.
++bool test_framebuffer_preserves_pixels()
++{
++    char directory[] = "framebuffer-test-XXXXXX";
++    if (!expect(mkdtemp(directory) != nullptr, "create framebuffer test directory")) {
++        return false;
++    }
++    const std::filesystem::path path =
++        std::filesystem::path(directory) / "framebuffer";
++    bool passed = true;
++    try {
++        const std::vector<std::uint8_t> pixels = {
++            0x12, 0x34, 0x56, 0xff, 0xab, 0xcd, 0xef, 0xff
++        };
++        framebuffer_file writer(path.string(), pixels.size());
++        passed &= expect(std::all_of(writer.data(),
++            writer.data() + pixels.size(), [](auto byte) { return byte == 0; }),
++            "new framebuffer bytes should be zero");
++        std::copy(pixels.begin(), pixels.end(), writer.data());
++        {
++            framebuffer_file viewer(path.string(), pixels.size());
++            passed &= expect(std::equal(pixels.begin(), pixels.end(), viewer.data()),
++                "attaching a viewer must preserve all BGRA bytes");
++            viewer.data()[0] = 0x77;
++            passed &= expect(writer.data()[0] == 0x77,
++                "writer and viewer should still share their mapping");
++            writer.data()[0] = pixels[0];
++        }
++        {
++            framebuffer_file larger(path.string(), pixels.size() * 2);
++            passed &= expect(std::equal(pixels.begin(), pixels.end(), larger.data()),
++                "growing the framebuffer must preserve existing bytes");
++            passed &= expect(std::all_of(larger.data() + pixels.size(),
++                larger.data() + pixels.size() * 2,
++                [](auto byte) { return byte == 0; }),
++                "newly grown bytes should be zero");
++        }
++        {
++            framebuffer_file smaller(path.string(), pixels.size() / 2);
++            passed &= expect(std::equal(pixels.begin(),
++                pixels.begin() + pixels.size() / 2, smaller.data()),
++                "shrinking the framebuffer must preserve retained bytes");
++            passed &= expect(std::filesystem::file_size(path) == pixels.size() / 2,
++                "framebuffer should have the requested size");
++        }
++    } catch (const std::exception &error) {
++        std::cerr << "framebuffer test: " << error.what() << '\n';
++        passed = false;
++    }
++    std::filesystem::remove_all(directory);
++    return passed;
+ }
+ 
+ bool test_argument_parsing_success()
+@@ -303,6 +361,9 @@
+ 
+ int main()
+ {
++    if (!test_framebuffer_preserves_pixels()) {
++        return EXIT_FAILURE;
++    }
+     if (!test_framebuffer_size()) {
+         return EXIT_FAILURE;
+     }
+--- a/README.md
++++ b/README.md
+@@ -103,6 +103,12 @@
+ ```text
+ ceil(width * height * bits_per_pixel / 8)
+ ```
++
++Existing bytes are preserved when opening or resizing the framebuffer; newly
++added bytes are zero-filled. Identical configuration subscriptions leave the
++window, texture and mapping unchanged. A client can therefore draw before its
++subscription is processed without losing the scene. Writers must coordinate
++actual size changes so they do not access bytes beyond the resized file.
+ 
+ Pixels are packed linearly and read most-significant-bit first.
+ 

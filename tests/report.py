@@ -116,6 +116,9 @@ def main():
              'All 34 demos run through Rasta in direct and proxy modes. '
              'A separate startup regression verifies Rasta adopts GEM\'s framebuffer '
              'path, geometry, BGRA depth and inverse mode before window input. '
+             'It also delays configuration until after GEM draws and repeats it, '
+             'checking preserved scene pixels and every alpha byte with matching '
+             'and mismatched initial viewer settings. '
              'UAT checks framebuffer references and scripted input; terminal cases verify a '
              'real shell command by reading its output file. The SDL viewer uses its dummy '
              'video driver unless UAT_SDL_DRIVER is set.', '',

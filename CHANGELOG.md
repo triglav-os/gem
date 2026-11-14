@@ -6,6 +6,11 @@ Unreleased.
 
 ## Unreleased
 
+- Fixed a Rasta startup race that could leave the screen black until pointer
+  movement revealed small patches of the desktop. Viewer configuration now
+  preserves existing framebuffer pixels and skips identical requests. GEM
+  applies the fix to its pinned viewer and tests delayed/repeated configuration.
+
 - Removed offset shadows from the shaded application and location icons,
   retaining their outlines. Home has an opaque black roof with a white
   outline. Terminal and Disk retain their original artwork. Generated

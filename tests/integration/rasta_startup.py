@@ -16,6 +16,7 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'uat'))
 from run import Session
+from scenarios import normalized
 
 
 class UnconfiguredViewer(Session):
@@ -28,6 +29,63 @@ class UnconfiguredViewer(Session):
             for option, value in overrides.items():
                 command[command.index(option) + 1] = value
         return super().start(name, command)
+
+
+class DelayedConfiguration(Session):
+    """Deliver the real subscription only after the demo has drawn its scene."""
+
+    def __init__(self, args):
+        super().__init__(args)
+        self.subscription = None
+        self.delay_subscription = True
+
+    def start(self, name, command):
+        if name == 'rasta':
+            # Wait for actual configuration processing, not an assumed delay.
+            command = ['stdbuf', '-oL', *command]
+        return super().start(name, command)
+
+    def pump(self):
+        try:
+            while True:
+                data, addr = self.relay.recvfrom(65535)
+                if addr[1] == self.viewer_port:
+                    if self.peer:
+                        self.relay.sendto(data, self.peer)
+                else:
+                    self.peer = addr
+                    if self.delay_subscription:
+                        self.subscription = data
+                    else:
+                        self.relay.sendto(data, ('127.0.0.1', self.viewer_port))
+        except BlockingIOError:
+            pass
+        return self.peer
+
+    def frame(self, name):
+        if name != 'initial' or not self.delay_subscription:
+            return super().frame(name)
+        before = super().frame('before_subscription')
+        assert self.subscription, 'No startup configuration to delay'
+        self.delay_subscription = False
+        log = self.path / 'rasta.log'
+        marker = 'reconfigured framebuffer='
+        for attempt in range(2):
+            count = log.read_text().count(marker)
+            self.relay.sendto(self.subscription, ('127.0.0.1', self.viewer_port))
+            self.wait(lambda: log.read_text().count(marker) > count,
+                      'viewer to process configuration')
+            after = super().frame(f'after_subscription_{attempt}')
+            raw = (self.path / 'framebuffer').read_bytes()
+            assert raw[3::4] == b'\xff' * (640 * 400), \
+                'Late/repeated configuration erased framebuffer alpha'
+            assert normalized(after) == normalized(before), \
+                'Late/repeated configuration erased the rendered scene'
+        return super().frame(name)
+
+
+class DelayedUnconfiguredViewer(DelayedConfiguration, UnconfiguredViewer):
+    """Also preserve a drawn scene when adopting another path and geometry."""
 
 
 def main():
@@ -55,6 +113,18 @@ def main():
     assert 'reconfigured framebuffer=' + session.env['GEM_RASTA_FRAMEBUFFER'] in log
     assert 'raster=640x400 bpp=32 inverse=off scale=1' in log
     print('PASS Rasta path, geometry, depth and inverse negotiation plus HID input')
+
+    artifacts = Path(args.artifacts)
+    for name, viewer in (('delayed', DelayedConfiguration),
+                         ('delayed-other', DelayedUnconfiguredViewer)):
+        args.artifacts = str(artifacts / name)
+        session = viewer(args)
+        session.env['GEM_RASTA_INVERSE'] = 'off'
+        try:
+            session.run()
+        finally:
+            session.close()
+    print('PASS delayed/repeated configuration preserves BGRA and window input')
 
 
 if __name__ == '__main__':

@@ -189,6 +189,14 @@ the separate `build/container-sdl/` directory.
 `tools/scripts/rasta.cmake` pins upstream Rasta revision
 `5f1e1511e918e8b4dfa6f8b7a51272f66133ea0e` and verifies its archive with
 SHA-256 `c017b7e0884d8e94bf16a6ce549c62f2fbf2013aeaf3bf14ef1fb0cc4bc04e78`.
+The checked-in `tools/scripts/patches/rasta-framebuffer.patch` carries the
+framebuffer-preservation fix and its upstream unit coverage. It removes the
+destructive truncate-on-open and skips identical runtime configurations.
+Source, build and ExternalProject stamp directories include the revision and
+patch hash, so changing the patch extracts and builds a fresh copy while
+reusing the verified archive. No sibling checkout or unpublished revision is
+required. Retire this patch when upgrading to a published revision containing
+the same fix.
 Downloads, extracted sources and CMake intermediates remain under root `build/`.
 The viewer is installed into `bin/tools/rasta`. Use `make rasta` to prepare
 just the viewer and its core test executable. Every build checks these outputs
@@ -298,6 +306,13 @@ Matching the initial paths manually is unnecessary. `test_rasta_startup`
 starts Rasta with a different path, 80×60 monochrome pixels and inverse mode
 enabled, then verifies GEM negotiates 640×400 BGRA with inverse disabled and
 completes a window drag and close.
+It also delays the actual startup subscription until GEM has drawn, both with
+matching viewer settings and with a different initial path/geometry. It checks
+all alpha bytes and the rendered scene after that subscription and a repeated
+request, then exercises window drag/close. This catches a viewer erasing a
+framebuffer whose inode and final size have not changed: GEM's file-identity
+checks cannot detect that destructive open reliably. Existing bytes must be
+preserved by the viewer; actual size changes still require writer coordination.
 
 ### Physical keyboard consumers
 
