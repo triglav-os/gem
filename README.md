@@ -1,5 +1,29 @@
 # GEM for Linux
 
+## GEMix has entered beta!
+
+**November 15, 2026 — GEMix 0.0.5 “Rain” is the first beta release.**
+The classic GEM desktop takes a major step forward as a complete desktop for
+Triglav OS, a minimal GNU/Linux system built from source.
+
+The beta brings together:
+
+- **GEM Setup and graphical login:** a native graphical installer and login
+  with real Linux user accounts.
+- **Applications for everyday tasks:** Gemscape, Gemread, Fyodor, Isaac,
+  Blaise, Ted and Terminal.
+- **Classic GEM character:** custom icons, file associations, Atari ST `.MSA`
+  disk-image support and an experimental `.PRG` emulator.
+
+**Visit [gemix.io](http://gemix.io)** to explore the release, see screenshots
+and [download the installation ISO](http://gemix.io/downloads). Follow the
+[installation guide](http://gemix.io/get-started) or try the
+[QEMU setup](http://gemix.io/installing-vm).
+The beta is ready for wider testing; try it and report problems to help shape
+the next release.
+
+## About GEM for Linux
+
 GEM for Linux brings the classic GEM graphical environment to modern Linux. It
 provides the GEM Desktop, windows, menus and dialogs together with a file
 manager, terminal, document tools and the Stout Atari executable runner.
