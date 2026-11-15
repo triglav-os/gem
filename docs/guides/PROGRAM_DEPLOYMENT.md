@@ -44,6 +44,17 @@ location in the system Desktop configuration (`/etc/xdg/gem/desktop.cfg`):
 Users can override this in `~/.config/gem/desktop.cfg`; see the
 [configuration guide](CONFIGURATION.md).
 
+## Application data
+
+Put application-only resources in `<prefix>/share/<name>/`. Bundled artwork
+consumers use a stable application name to locate these directories through
+XDG data roots and the executable's installation prefix, with shared GEM data
+as a fallback. See [resource lookup](LINUX_PATHS.md#application-owned-resources)
+for the public helper and exact search order. Keep Desktop icons in the shared
+icon directory below, so Desktop can find them before the application starts.
+The default build/package output remains unchanged; distributions can reorganize
+the application data while assembling their image.
+
 ## Icon
 
 An icon is an icon-only GEM resource with a single monochrome ICONBLK of up to

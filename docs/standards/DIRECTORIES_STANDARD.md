@@ -60,7 +60,9 @@ Only normal top-level project metadata, such as `LICENSE`, `README.md`,
 ## Installed files and user storage
 
 Installed programs follow GNUInstallDirs: `bin/`, architecture-specific `lib/`,
-and `share/gem/`. Headers and static archives belong only in the SDK export. Private CEF dependencies belong under
+and `share/gem/` for shared resources. Application-only data may use
+`share/<application>/`; use the application resource lookup described in
+[Linux paths](../guides/LINUX_PATHS.md#application-owned-resources). Headers and static archives belong only in the SDK export. Private CEF dependencies belong under
 `lib/gem/cef/`. `make package` stages the same install rules into `bin/gemix`;
 `make install` supports a prefix and DESTDIR. Do not place installed resources
 beside executables in `bin/data` or embed build-dependency paths in installed

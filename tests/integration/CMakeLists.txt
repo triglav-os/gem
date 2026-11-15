@@ -33,7 +33,8 @@ set_tests_properties(test_runtime_paths PROPERTIES LABELS integration TIMEOUT 15
 
 if(GEM_PLATFORM STREQUAL "rasta")
     add_test(NAME test_install_layout COMMAND ${Python3_EXECUTABLE} -B
-        ${CMAKE_CURRENT_SOURCE_DIR}/install_layout.py --build ${CMAKE_BINARY_DIR})
+        ${CMAKE_CURRENT_SOURCE_DIR}/install_layout.py --build ${CMAKE_BINARY_DIR}
+        --resource-probe $<TARGET_FILE:test_paths>)
     set_tests_properties(test_install_layout PROPERTIES LABELS integration TIMEOUT 90)
 endif()
 

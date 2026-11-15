@@ -31,7 +31,11 @@ WORD aes_fsel_rows_top(const aes_fsel_state_t *state)
 
 WORD aes_fsel_body_bottom(const aes_fsel_state_t *state)
 {
-    return (WORD)(aes_fsel_action_y(state) - AES_FSEL_MARGIN);
+    WORD filter_height =
+        state->mode == AES_FSEL_OPEN || state->mode == AES_FSEL_SAVE
+            ? AES_FSEL_BUTTON_HEIGHT + AES_FSEL_MARGIN
+            : 0;
+    return (WORD)(aes_fsel_action_y(state) - AES_FSEL_MARGIN - filter_height);
 }
 
 void aes_fsel_file_rect(const aes_fsel_state_t *state, GRECT *rect)
@@ -63,6 +67,18 @@ void aes_fsel_name_rect(const aes_fsel_state_t *state, GRECT *rect)
     rect->g_h = AES_FSEL_BUTTON_HEIGHT;
 }
 
+void aes_fsel_filter_rect(const aes_fsel_state_t *state, GRECT *rect)
+{
+    memset(rect, 0, sizeof(*rect));
+    if (state->mode != AES_FSEL_OPEN && state->mode != AES_FSEL_SAVE) {
+        return;
+    }
+    aes_fsel_name_rect(state, rect);
+    rect->g_y -= AES_FSEL_BUTTON_HEIGHT + AES_FSEL_MARGIN;
+    rect->g_w =
+        (WORD)(state->work.g_x + state->work.g_w - AES_FSEL_MARGIN - rect->g_x);
+}
+
 void aes_fsel_path_rect(const aes_fsel_state_t *state, GRECT *rect)
 {
     GRECT up;
@@ -73,8 +89,8 @@ void aes_fsel_path_rect(const aes_fsel_state_t *state, GRECT *rect)
     aes_fsel_control_rect(state, AES_FSEL_CONTROL_UP, &up);
     rect->g_x = (WORD)(up.g_x + up.g_w + AES_FSEL_MARGIN);
     rect->g_y = (WORD)(state->work.g_y + AES_FSEL_MARGIN);
-    rect->g_w = (WORD)(state->work.g_x + state->work.g_w -
-                       AES_FSEL_MARGIN - rect->g_x);
+    rect->g_w =
+        (WORD)(state->work.g_x + state->work.g_w - AES_FSEL_MARGIN - rect->g_x);
     rect->g_h = AES_FSEL_TOOL_BUTTON;
 }
 
@@ -91,20 +107,6 @@ void aes_fsel_sync_work(aes_fsel_state_t *state)
     state->visible_rows = available > 0 ? (WORD)(available / state->row_h) : 1;
     if (state->visible_rows < 1) {
         state->visible_rows = 1;
-    }
-    if (state->handle > 0) {
-        WORD size = state->entry_count > 0
-                        ? (WORD)((long)state->visible_rows * 1000L /
-                                 state->entry_count)
-                        : 1000;
-        WORD maximum = state->entry_count > state->visible_rows
-                           ? (WORD)(state->entry_count - state->visible_rows)
-                           : 0;
-        WORD position = maximum > 0
-                            ? (WORD)((long)state->top_index * 1000L / maximum)
-                            : 0;
-        wind_set(state->handle, WF_VSLSIZ, size, 0, 0, 0);
-        wind_set(state->handle, WF_VSLIDE, position, 0, 0, 0);
     }
 }
 
@@ -144,6 +146,19 @@ void aes_fsel_control_rect(const aes_fsel_state_t *state, WORD control,
             rect->g_w = AES_FSEL_TOOL_BUTTON;
             rect->g_h = AES_FSEL_TOOL_BUTTON;
             break;
+        case AES_FSEL_CONTROL_SCROLL_UP:
+        case AES_FSEL_CONTROL_SCROLL_DOWN:
+            if (state->entry_count > state->visible_rows) {
+                aes_fsel_file_rect(state, rect);
+                rect->g_x += rect->g_w - AES_FSEL_TOOL_BUTTON;
+                rect->g_y =
+                    control == AES_FSEL_CONTROL_SCROLL_UP
+                        ? aes_fsel_rows_top(state)
+                        : aes_fsel_body_bottom(state) - AES_FSEL_TOOL_BUTTON;
+                rect->g_w = AES_FSEL_TOOL_BUTTON;
+                rect->g_h = AES_FSEL_TOOL_BUTTON;
+            }
+            break;
         default:
             break;
     }
@@ -155,6 +170,9 @@ WORD aes_fsel_entry_at(const aes_fsel_state_t *state, WORD x, WORD y)
     WORD row;
 
     aes_fsel_file_rect(state, &file);
+    if (state->entry_count > state->visible_rows) {
+        file.g_w -= AES_FSEL_TOOL_BUTTON;
+    }
     file.g_y = aes_fsel_rows_top(state);
     file.g_h = (WORD)(aes_fsel_body_bottom(state) - file.g_y);
     if (aes_point_in_rect(x, y, &file) == 0) {
@@ -192,6 +210,14 @@ int aes_fsel_name_hit(const aes_fsel_state_t *state, WORD x, WORD y)
     }
     aes_fsel_name_rect(state, &rect);
     return aes_point_in_rect(x, y, &rect);
+}
+
+int aes_fsel_filter_hit(const aes_fsel_state_t *state, WORD x, WORD y)
+{
+    GRECT rect;
+
+    aes_fsel_filter_rect(state, &rect);
+    return rect.g_w > 0 && aes_point_in_rect(x, y, &rect);
 }
 
 int aes_fsel_path_hit(const aes_fsel_state_t *state, WORD x, WORD y)

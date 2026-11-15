@@ -1544,6 +1544,9 @@ WORD scrp_clear(void);
  *
  * Notes:
  *      Historically AES updates both the directory and selection text.
+ *      Hosted Open/Save filters accept semicolon-separated, case-insensitive
+ *      wildcards, e.g. "*.txt;*.md". The editable filter is returned in pipath;
+ *      directories remain visible regardless of the filter.
  *
  * Sample call:
  *      char path[128] = "A:\\*.*";

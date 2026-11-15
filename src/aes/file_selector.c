@@ -22,7 +22,8 @@ static int aes_fsel_cursor_at(WORD x, WORD y)
         return ARROW;
     }
     if (aes_fsel_path_hit(g_fsel_cursor_state, x, y) != 0 ||
-        aes_fsel_name_hit(g_fsel_cursor_state, x, y) != 0) {
+        aes_fsel_name_hit(g_fsel_cursor_state, x, y) != 0 ||
+        aes_fsel_filter_hit(g_fsel_cursor_state, x, y) != 0) {
         return TEXT_CRSR;
     }
     return ARROW;
@@ -174,8 +175,8 @@ static WORD aes_fsel_control_at(const aes_fsel_state_t *state, WORD x, WORD y)
 {
     WORD control;
 
-    for (control = AES_FSEL_CONTROL_ACCEPT; control <= AES_FSEL_CONTROL_UP;
-         ++control) {
+    for (control = AES_FSEL_CONTROL_ACCEPT;
+         control <= AES_FSEL_CONTROL_SCROLL_DOWN; ++control) {
         GRECT rect;
 
         aes_fsel_control_rect(state, control, &rect);
@@ -239,7 +240,8 @@ static void aes_fsel_accept_result(const aes_fsel_state_t *state, char *pipath,
     if (pipath != NULL) {
         char path[AES_PATH_LEN];
 
-        if (aes_fsel_join_path(state->directory, state->pattern, path,
+        if (aes_fsel_join_path(state->directory,
+                               state->pattern[0] ? state->pattern : "*", path,
                                sizeof(path)) == 0) {
             path[0] = '\0';
         }
@@ -298,14 +300,16 @@ static int aes_fsel_prepare(aes_fsel_state_t *state, char *pipath, char *pisel,
     gemctl_text_edit_init(&state->path_edit, state->directory,
                           sizeof(state->directory));
 
+    gemctl_text_edit_init(&state->filter_edit, state->pattern,
+                          sizeof(state->pattern));
+
     wind_get(0, WF_CXYWH, &desk.g_x, &desk.g_y, &desk.g_w, &desk.g_h);
     width = desk.g_w > 620 ? 620 : (WORD)(desk.g_w - 20);
     height = desk.g_h > 390 ? 390 : (WORD)(desk.g_h - 20);
     GRECT parent;
     aes_dialog_parent_rect(&parent);
     state->handle =
-        wind_create(NAME | CLOSER | MOVER | UPARROW | DNARROW | VSLIDE,
-                    desk.g_x, desk.g_y, width, height);
+        wind_create(NAME | CLOSER | MOVER, desk.g_x, desk.g_y, width, height);
     if (state->handle <= 0) {
         return 0;
     }
@@ -335,12 +339,27 @@ static int aes_fsel_prepare(aes_fsel_state_t *state, char *pipath, char *pisel,
     return 1;
 }
 
-static void aes_fsel_key(aes_fsel_state_t *state, WORD key)
+static void aes_fsel_key(aes_fsel_state_t *state, WORD key, WORD modifiers)
 {
     WORD ascii = (WORD)(key & 0xffu);
     WORD scancode = (WORD)((key >> 8) & 0xffu);
     gemctl_text_edit_result_t path_result;
 
+    if (gemctl_text_edit_active(&state->filter_edit)) {
+        gemctl_text_edit_result_t result = gemctl_text_edit_key_mod(
+            &state->filter_edit, (uint16_t)key, (uint16_t)modifiers);
+        if (result == GEMCTL_TEXT_EDIT_CANCEL) {
+            aes_fsel_cancel(state);
+        } else if (result == GEMCTL_TEXT_EDIT_ACCEPT) {
+            gemctl_text_edit_blur(&state->filter_edit);
+        } else if (result == GEMCTL_TEXT_EDIT_CHANGED) {
+            state->top_index = 0;
+            state->last_click_entry = NIL;
+            aes_fsel_reload_entries(state);
+            aes_fsel_sync_work(state);
+        }
+        return;
+    }
     path_result = gemctl_text_edit_key(&state->path_edit, (uint16_t)key);
     if (path_result == GEMCTL_TEXT_EDIT_ACCEPT) {
         char path[AES_PATH_LEN];
@@ -475,6 +494,14 @@ static void aes_fsel_button(aes_fsel_state_t *state, WORD x, WORD y)
     if (wind_find(x, y) != state->handle) {
         return;
     }
+    if (aes_fsel_filter_hit(state, x, y)) {
+        gemctl_text_edit_blur(&state->path_edit);
+        gemctl_text_edit_focus(&state->filter_edit, 1);
+        state->editing_name = 0;
+        aes_fsel_draw(state, NULL);
+        return;
+    }
+    gemctl_text_edit_blur(&state->filter_edit);
     state->pressed_control = aes_fsel_control_at(state, x, y);
     if (state->pressed_control != AES_FSEL_CONTROL_NONE) {
         aes_fsel_draw(state, NULL);
@@ -516,6 +543,7 @@ static void aes_fsel_button(aes_fsel_state_t *state, WORD x, WORD y)
             if (double_click != 0) {
                 aes_fsel_activate_entry(state);
             } else {
+                gemctl_text_edit_blur(&state->path_edit);
                 state->selected = entry;
                 aes_fsel_set_selection_from_index(state);
                 aes_fsel_scroll_into_view(state);
@@ -565,7 +593,7 @@ static WORD aes_fsel_run(char *pipath, char *pisel, WORD *pbutton, WORD mode,
             aes_fsel_message(&state, msg);
         }
         if ((event & MU_KEYBD) != 0) {
-            aes_fsel_key(&state, kr);
+            aes_fsel_key(&state, kr, ks);
             aes_fsel_draw(&state, NULL);
         }
         if ((event & MU_BUTTON) != 0) {

@@ -6,6 +6,18 @@ Unreleased.
 
 ## Unreleased
 
+- Redrew Home directly on its native 32x32 pixel grid: a flat house with a
+  bold roof, clean window and door, and a one-pixel white outer contour.
+
+- Application artwork can be placed under `share/<app>/` when assembling a
+  distribution. Gemscape, Clock and Maestro search XDG and installed application
+  directories, then retain the shared-resource and development fallbacks.
+  The current build/package output is unchanged.
+
+- Open and Save dialogs now have an editable Filter field supporting patterns
+  such as `*.txt;*.md`. Folder selection has no filter. All selectors omit the
+  window scrollbar; file-pane arrows appear only for lists that do not fit.
+
 - Rasta now follows the latest upstream `main` on every build and compiles
   locally inside Docker. Builds require GitHub access to check for updates.
   Removed GEM's framebuffer patch because upstream includes the fix and tests.

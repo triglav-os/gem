@@ -28,4 +28,13 @@ int sample_clone_bitblk(BITBLK *dst, const BITBLK *src);
 int sample_load_bitblks(const char *primary_path, const char *fallback_path,
                         BITBLK *bitblks, WORD count);
 
+/* Load and clone application bit blocks using installed application data first,
+ * followed by the shared GEM and sample paths. application is the stable data
+ * directory name (e.g. "gemscape"), independent of the executable filename.
+ * GEM_SAMPLE_DATA remains the explicit sample override. Ownership and return
+ * value are the same as sample_load_bitblks(). */
+int sample_load_app_bitblks(const char *application, const char *primary_path,
+                            const char *fallback_path, BITBLK *bitblks,
+                            WORD count);
+
 #endif

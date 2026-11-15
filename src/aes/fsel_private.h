@@ -75,6 +75,7 @@ typedef struct aes_fsel_state {
     WORD editing_name;
     WORD show_hidden;
     gemctl_text_edit_t path_edit;
+    gemctl_text_edit_t filter_edit;
     WORD pressed_control;
     WORD last_click_entry;
     uint32_t last_click_ms;
@@ -103,6 +104,8 @@ int aes_fsel_join_path(const char *directory, const char *name, char *path,
                        size_t path_size);
 /* Match one case-insensitive wildcard pattern. */
 int aes_fsel_match_pattern(const char *pattern, const char *name);
+/* Match semicolon-separated wildcards; an empty filter shows all files. */
+int aes_fsel_match_filter(const char *filter, const char *name);
 /* Copy the highlighted file into the filename field. */
 void aes_fsel_set_selection_from_index(aes_fsel_state_t *state);
 /* Rescan the directory through the pattern, yielding periodically. */
@@ -125,6 +128,8 @@ void aes_fsel_file_rect(const aes_fsel_state_t *state, GRECT *rect);
 void aes_fsel_location_rect(const aes_fsel_state_t *state, GRECT *rect);
 /* Return the editable filename field. */
 void aes_fsel_name_rect(const aes_fsel_state_t *state, GRECT *rect);
+/* Return the filter field, or an empty rectangle outside Open/Save mode. */
+void aes_fsel_filter_rect(const aes_fsel_state_t *state, GRECT *rect);
 /* Return the editable toolbar path field. */
 void aes_fsel_path_rect(const aes_fsel_state_t *state, GRECT *rect);
 /* Return the first file/location row coordinate. */
@@ -142,6 +147,8 @@ WORD aes_fsel_entry_at(const aes_fsel_state_t *state, WORD x, WORD y);
 WORD aes_fsel_location_at(const aes_fsel_state_t *state, WORD x, WORD y);
 /* Return nonzero when a point lies in the filename field. */
 int aes_fsel_name_hit(const aes_fsel_state_t *state, WORD x, WORD y);
+/* Return nonzero when a point lies in the Open/Save filter field. */
+int aes_fsel_filter_hit(const aes_fsel_state_t *state, WORD x, WORD y);
 /* Return nonzero when a point lies in the toolbar path field. */
 int aes_fsel_path_hit(const aes_fsel_state_t *state, WORD x, WORD y);
 /* Adjust the top index so the selection is visible. */

@@ -26,6 +26,10 @@ permissions. `test_runtime_paths` checks Docker mounts and non-overwriting
 settings/profile migration, including shared XDG bases. `test_install_layout`
 checks exact contents, strips/dependency closure, removes stale files and
 launches relocated installed applications without checkout resource overrides.
+It also moves Gemscape's toolbar to `share/gemscape/`, checks the resolved path
+from a relocated probe executable and verifies the same toolbar after relaunch.
+`test_paths` covers application/user/system precedence, explicit resource
+overrides and fallback to shared GEM data.
 Its icon allowlist covers all 21 approved artwork resources: program, location,
 generic Desktop and extension icons. `test_desktop_icon_lookup` checks the four
 folder-name mappings,

@@ -95,9 +95,9 @@ static int clock_load_numbers(clock_state_t *state)
 #ifdef CLOCK_GEMD_CLIENT
     state->numbers_loaded = 0;
 #else
-    state->numbers_loaded =
-        sample_load_bitblks("clock_numbers.rsc", "clock_numbers.rsc",
-                            state->numbers, clock_number_count);
+    state->numbers_loaded = sample_load_app_bitblks(
+        "clock", "clock_numbers.rsc", "clock_numbers.rsc", state->numbers,
+        clock_number_count);
 #endif
     return state->numbers_loaded;
 }

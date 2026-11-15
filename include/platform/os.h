@@ -143,6 +143,13 @@ int gem_os_runtime_dir(char *out, size_t capacity);
 int gem_os_executable_dir(char *out, size_t capacity);
 /* Find GEM data through overrides, XDG data roots and installation prefixes. */
 int gem_os_find_resource(const char *name, char *out, size_t capacity);
+/* Find application-owned data in XDG/<application> and
+ * prefix/share/<application>, then fall back to shared GEM data.
+ * GEM_RESOURCE_DIR takes precedence. Application must be a single directory
+ * name, not "." or "..". Returns nonzero with the readable path in out, or zero
+ * on failure. */
+int gem_os_find_app_resource(const char *application, const char *name,
+                             char *out, size_t capacity);
 
 /*
  * Starts a GEM child with a TOS-tail payload and child-only launch metadata.

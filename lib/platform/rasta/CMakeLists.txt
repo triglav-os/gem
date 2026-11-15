@@ -24,4 +24,4 @@ target_compile_options(rasta
 )
 
 target_compile_definitions(rasta PRIVATE
-    GEM_INSTALL_DATA_DIR="${CMAKE_INSTALL_FULL_DATADIR}/gem")
+    GEM_INSTALL_DATA_ROOT="${CMAKE_INSTALL_FULL_DATADIR}")

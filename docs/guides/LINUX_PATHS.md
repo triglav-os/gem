@@ -107,3 +107,45 @@ override. Build outputs retain their development search paths.
 The relocated-install regression starts installed Gemscape, Gemread and Clock
 from an unrelated directory with build-resource overrides removed; it also
 checks ELF dependencies and the browser's separate XDG data/cache/state paths.
+
+
+## Application-owned resources
+
+Distributions may place application-only resources in `<prefix>/share/<app>/`.
+For example, Gemscape finds `gemscape_toolbar.rsc` in
+`/usr/share/gemscape/` or `/usr/local/share/gemscape/`. The current build and
+package output is unchanged: keeping that file in `share/gem/` still works.
+Clock and Maestro use the same application lookup for their optional numeral
+and tree resources, with the stable names `clock` and `maestro` even when the
+executable has a development suffix.
+
+`gem_os_find_app_resource(application, name, out, capacity)` searches:
+
+1. `GEM_RESOURCE_DIR`, when set, as an explicit resource directory.
+2. `$XDG_DATA_HOME/<app>/`, defaulting to `$HOME/.local/share/<app>/`.
+3. `<app>/` in each absolute `XDG_DATA_DIRS` entry, defaulting to
+   `/usr/local/share:/usr/share`.
+4. `../share/<app>/` relative to the actual running executable.
+5. `<app>/` under the data directory configured at build time.
+6. The existing shared GEM resource search, including `share/gem/`.
+
+Pass a stable application name and a resource name, then load the returned
+path with `rsrc_load()` or the appropriate file API. The ordinary
+`gem_os_find_resource()` continues to search shared GEM data only. No working
+directory or launcher environment change is needed for the standard installed
+layout. The sample artwork loader retains `GEM_SAMPLE_DATA` as its explicit
+override and its existing development fallbacks.
+
+Keep common fonts, cursors, alerts and Desktop launcher/file-type icons in
+`share/gem/` (icons in `share/gem/icons/`). Desktop discovers those icons
+independently of the application, so moving them into application directories
+would break that shared lookup.
+
+CEF is a separate dependency layout: keep its shared libraries and required
+companion data together in `<libdir>/gem/cef/`, with locales in its `locales/`
+subdirectory. The application-resource lookup does not relocate CEF's ICU,
+snapshot or resource packs. See [packaging](PACKAGING.md).
+
+The install regression moves the staged Gemscape toolbar into
+`share/gemscape/`, verifies lookup from a relocated executable without resource
+or XDG system overrides, and compares the rendered toolbar after relaunch.

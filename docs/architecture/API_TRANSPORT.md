@@ -146,6 +146,15 @@ The file-selector request carries an explicit open, save or directory mode and
 an optional 64-byte dialog title. All modes run through the same server-side
 modal chooser; `fsel_input(path, name, button)` and the titled
 `fsel_exinput(path, name, button, title)` open the same custom selector.
+Open and Save include a Filter field initialized from the caller's path pattern.
+It filters files as you type using case-insensitive `*` and `?` wildcards;
+semicolon-separated patterns (for example `*.txt;*.md`) match either type.
+Spaces around patterns and empty segments are ignored; a blank filter shows
+all files. Folders remain visible, and filtering never changes a typed save
+filename. Enter leaves the filter field without accepting the dialog. Directory
+and location selectors omit this field. Selector windows have no frame
+scrollbars; file-pane up/down buttons appear only when entries overflow, and
+arrow/Page Up/Page Down keys also navigate the list.
 Save and directory selection are additive wrappers over that validated request
 rather than separate protocol opcodes. Hidden and dot-prefixed directory
 entries are omitted by default. `fsel_options(FSEL_SHOW_HIDDEN, 1)` enables

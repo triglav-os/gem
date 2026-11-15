@@ -135,8 +135,11 @@ A single click selects a configured location icon; double-click its image or lab
 or choose File → Open, to browse it. Other sample windows may cover the icon
 and must be moved to expose the intended click target.
 
-Sample resource lookup tries `GEM_SAMPLE_DATA`, then `data/` beside the running
-executable, then the configured sample build data path. Core fonts, cursors and
+Sample resource lookup tries `GEM_SAMPLE_DATA` first. The application-aware
+artwork helper then searches installed/XDG application data and shared GEM data,
+using a stable name (`maestro`, `clock` or `gemscape`); legacy resource lookup,
+`data/` beside the executable and the configured sample build data path remain
+fallbacks. See [application resources](LINUX_PATHS.md#application-owned-resources). Core fonts, cursors and
 alert icons use `GEM_RESOURCE_DIR`; sample artwork does not belong there.
 Copy `samples/data/` with the standalone source tree. ImageMagick and the SDK
 resource generator build its RSC files without a core source checkout.

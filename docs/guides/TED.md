@@ -16,8 +16,10 @@ icon slots; all commands remain available through the menus and shortcuts.
 
 The File menu and toolbar provide New, Open, Save and Save As. Ctrl+N, Ctrl+O,
 Ctrl+S, Ctrl+Shift+S and Ctrl+Q provide the corresponding shortcuts. The standard
-file chooser selects paths; normal save replaces the file atomically. A failed
-save retains the in-memory edits. Closing, opening or creating a document with
+file chooser selects paths. Its Filter field accepts patterns such as
+`*.txt;*.md`, updates the list as you type, and keeps folders visible. Use `*`
+or clear the filter to show all files. Normal save replaces the file atomically.
+A failed save retains the in-memory edits. Closing, opening or creating a document with
 unsaved changes offers Save, Discard and Cancel, defaulting to Cancel.
 
 Click to place the caret; drag or use Shift+arrows to select. Ctrl+A selects all;

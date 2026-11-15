@@ -204,6 +204,19 @@ static void selector_patterns(void)
                  {"*ab*ab", "aba", 0},
                  {"*.?", "name.c", 1},
                  {"*.?", "name.cpp", 0}};
+    static const struct {
+        const char *filter, *name;
+        int matches;
+    } filters[] = {
+        {"*.txt;*.md", "Readme.TXT", 1}, {"*.txt;*.md", "Notes.MD", 1},
+        {"*.txt;*.md", "image.png", 0},  {" ; *.txt ;; *.md; ", "notes.md", 1},
+        {"*.txt;", "image.png", 0},      {"", "image.png", 1},
+        {" ; ; ", "image.png", 1},       {"readme.txt;notes.md", "notes.md", 1},
+        {"?.txt;*.md", "ab.txt", 0},     {"*.txt;*", "image.png", 1}};
+    for (size_t i = 0; i < sizeof(filters) / sizeof(filters[0]); ++i) {
+        assert(aes_fsel_match_filter(filters[i].filter, filters[i].name) ==
+               filters[i].matches);
+    }
     char hostile[202], name[201];
     for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i)
         assert(aes_fsel_match_pattern(cases[i].pattern, cases[i].name) ==
@@ -262,8 +275,25 @@ static void selector_hidden_entries(void)
     aes_fsel_reload_entries(&state);
     assert(selector_has_entry(&state, ".hidden.pdf"));
     assert(fsel_options(0, 1) == 0);
+    for (WORD mode = AES_FSEL_OPEN; mode <= AES_FSEL_SAVE; ++mode) {
+        state.mode = mode;
+        strcpy(state.selection, "new-name.txt");
+        strcpy(state.pattern, "*.txt;*.md");
+        aes_fsel_reload_entries(&state);
+        assert(!selector_has_entry(&state, "visible.pdf"));
+        assert(selector_has_entry(&state, ".."));
+        assert(strcmp(state.selection, "new-name.txt") == 0);
+        strcpy(state.pattern, "*.txt;*.pdf");
+        aes_fsel_reload_entries(&state);
+        assert(selector_has_entry(&state, "visible.pdf"));
+    }
+    state.mode = AES_FSEL_DIRECTORY;
+    aes_fsel_reload_entries(&state);
+    assert(!selector_has_entry(&state, "visible.pdf"));
+    assert(selector_has_entry(&state, ".."));
 
-    assert(unlink(hidden) == 0 && unlink(visible) == 0 && rmdir(directory) == 0);
+    assert(unlink(hidden) == 0 && unlink(visible) == 0 &&
+           rmdir(directory) == 0);
 }
 
 static void text_editor_hid_collisions(void)

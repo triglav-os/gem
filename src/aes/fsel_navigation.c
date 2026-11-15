@@ -139,6 +139,7 @@ void aes_fsel_navigate(aes_fsel_state_t *state, const char *path, int remember)
     state->selection[0] = '\0';
     state->editing_name = 0;
     gemctl_text_edit_blur(&state->path_edit);
+    gemctl_text_edit_blur(&state->filter_edit);
     state->selected = NIL;
     state->last_click_entry = NIL;
     state->last_click_ms = 0u;

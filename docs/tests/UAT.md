@@ -99,15 +99,21 @@ parser.
 | 31 | Scrollback shell terminal | Real shell execution, visible output and shell exit |
 | 32 | Alert and error dialog launcher | Open note, accept it and verify returned button status |
 | 33 | Ten-field form_do editor | Type, Tab, type, accept, inspect saved-fields alert, dismiss |
-| 34 | Modern GEM file choosers | Render and cancel open, save and directory modes |
+| 34 | Modern GEM file choosers | Render Open/Save filters, edit multiple patterns, and cancel all three modes |
 
 Demo 34 enumerates the checked-in `demo34_fixture` directory instead of the
 host's changing `/tmp` contents. Its editable absolute path text and discovered
 location rows are masked from reference comparison because mount lists differ
 between hosts and containers. The field border, all three navigation buttons,
 Locations header/frame, deterministic file rows and actions remain checked.
-The reviewed references include the Up button and standard vertical scrollbar;
-long path text must stay inside its field instead of crossing the right border.
+The reviewed references include the Up button, Open/Save Filter row and
+scrollbar-free window frame; long path text must stay inside its field instead
+of crossing the right border.
+The filter checkpoints show both `.txt` and `.md` matches, exclude `.dat`, and
+preserve the save filename while changing to `*.md`. Directory mode has no
+Filter row. A generated folder list checks that overflow arrows scroll down
+and back up inside the file pane. `test_gemd_host` also checks wildcard lists,
+whitespace/empty segments, case-insensitive matching and preserved save names.
 
 The catalog describes representative acceptance paths, not exhaustive coverage
 of every combination or every historical GEM behavior. Integration tests cover

@@ -51,7 +51,11 @@ resgen, pkg-config development metadata, tests, source code and sample programs
 are excluded. Debug symbols are stripped from staged copies; development build
 outputs remain available for debugging.
 
-Fonts, cursor/alert resources and Gemscape toolbar artwork live in share/gem.
+The default package places fonts, cursor/alert resources and Gemscape toolbar
+artwork in share/gem. Distributions may move the toolbar to share/gemscape;
+application lookup supports both layouts without a launcher override. Shared
+fonts, cursors, alerts and Desktop icons retain their share/gem paths. See
+[application resource lookup](LINUX_PATHS.md#application-owned-resources).
 Clock's installed proxy variant draws its own numerals and needs no numeral
 resource. Built-in Desktop icons are compiled in as fallbacks; the bundled
 folder, disk, document, program and trash resources in share/gem/icons override

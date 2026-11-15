@@ -202,6 +202,9 @@ static void aes_fsel_draw_files(const aes_fsel_state_t *state)
     aes_fsel_file_rect(state, &file);
     aes_fsel_outline(&file);
     content_right = (WORD)(file.g_x + file.g_w);
+    if (state->entry_count > state->visible_rows) {
+        content_right -= AES_FSEL_TOOL_BUTTON;
+    }
     size_x = (WORD)(content_right - 68);
     type_x = (WORD)(size_x - 76);
     vst_color(aes_state.vdi_handle, aes_dark_color());
@@ -249,6 +252,40 @@ static void aes_fsel_draw_files(const aes_fsel_state_t *state)
             aes_fsel_size_text(state->entries[index].size_bytes, size);
             aes_fsel_text((WORD)(size_x + 3), (WORD)(y + state->text_ascent),
                           size, 62);
+        }
+    }
+}
+
+static void aes_fsel_draw_filter(const aes_fsel_state_t *state)
+{
+    GRECT rect;
+    WORD baseline;
+
+    aes_fsel_filter_rect(state, &rect);
+    if (rect.g_w == 0) {
+        return;
+    }
+    baseline =
+        (WORD)(rect.g_y + (rect.g_h - state->char_h) / 2 + state->text_ascent);
+    vst_color(aes_state.vdi_handle, aes_dark_color());
+    v_gtext(aes_state.vdi_handle, state->work.g_x + AES_FSEL_MARGIN, baseline,
+            (CONST BYTE *)"Filter:");
+    aes_fsel_outline(&rect);
+    aes_fsel_text(rect.g_x + 4, baseline, state->pattern, rect.g_w - 8);
+    if (gemctl_text_edit_active(&state->filter_edit)) {
+        char prefix[AES_PATH_LEN];
+        size_t cursor = state->filter_edit.cursor;
+        WORD cursor_x;
+
+        if (cursor > strlen(state->pattern)) {
+            cursor = strlen(state->pattern);
+        }
+        memcpy(prefix, state->pattern, cursor);
+        prefix[cursor] = '\0';
+        cursor_x = (WORD)(rect.g_x + 4 + vdi_string_width(prefix));
+        if (cursor_x < rect.g_x + rect.g_w - 3) {
+            aes_fsel_line(cursor_x, rect.g_y + 4, cursor_x,
+                          rect.g_y + rect.g_h - 5);
         }
     }
 }
@@ -321,6 +358,11 @@ void aes_fsel_draw(const aes_fsel_state_t *state, const GRECT *dirty)
             aes_fsel_draw_toolbar(state);
             aes_fsel_draw_locations(state);
             aes_fsel_draw_files(state);
+            if (state->entry_count > state->visible_rows) {
+                aes_fsel_draw_button(state, AES_FSEL_CONTROL_SCROLL_UP, "^");
+                aes_fsel_draw_button(state, AES_FSEL_CONTROL_SCROLL_DOWN, "v");
+            }
+            aes_fsel_draw_filter(state);
             aes_fsel_draw_actions(state);
             vs_clip(aes_state.vdi_handle, 0, clip);
         }

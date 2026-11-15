@@ -112,9 +112,9 @@ static int gemscape_load_toolbar_icons(gemscape_state_t *state)
         return 0;
     }
 
-    state->toolbar_icons_loaded =
-        sample_load_bitblks("gemscape_toolbar.rsc", "gemscape_toolbar.rsc",
-                            state->toolbar_icons, gemscape_toolbar_icon_count);
+    state->toolbar_icons_loaded = sample_load_app_bitblks(
+        "gemscape", "gemscape_toolbar.rsc", "gemscape_toolbar.rsc",
+        state->toolbar_icons, gemscape_toolbar_icon_count);
     return state->toolbar_icons_loaded;
 }
 

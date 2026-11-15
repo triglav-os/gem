@@ -124,9 +124,9 @@ static int maestro_load_tree_icons(maestro_state_t *state)
         return 0;
     }
 
-    state->tree_icons_loaded =
-        sample_load_bitblks("maestro_tree.rsc", "maestro_tree.rsc",
-                            state->tree_icons, maestro_tree_icon_count);
+    state->tree_icons_loaded = sample_load_app_bitblks(
+        "maestro", "maestro_tree.rsc", "maestro_tree.rsc", state->tree_icons,
+        maestro_tree_icon_count);
     return state->tree_icons_loaded;
 }
 

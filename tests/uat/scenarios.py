@@ -9,7 +9,7 @@ import time
 REFERENCES = Path(__file__).resolve().parents[1] / 'data' / 'uat'
 
 
-def normalized(data, demo=None):
+def normalized(data, demo=None, checkpoint_name=None):
     data = bytearray(data)
     # The software pointer is asynchronous and is not part of the scene.
     for y in range(24):
@@ -20,8 +20,9 @@ def normalized(data, demo=None):
     # host's discovered locations vary between checkouts and containers;
     # retain the toolbar buttons, path border and Locations header/frame.
     if demo == 34:
-        for left, top, right, bottom in ((108, 36, 600, 58),
-                                         (20, 112, 144, 350)):
+        locations_bottom = 350 if checkpoint_name == 'directory' else 316
+        for left, top, right, bottom in ((108, 36, 618, 58),
+                                         (20, 112, 144, locations_bottom)):
             for y in range(top, bottom):
                 for x in range(left, right):
                     data[y * 80 + x // 8] &= ~(0x80 >> (x % 8))
@@ -30,7 +31,7 @@ def normalized(data, demo=None):
 
 def checkpoint(session, name, data=None):
     data = normalized(session.frame(name) if data is None else data,
-                      session.args.demo)
+                      session.args.demo, name)
     reference = REFERENCES / f'demo{session.args.demo}_{name}.pbm'
     if session.args.record:
         assert session.args.mode == 'direct', 'Record references from direct execution only'
@@ -65,6 +66,10 @@ def type_text(session, text):
         elif char in '1234567890': scan='1234567890'.index(char)+30
         elif char==' ': scan=44
         elif char=='\n': scan=40
+        elif char in '.;/-': scan={'.':55, ';':51, '/':56, '-':45}[char]
+        elif char=='*':
+            session.event(1,225); session.key(37); session.event(2,225)
+            continue
         elif char=='>':
             session.event(1,225); session.key(55); session.event(2,225)
             continue
@@ -194,8 +199,32 @@ def check(session, initial):
         changed(session,'saved_alert',initial)
         session.key(40); exited(session)
     elif n==34:
+        session.click(180, 326)
+        type_text(session, '*.txt;*.md')
+        session.key(40)
+        checkpoint(session, 'filtered')
+        # Editing the filter must leave the chooser open on Enter.
+        assert session.demo.poll() is None
         session.key(41)
         save=changed(session,'save',initial)
+        session.click(180, 326)
+        type_text(session, '*.md')
+        session.key(40)
+        checkpoint(session, 'save_filtered')
         session.key(41)
         changed(session,'directory',save)
+        folders = session.path/'folders'
+        folders.mkdir(exist_ok=True)
+        for index in range(16):
+            (folders/f'folder{index:02}').mkdir(exist_ok=True)
+        session.click(180, 46)
+        type_text(session, 'folders')
+        session.key(40)
+        before = normalized(session.frame('directory_overflow'))
+        session.click(608, 338)
+        after = normalized(session.frame('directory_scrolled'))
+        assert before != after, 'File-pane down arrow did not scroll'
+        session.click(608, 123)
+        assert normalized(session.frame('directory_scroll_restored')) == before, \
+            'File-pane up arrow did not restore the list'
         session.key(41); exited(session)

@@ -1,7 +1,7 @@
 /*
- * Resolves sample data beside installed executables, with an explicit
- * override and a build-tree fallback, and copies resource bit blocks into
- * application-owned memory so they outlive rsrc_free(). Only the public
+ * Resolves application and sample data through installed/XDG directories,
+ * explicit overrides and build-tree fallbacks, and copies resource bit blocks
+ * into application-owned memory so they outlive rsrc_free(). Only the public
  * GEM API is used.
  *
  * SPDX-License-Identifier: GPL-2.0-or-later
@@ -9,6 +9,7 @@
  */
 #define _POSIX_C_SOURCE 200809L
 #include "sample_resources.h"
+#include <platform/os.h>
 
 #include <stdint.h>
 #include <stdio.h>
@@ -25,12 +26,17 @@ static WORD load_from(const char *directory, const char *name)
     return size > 0 && (size_t)size < sizeof(path) ? rsrc_load(path) : 0;
 }
 
-WORD sample_resource_load(const char *name)
+static WORD resource_load_for(const char *application, const char *name)
 {
     char executable[260];
     if (!name || strchr(name, '/') || strchr(name, '\\'))
         return 0;
     if (load_from(getenv("GEM_SAMPLE_DATA"), name))
+        return 1;
+    if (application &&
+        gem_os_find_app_resource(application, name, executable,
+                                 sizeof(executable)) &&
+        rsrc_load(executable))
         return 1;
     if (rsrc_load((char *)name))
         return 1;
@@ -46,6 +52,11 @@ WORD sample_resource_load(const char *name)
         }
     }
     return load_from(SAMPLE_BUILD_DATA, name);
+}
+
+WORD sample_resource_load(const char *name)
+{
+    return resource_load_for(NULL, name);
 }
 
 void sample_free_bitblk(BITBLK *bitblk)
@@ -80,8 +91,9 @@ int sample_clone_bitblk(BITBLK *dst, const BITBLK *src)
     return 1;
 }
 
-int sample_load_bitblks(const char *primary_path, const char *fallback_path,
-                        BITBLK *bitblks, WORD count)
+int sample_load_app_bitblks(const char *application, const char *primary_path,
+                            const char *fallback_path, BITBLK *bitblks,
+                            WORD count)
 {
     BITBLK *bitblk;
     WORD ii;
@@ -89,8 +101,8 @@ int sample_load_bitblks(const char *primary_path, const char *fallback_path,
     if (bitblks == NULL || count <= 0) {
         return 0;
     }
-    if (sample_resource_load(primary_path) == 0 &&
-        sample_resource_load(fallback_path) == 0) {
+    if (resource_load_for(application, primary_path) == 0 &&
+        resource_load_for(application, fallback_path) == 0) {
         return 0;
     }
 
@@ -107,4 +119,11 @@ int sample_load_bitblks(const char *primary_path, const char *fallback_path,
     }
     rsrc_free();
     return 1;
+}
+
+int sample_load_bitblks(const char *primary_path, const char *fallback_path,
+                        BITBLK *bitblks, WORD count)
+{
+    return sample_load_app_bitblks(NULL, primary_path, fallback_path, bitblks,
+                                   count);
 }

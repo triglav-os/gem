@@ -24,7 +24,7 @@ static int aes_fsel_has_wildcards(const char *text)
     }
 
     while (*text != '\0') {
-        if (*text == '*' || *text == '?') {
+        if (*text == '*' || *text == '?' || *text == ';') {
             return 1;
         }
         ++text;
@@ -196,6 +196,44 @@ int aes_fsel_match_pattern(const char *pattern, const char *name)
     return *pattern == '\0';
 }
 
+int aes_fsel_match_filter(const char *filter, const char *name)
+{
+    int has_pattern = 0;
+
+    if (filter == NULL || name == NULL) {
+        return 0;
+    }
+    while (*filter != '\0') {
+        const char *end = strchr(filter, ';');
+        const char *next = end != NULL ? end + 1 : filter + strlen(filter);
+        char pattern[AES_PATH_LEN];
+        size_t length;
+
+        if (end == NULL) {
+            end = next;
+        }
+        while (filter < end && isspace((unsigned char)*filter)) {
+            ++filter;
+        }
+        while (end > filter && isspace((unsigned char)end[-1])) {
+            --end;
+        }
+        length = (size_t)(end - filter);
+        if (length > 0u) {
+            has_pattern = 1;
+            if (length < sizeof(pattern)) {
+                memcpy(pattern, filter, length);
+                pattern[length] = '\0';
+                if (aes_fsel_match_pattern(pattern, name)) {
+                    return 1;
+                }
+            }
+        }
+        filter = next;
+    }
+    return !has_pattern;
+}
+
 int aes_fsel_join_path(const char *directory, const char *name, char *path,
                        size_t path_size)
 {
@@ -302,14 +340,13 @@ void aes_fsel_reload_entries(aes_fsel_state_t *state)
             if (state->mode == AES_FSEL_LOCATION &&
                 dent.info.is_directory == 0) {
                 const char *dot = strrchr(dent.name, '.');
-                if (dot == NULL ||
-                    (strcasecmp(dot, ".st") != 0 &&
-                     strcasecmp(dot, ".msa") != 0)) {
+                if (dot == NULL || (strcasecmp(dot, ".st") != 0 &&
+                                    strcasecmp(dot, ".msa") != 0)) {
                     continue;
                 }
             }
             if (dent.info.is_directory == 0 &&
-                aes_fsel_match_pattern(state->pattern, dent.name) == 0) {
+                aes_fsel_match_filter(state->pattern, dent.name) == 0) {
                 continue;
             }
 

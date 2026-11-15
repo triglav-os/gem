@@ -10,6 +10,7 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
+import struct
 import sys
 from types import SimpleNamespace
 ROOT = Path(__file__).resolve().parents[2]
@@ -22,6 +23,7 @@ from run import Session
 parser = argparse.ArgumentParser()
 parser.add_argument('--build', type=Path, required=True)
 parser.add_argument('--no-gui', action='store_true')
+parser.add_argument('--resource-probe', type=Path)
 args = parser.parse_args()
 build = args.build.resolve()
 stage = build/'install-layout'
@@ -86,16 +88,37 @@ if args.no_gui:
     print('PASS native runtime contents, stripped ELF dependencies and resource allowlists')
     sys.exit(0)
 os.environ['RASTA_BIN'] = str(relocated/bindir/'rasta')
-for app in ('gemscape', 'gemread', 'clock', 'desktop', 'terminal', 'calc', 'ted'):
-    scenario = SimpleNamespace(demo='installed_' + app, capture=True, mode='proxy',
+toolbar = None
+for app in ('gemscape', 'gemread', 'clock', 'desktop', 'terminal', 'calc', 'ted', 'gemscape'):
+    app_resources = app == 'gemscape' and toolbar is not None
+    if app_resources:
+        # Reorganize only the staged copy, leaving build outputs untouched.
+        destination = relocated/datadir/'gemscape'
+        destination.mkdir()
+        (relocated/datadir/'gem/gemscape_toolbar.rsc').rename(destination/'gemscape_toolbar.rsc')
+        assert args.resource_probe, 'Supply --resource-probe for the relocation check'
+        probe = relocated/bindir/'resource_probe'
+        shutil.copy2(args.resource_probe, probe)
+        probe_env = dict(env, XDG_DATA_HOME=str(stage/'empty-data'),
+                         XDG_DATA_DIRS=str(stage/'empty-system-data'))
+        probe_env.pop('GEM_RESOURCE_DIR', None)
+        expected = relocated/bindir/'..'/datadir/'gemscape/gemscape_toolbar.rsc'
+        try:
+            subprocess.run([str(probe), 'gemscape', 'gemscape_toolbar.rsc', str(expected)],
+                           cwd=stage, env=probe_env, check=True)
+        finally:
+            probe.unlink()
+    label = 'app_resources_gemscape' if app_resources else 'installed_' + app
+    scenario = SimpleNamespace(demo=label, capture=True, mode='proxy',
         binary=str(relocated/bindir/app), gemd=str(relocated/bindir/'gemd'),
         artifacts=str(stage), resources=str(relocated/datadir/'gem'))
     session = Session(scenario)
-    for key in ('GEM_RESOURCE_DIR', 'GEMIX_HOME', 'GEMSCAPE_PROFILE', 'GEM_CEF_ROOT', 'LD_LIBRARY_PATH'):
+    for key in ('GEM_RESOURCE_DIR', 'GEM_SAMPLE_DATA', 'GEMIX_HOME', 'GEMSCAPE_PROFILE', 'GEM_CEF_ROOT', 'LD_LIBRARY_PATH'):
         session.env.pop(key, None)
     for variable, directory in (('XDG_CONFIG_HOME', 'config'), ('XDG_DATA_HOME', 'data'),
                                 ('XDG_CACHE_HOME', 'cache'), ('XDG_STATE_HOME', 'state')):
         session.env[variable] = str(session.path/directory)
+    session.env['XDG_DATA_DIRS'] = str(stage/'empty-system-data')
     session.env['GEMSCAPE_URL'] = 'data:text/html,<h1>Installed browser</h1>'
     try:
         session.run()
@@ -108,7 +131,17 @@ for app in ('gemscape', 'gemread', 'clock', 'desktop', 'terminal', 'calc', 'ted'
             assert (session.path/'data/gem/gemscape/profile').is_dir()
             assert (session.path/'cache/gem/gemscape').is_dir()
             assert (session.path/'state/gem/gemscape').is_dir()
-        session.frame('installed_application')
+        frame = session.frame('installed_application')
+        if app == 'gemscape':
+            status, work = session.rpc(33, struct.pack('=hh', 1, 5))
+            assert status == 1
+            x, y, w, _ = struct.unpack('=4h', work)
+            pixels = bytes((frame[row*80+col//8] >> (7-col%8)) & 1
+                           for row in range(y, y+20) for col in range(x, x+w))
+            if app_resources:
+                assert pixels == toolbar, 'Moving application data changed the rendered toolbar'
+            else:
+                toolbar = pixels
     finally:
         session.close()
-print('PASS relocated install, private CEF, resource discovery and XDG browser storage')
+print('PASS relocated install, shared/application resources, private CEF and XDG browser storage')

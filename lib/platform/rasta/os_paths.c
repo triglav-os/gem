@@ -1,5 +1,5 @@
 /*
- * Resolves Linux XDG cache/state/runtime paths and installed GEM resources.
+ * Resolves Linux XDG cache/state/runtime paths and shared/application data.
  * Runtime directories are private and ownership checked; resource discovery
  * works without a checkout or a particular current working directory.
  *
@@ -14,8 +14,8 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#ifndef GEM_INSTALL_DATA_DIR
-#define GEM_INSTALL_DATA_DIR "/usr/local/share/gem"
+#ifndef GEM_INSTALL_DATA_ROOT
+#define GEM_INSTALL_DATA_ROOT "/usr/local/share"
 #endif
 
 static int user_directory(const char *variable, const char *suffix, char *out,
@@ -100,7 +100,8 @@ static int resource_at(const char *base, const char *name, char *out,
            gem_os_access(out, GEM_OS_ACCESS_READ);
 }
 
-int gem_os_find_resource(const char *name, char *out, size_t capacity)
+static int find_resource_in(const char *application, const char *name,
+                            char *out, size_t capacity)
 {
     char base[GEM_OS_PATH_MAX], path[GEM_OS_PATH_MAX];
     const char *override = getenv("GEM_RESOURCE_DIR");
@@ -112,7 +113,7 @@ int gem_os_find_resource(const char *name, char *out, size_t capacity)
     if (override && override[0] && resource_at(override, name, out, capacity))
         return 1;
     if (gem_os_user_data_dir(base, sizeof(base))) {
-        int length = snprintf(path, sizeof(path), "%s/gem", base);
+        int length = snprintf(path, sizeof(path), "%s/%s", base, application);
         if (length > 0 && (size_t)length < sizeof(path) &&
             resource_at(path, name, out, capacity))
             return 1;
@@ -122,9 +123,11 @@ int gem_os_find_resource(const char *name, char *out, size_t capacity)
     while (*directories) {
         const char *end = strchr(directories, ':');
         size_t length = end ? (size_t)(end - directories) : strlen(directories);
-        if (*directories == '/' && length + 5 < sizeof(path)) {
+        if (*directories == '/' &&
+            length + strlen(application) + 2 <= sizeof(path)) {
             memcpy(path, directories, length);
-            strcpy(path + length, "/gem");
+            path[length] = '/';
+            strcpy(path + length + 1, application);
             if (resource_at(path, name, out, capacity))
                 return 1;
         }
@@ -133,13 +136,37 @@ int gem_os_find_resource(const char *name, char *out, size_t capacity)
         directories = end + 1;
     }
     if (gem_os_executable_dir(base, sizeof(base))) {
-        int length = snprintf(path, sizeof(path), "%s/../share/gem", base);
+        int length =
+            snprintf(path, sizeof(path), "%s/../share/%s", base, application);
         if (length > 0 && (size_t)length < sizeof(path) &&
             resource_at(path, name, out, capacity))
             return 1;
     }
-    if (resource_at(GEM_INSTALL_DATA_DIR, name, out, capacity))
+    int length = snprintf(path, sizeof(path), "%s/%s", GEM_INSTALL_DATA_ROOT,
+                          application);
+    if (length > 0 && (size_t)length < sizeof(path) &&
+        resource_at(path, name, out, capacity))
         return 1;
     out[0] = '\0';
     return 0;
+}
+
+int gem_os_find_resource(const char *name, char *out, size_t capacity)
+{
+    return find_resource_in("gem", name, out, capacity);
+}
+
+int gem_os_find_app_resource(const char *application, const char *name,
+                             char *out, size_t capacity)
+{
+    if (out && capacity) {
+        out[0] = '\0';
+    }
+    if (!application || !application[0] || strchr(application, '/') ||
+        strchr(application, '\\') || strcmp(application, ".") == 0 ||
+        strcmp(application, "..") == 0) {
+        return 0;
+    }
+    return find_resource_in(application, name, out, capacity) ||
+           gem_os_find_resource(name, out, capacity);
 }
