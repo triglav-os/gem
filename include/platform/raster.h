@@ -101,7 +101,9 @@ int gem_raster_overlay_update(uint32_t id, int x, int y, uint16_t width,
 void gem_raster_overlay_destroy(uint32_t id);
 /* Changes overlay visibility without destroying its pixels. */
 void gem_raster_overlay_set_visible(uint32_t id, int visible);
-/* Sets screen rectangles that temporarily occlude an overlay. */
+/* Sets screen rectangles that temporarily occlude an overlay; at most
+ * GEM_RASTER_OVERLAY_OCCLUSION_MAX are kept. */
+#define GEM_RASTER_OVERLAY_OCCLUSION_MAX 24
 void gem_raster_overlay_set_occlusion(uint32_t id, const int *rects,
                                       unsigned count);
 /* Destroys every presenter overlay owned by the backend. */

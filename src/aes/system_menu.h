@@ -50,6 +50,9 @@ int aes_system_menu_hit(WORD x, WORD y);
  * item or AES_SYSTEM_MENU_NONE. Polls HID directly, like the menu tracker. */
 WORD aes_system_menu_track(int latched, WORD *handoff_x, WORD *handoff_y);
 
+/* Nonzero with the open system popup's rectangle while it is tracked. */
+int aes_system_menu_cover(GRECT *rect);
+
 /* Hook gemd installs so "Shutdown" can stop the server. Returns nonzero
  * when the shutdown was accepted. */
 extern int (*aes_system_shutdown_hook)(void);

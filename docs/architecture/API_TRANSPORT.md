@@ -69,7 +69,10 @@ gemd moves each mapped layer with its window whenever the window stack or
 geometry changes, before the AES repaints the area a move exposed. Both
 presenters then recomposite the layer's previous rectangle, so a moved window
 never leaves browser or page pixels behind while its owner is still handling
-`WM_MOVED`. A layer is hidden while its window is closed or iconified.
+`WM_MOVED`. A layer is hidden while its window is closed or iconified. Higher
+windows, modal alerts and forms, the menu bar, an open drop-down and the system
+popup occlude every layer (up to 24 rectangles); AES notifies gemd whenever a
+menu opens, closes or changes so the layer is cut back around it.
 Applications may still call `gem_overlay_map()` after `WM_MOVED`; it is then a
 no-op for position.
 

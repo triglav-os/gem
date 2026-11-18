@@ -348,6 +348,8 @@ void aes_menu_redraw_tree(OBJECT *tree)
     v_show_c(aes_state.vdi_handle, 1);
     vdi_end_update();
     aes_menu_redraw_in_progress = 0;
+    /* Drop-downs are framebuffer pixels; overlays must stop covering them. */
+    aes_notify_window_topology_changed();
 }
 
 void aes_menu_clear_saved_region(void)
@@ -357,6 +359,25 @@ void aes_menu_clear_saved_region(void)
     aes_menu_restore_saved_region();
     v_show_c(aes_state.vdi_handle, 1);
     vdi_end_update();
+    aes_notify_window_topology_changed();
+}
+
+WORD aes_menu_cover_rects(GRECT out[], WORD max_rects)
+{
+    WORD count = 0;
+    WORD i;
+    GRECT system;
+
+    for (i = 0; i < aes_state.menu_saved_count && count < max_rects; ++i) {
+        if (aes_state.menu_saved_rects[i].g_w > 0 &&
+            aes_state.menu_saved_rects[i].g_h > 0) {
+            out[count++] = aes_state.menu_saved_rects[i];
+        }
+    }
+    if (count < max_rects && aes_system_menu_cover(&system) != 0) {
+        out[count++] = system;
+    }
+    return count;
 }
 
 void aes_menu_switch_to_app(WORD app_id)

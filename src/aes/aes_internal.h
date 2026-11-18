@@ -298,6 +298,10 @@ void aes_menu_prepare_tree(OBJECT *tree);
 void aes_menu_hide_popups(OBJECT *tree);
 void aes_menu_redraw_tree(OBJECT *tree);
 void aes_menu_clear_saved_region(void);
+/* Screen areas the menu bar, an open drop-down or the system popup currently
+ * paint over. Presenter overlays are composited above the framebuffer, so
+ * they must treat these as occluded. Returns the number written. */
+WORD aes_menu_cover_rects(GRECT out[], WORD max_rects);
 void aes_menu_switch_to_app(WORD app_id);
 int aes_menu_subtree_rect(OBJECT *tree, WORD object, GRECT *rect);
 WORD aes_menu_key_event(OBJECT *tree, const gem_hid_event_t *evt,

@@ -313,6 +313,18 @@ static int system_application_title_at(WORD x, WORD y)
            aes_menu_popup_for_title(aes_state.menu_tree, title) != NIL;
 }
 
+static GRECT system_cover;
+static int system_cover_active;
+
+int aes_system_menu_cover(GRECT *rect)
+{
+    if (system_cover_active == 0 || rect == NULL) {
+        return 0;
+    }
+    *rect = system_cover;
+    return 1;
+}
+
 WORD aes_system_menu_track(int latched, WORD *handoff_x, WORD *handoff_y)
 {
     GRECT popup;
@@ -349,6 +361,9 @@ WORD aes_system_menu_track(int latched, WORD *handoff_x, WORD *handoff_y)
     vdi_flush_rect(title.g_x, title.g_y, title.g_w,
                    (WORD)(title.g_h + popup.g_h));
     vdi_end_update();
+    system_cover = popup;
+    system_cover_active = 1;
+    aes_notify_window_topology_changed();
 
     for (;;) {
         WORD hovered;
@@ -413,6 +428,8 @@ WORD aes_system_menu_track(int latched, WORD *handoff_x, WORD *handoff_y)
 
     gem_os_free(saved);
     gem_os_free(title_saved);
+    system_cover_active = 0;
+    aes_notify_window_topology_changed();
 
     /* Restore shared drawing state the popup changed. */
     (void)vswr_mode(aes_state.vdi_handle, MD_REPLACE);

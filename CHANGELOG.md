@@ -6,6 +6,10 @@ Unreleased.
 
 ## Unreleased
 
+- Native colour overlays no longer draw over open menus. gemd now treats the
+  menu bar, an open drop-down and the system popup as occluding every
+  overlay, and updates overlays as soon as a menu opens or closes.
+
 - Redrew Home directly on its native 32x32 pixel grid: a flat house with a
   bold roof, clean window and door, and a one-pixel white outer contour.
 

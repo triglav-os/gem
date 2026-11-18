@@ -9,6 +9,7 @@
 #include "../../../src/aes/window_internal.h"
 #include <gem/input.h>
 #include "../../../src/aes/fsel_private.h"
+#include "../../../src/aes/menu_private.h"
 #include "gem/gemctl.h"
 #include "platform/raster.h"
 
@@ -451,6 +452,95 @@ static void window_below_menu_bar(void)
     assert(unlink(path) == 0 && rmdir(directory) == 0);
 }
 
+/* gemd's overlay hook is weak in AES; count topology notifications here. */
+static int topology_notifications;
+void gemd_overlay_window_top_changed(void)
+{
+    ++topology_notifications;
+}
+
+/* One title with a two-entry drop-down, in menu_bar() source form. */
+static void make_menu(OBJECT *tree)
+{
+    for (WORD i = 0; i < 8; ++i)
+        tree[i] = (OBJECT){NIL, NIL, NIL, G_IBOX, 0, 0, 0, 0, 0, 80, 16};
+    tree[0].ob_head = 1;
+    tree[0].ob_tail = 4;
+    tree[1].ob_next = 4;
+    tree[1].ob_head = tree[1].ob_tail = 2;
+    tree[1].ob_type = G_BOX;
+    tree[2].ob_next = 1;
+    tree[2].ob_head = tree[2].ob_tail = 3;
+    tree[3].ob_next = 2;
+    tree[3].ob_type = G_TITLE;
+    tree[3].ob_spec = (LONG)(intptr_t) " File ";
+    tree[4].ob_next = 0;
+    tree[4].ob_head = tree[4].ob_tail = 5;
+    tree[5].ob_next = 4;
+    tree[5].ob_head = 6;
+    tree[5].ob_tail = 7;
+    tree[5].ob_type = G_BOX;
+    tree[5].ob_height = 32;
+    for (WORD i = 6; i < 8; ++i) {
+        tree[i].ob_type = G_STRING;
+        tree[i].ob_spec = (LONG)(intptr_t) " Entry ";
+        tree[i].ob_y = (WORD)((i - 6) * 16);
+        tree[i].ob_next = i + 1 < 8 ? i + 1 : 5;
+    }
+    tree[7].ob_flags = LASTOB;
+}
+
+/* An open drop-down is reported as overlay cover until it closes, so
+ * presenter colour layers never composite over menu pixels. */
+static void menu_drop_down_covers_overlays(void)
+{
+    char directory[] = "/tmp/gem-menu-cover.XXXXXXXX";
+    char path[128];
+    OBJECT tree[8];
+    GRECT covers[AES_MAX_MENU_SAVED_REGIONS + 1];
+    WORD app, popup, before, open, closed, x, y;
+    int found = 0, notified;
+
+    assert(mkdtemp(directory));
+    snprintf(path, sizeof(path), "%s/framebuffer", directory);
+    assert(setenv("GEM_RASTA_FRAMEBUFFER", path, 1) == 0);
+    app = appl_init();
+    assert(app > 0);
+    assert(graf_handle(NULL, NULL, NULL, NULL) > 0);
+    make_menu(tree);
+    assert(menu_bar(tree, 1) == 1);
+    popup = aes_menu_popup_for_title(tree, 3);
+    assert(popup != NIL);
+    before = aes_menu_cover_rects(covers, AES_MAX_MENU_SAVED_REGIONS + 1);
+
+    notified = topology_notifications;
+    tree[popup].ob_flags &= (UWORD)~HIDETREE;
+    aes_menu_redraw_tree(tree);
+    assert(topology_notifications > notified);
+    open = aes_menu_cover_rects(covers, AES_MAX_MENU_SAVED_REGIONS + 1);
+    assert(open == before + 1);
+    assert(objc_offset(tree, popup, &x, &y));
+    for (WORD i = 0; i < open; ++i) {
+        if (aes_point_in_rect(x, y, &covers[i]) &&
+            aes_point_in_rect((WORD)(x + tree[popup].ob_width - 1),
+                              (WORD)(y + tree[popup].ob_height - 1),
+                              &covers[i]))
+            found = 1;
+    }
+    assert(found);
+
+    notified = topology_notifications;
+    aes_menu_hide_popups(tree);
+    aes_menu_redraw_tree(tree);
+    assert(topology_notifications > notified);
+    closed = aes_menu_cover_rects(covers, AES_MAX_MENU_SAVED_REGIONS + 1);
+    assert(closed == before);
+
+    assert(menu_bar(tree, 0) == 1);
+    assert(appl_exit());
+    assert(unlink(path) == 0 && rmdir(directory) == 0);
+}
+
 /* SIZER alone keeps a thin frame and never steals a client-area click. */
 static void compact_window_geometry(void)
 {
@@ -524,6 +614,7 @@ int main(void)
     physical_keyboard_extension();
     background_window_title();
     window_below_menu_bar();
+    menu_drop_down_covers_overlays();
     puts("hostile framebuffer paths, viewer replacement and app-id rollover "
          "passed");
     return 0;

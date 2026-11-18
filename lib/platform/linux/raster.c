@@ -29,7 +29,7 @@ static size_t g_framebuffer_size;
 static int g_framebuffer_fd = -1;
 
 enum { linux_overlay_max = 8, linux_overlay_limit = 8 * 1024 * 1024 };
-enum { linux_overlay_occlusion_max = 18 };
+enum { linux_overlay_occlusion_max = GEM_RASTER_OVERLAY_OCCLUSION_MAX };
 typedef struct linux_overlay {
     uint32_t id;
     int x;

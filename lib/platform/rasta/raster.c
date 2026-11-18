@@ -32,7 +32,7 @@ enum {
     rasta_bytes_per_pixel = rasta_bits_per_pixel / 8,
     rasta_overlay_max = 8,
     rasta_overlay_limit = 8 * 1024 * 1024,
-    rasta_overlay_occlusion_max = 18
+    rasta_overlay_occlusion_max = GEM_RASTER_OVERLAY_OCCLUSION_MAX
 };
 
 typedef struct rasta_overlay {

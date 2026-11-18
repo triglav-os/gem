@@ -32,7 +32,9 @@ void gemd_overlay_window_top_changed(void)
     for (size_t i = 0; i < gemd_overlay_max; ++i) {
         gemd_overlay_t *overlay = &g_overlays[i];
         aes_window_t *target;
-        int occlusion[18][4];
+        int occlusion[GEM_RASTER_OVERLAY_OCCLUSION_MAX][4];
+        GRECT menus[AES_MAX_MENU_SAVED_REGIONS + 1];
+        WORD menu_count;
         unsigned count = 0;
 
         if (overlay->id == 0u || overlay->window == 0)
@@ -92,13 +94,24 @@ void gemd_overlay_window_top_changed(void)
                                  aes_state.modal_form_z > target->z_order
                                      ? &aes_state.modal_form_rect
                                      : NULL};
-        for (int m = 0; m < 2 && count < 18; ++m) {
+        for (int m = 0; m < 2 && count < GEM_RASTER_OVERLAY_OCCLUSION_MAX; ++m) {
             if (modal[m] && modal[m]->g_w > 0 && modal[m]->g_h > 0) {
                 occlusion[count][0] = modal[m]->g_x;
                 occlusion[count][1] = modal[m]->g_y;
                 occlusion[count][2] = modal[m]->g_w;
                 occlusion[count++][3] = modal[m]->g_h;
             }
+        }
+        /* Menus draw into the framebuffer below every overlay; an open
+         * drop-down must cut through a window's colour layer. */
+        menu_count = aes_menu_cover_rects(
+            menus, (WORD)(sizeof(menus) / sizeof(menus[0])));
+        for (WORD m = 0;
+             m < menu_count && count < GEM_RASTER_OVERLAY_OCCLUSION_MAX; ++m) {
+            occlusion[count][0] = menus[m].g_x;
+            occlusion[count][1] = menus[m].g_y;
+            occlusion[count][2] = menus[m].g_w;
+            occlusion[count++][3] = menus[m].g_h;
         }
         gem_raster_overlay_set_visible(overlay->id, 1);
         gem_raster_overlay_set_occlusion(overlay->id, &occlusion[0][0], count);
